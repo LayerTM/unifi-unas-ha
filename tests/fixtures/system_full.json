@@ -3,11 +3,10 @@
   "name": "Name-Example",
   "deviceState": "setup",
   "hardware": { "shortname": "UNAS2B", "firmwareVersion": "5.1.19" },
-  "firmwareVersion": "5.1.19",
   "uptime": 3460.47,
   "firmware": {
     "releaseChannel": "release",
-    "latest": { "channel": "release", "version": "5.2.0" }
+    "latest": { "channel": "release", "version": "v5.2.0+abc1234" }
   },
   "apps": {
     "controllers": [

@@ -5,9 +5,26 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from aiounas.models import DeviceInfo, NetworkIO, Share, Storage, SystemIdentity
+from aiounas.models import DeviceInfo, NetworkIO, Share, Storage, SystemIdentity, UpdateInfo
 
 Fx = Callable[[str], dict[str, Any]]
+
+
+def test_update_info_normalizes_versions_no_false_update() -> None:
+    # Same marketing version, different format (real hardware) -> NOT an update.
+    info = UpdateInfo.from_api(
+        {
+            "hardware": {"firmwareVersion": "5.1.19"},
+            "firmware": {"latest": {"version": "v5.1.19+3fbc1da"}},
+            "apps": {
+                "controllers": [{"name": "drive", "version": "4.3.6", "updateAvailable": None}]
+            },
+        }
+    )
+    assert info.unifi_os_installed == "5.1.19"
+    assert info.unifi_os_latest == "5.1.19"  # normalized -> equal -> no update
+    assert info.drive_installed == "4.3.6"
+    assert info.drive_latest is None
 
 
 def test_storage_parses_pools_and_disks(fixture: Fx) -> None:

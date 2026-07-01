@@ -65,6 +65,18 @@ def _dt(value: Any) -> datetime | None:
         return None
 
 
+def _norm_version(value: Any) -> str:
+    """Normalize a firmware version to a comparable marketing version.
+
+    Strips a leading ``v`` and any ``+build`` suffix so ``5.1.19`` and
+    ``v5.1.19+3fbc1da`` compare equal (avoiding a false "update available").
+    """
+    v = value.strip() if isinstance(value, str) else ""
+    if v[:1] == "v" and v[1:2].isdigit():
+        v = v[1:]
+    return v.split("+", 1)[0]
+
+
 @dataclass(frozen=True, slots=True)
 class Disk:
     """A physical drive with SMART-derived health fields."""
@@ -422,17 +434,21 @@ class UpdateInfo:
     def from_api(cls, d: dict[str, Any]) -> UpdateInfo:
         fw = d.get("firmware") or {}
         latest = fw.get("latest") or {}
+        hw = d.get("hardware") or {}
         controllers = (d.get("apps") or {}).get("controllers") or []
         drive = next(
             (c for c in controllers if isinstance(c, dict) and c.get("name") == "drive"),
             {},
         )
         avail = drive.get("updateAvailable")
+        # Installed UniFi OS is under hardware.firmwareVersion (top-level
+        # firmwareVersion is empty on real hardware). Normalize both sides so
+        # "5.1.19" and "v5.1.19+3fbc1da" don't read as an available update.
         return cls(
-            unifi_os_installed=_s(d.get("firmwareVersion")),
-            unifi_os_latest=_s(latest.get("version")) or None,
+            unifi_os_installed=_norm_version(hw.get("firmwareVersion") or d.get("firmwareVersion")),
+            unifi_os_latest=_norm_version(latest.get("version")) or None,
             drive_installed=_s(drive.get("version")),
-            drive_latest=(_s(avail) or None) if isinstance(avail, str) else None,
+            drive_latest=(_norm_version(avail) or None) if isinstance(avail, str) else None,
         )
 
 
