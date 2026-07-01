@@ -17,9 +17,11 @@ async def test_probe_api_key_denies_shares(session, unas_server) -> None:
     assert caps.device_info is True
     assert caps.network_io is True
     assert caps.shares is False
+    assert caps.users is False
 
 
 async def test_probe_session_allows_shares(session, unas_server) -> None:
     caps = await probe(_client(session, unas_server, SessionAuth("user", "pass")))
     assert caps.storage is True
     assert caps.shares is True
+    assert caps.users is True

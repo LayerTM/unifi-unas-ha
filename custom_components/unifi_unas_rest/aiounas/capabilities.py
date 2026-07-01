@@ -17,6 +17,7 @@ class Capabilities:
     device_info: bool
     network_io: bool
     shares: bool
+    users: bool
 
 
 async def _reachable(call: Callable[[], Awaitable[object]]) -> bool:
@@ -38,4 +39,5 @@ async def probe(client: UnasClient) -> Capabilities:
         device_info=await _reachable(client.get_device_info),
         network_io=await _reachable(client.get_network_io),
         shares=await _reachable(client.get_shares),
+        users=await _reachable(client.get_user_count),
     )

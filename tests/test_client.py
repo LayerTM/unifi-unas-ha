@@ -57,6 +57,17 @@ async def test_get_shares_api_key_denied(session, unas_server) -> None:
         await client.get_shares()
 
 
+async def test_get_user_count_with_session_auth(session, unas_server) -> None:
+    client = _client(session, unas_server, SessionAuth("user", "pass"))
+    assert await client.get_user_count() == 6  # from the fake console's `total`
+
+
+async def test_get_user_count_api_key_denied(session, unas_server) -> None:
+    client = _client(session, unas_server, ApiKeyAuth(unas_server.api_key))
+    with pytest.raises(UnasCapabilityError, match="session"):
+        await client.get_user_count()
+
+
 async def test_base_url_and_prepare(session, unas_server) -> None:
     client = _client(session, unas_server, ApiKeyAuth(unas_server.api_key))
     assert client.base_url == f"http://{unas_server.host}:{unas_server.port}"

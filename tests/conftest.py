@@ -85,7 +85,8 @@ async def _users(request: web.Request) -> web.Response:
         return web.json_response({"error": {"code": 401}}, status=401)
     if mode == "apikey":
         return web.json_response({"error": {"code": 403, "message": "Forbidden"}}, status=403)
-    return web.json_response({"data": []})
+    # session: the count comes from `total`; the account list (PII) is left empty here.
+    return web.json_response({"data": [], "total": 6})
 
 
 def _write() -> Callable[[web.Request], Any]:

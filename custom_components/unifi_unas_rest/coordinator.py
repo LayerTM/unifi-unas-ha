@@ -36,6 +36,7 @@ class UnasData:
     device_info: DeviceInfo
     network_io: NetworkIO
     shares: list[Share] | None
+    user_count: int | None
 
 
 class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
@@ -67,6 +68,7 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
                 self.client.get_network_io(),
             )
             shares = await self.client.get_shares() if self.capabilities.shares else None
+            user_count = await self.client.get_user_count() if self.capabilities.users else None
         except UnasAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except (UnasConnectionError, UnasApiError) as err:
@@ -75,5 +77,6 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
             storage=storage,
             device_info=device_info,
             network_io=network_io,
+            user_count=user_count,
             shares=shares,
         )

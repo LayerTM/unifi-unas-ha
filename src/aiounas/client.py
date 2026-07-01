@@ -14,12 +14,14 @@ from .const import (
     PATH_SHARES,
     PATH_STORAGE,
     PATH_SYSTEM,
+    PATH_USERS,
 )
 from .exceptions import UnasApiError, UnasCapabilityError
 from .models import DeviceInfo, NetworkIO, Share, Storage, SystemIdentity
 from .transport import UnasTransport
 
 _SHARES_HINT = "shares require session (username/password) auth"
+_USERS_HINT = "the user count requires session (username/password) auth"
 
 
 class UnasClient:
@@ -85,6 +87,29 @@ class UnasClient:
             raise
         drives = data.get("drives") if isinstance(data, dict) else None
         return [Share.from_api(item) for item in (drives or []) if isinstance(item, dict)]
+
+    async def get_user_count(self) -> int:
+        """Return the number of local accounts, retaining no account data.
+
+        Only the total is read; the user list (which is PII — names, emails) is
+        never returned or stored. Session auth only; an API key is denied
+        (403, or 500 on some firmware), surfaced as :class:`UnasCapabilityError`.
+        """
+        try:
+            data = await self._transport.get_json(PATH_USERS)
+        except UnasCapabilityError as err:
+            raise UnasCapabilityError(_USERS_HINT) from err
+        except UnasApiError as err:
+            if err.status == 500:
+                raise UnasCapabilityError(_USERS_HINT) from err
+            raise
+        if isinstance(data, dict):
+            total = data.get("total")
+            if isinstance(total, int):
+                return total
+            rows = data.get("data")
+            return len(rows) if isinstance(rows, list) else 0
+        return len(data) if isinstance(data, list) else 0
 
     async def close(self) -> None:
         """Release client resources.

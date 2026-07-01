@@ -198,6 +198,15 @@ SENSORS: tuple[UnasSensorDescription, ...] = (
     ),
 )
 
+# Session-only: the number of local accounts (count only — no account PII is read).
+USER_COUNT = UnasSensorDescription(
+    key="user_count",
+    translation_key="user_count",
+    state_class=SensorStateClass.MEASUREMENT,
+    entity_category=EntityCategory.DIAGNOSTIC,
+    value_fn=lambda d: d.user_count,
+)
+
 DISK_SENSORS: tuple[UnasDiskSensorDescription, ...] = (
     UnasDiskSensorDescription(
         key="temperature",
@@ -314,6 +323,8 @@ async def async_setup_entry(
     """Set up UNAS sensors from a config entry."""
     coordinator = entry.runtime_data.coordinator
     entities: list[SensorEntity] = [UnasSensor(coordinator, description) for description in SENSORS]
+    if coordinator.capabilities.users:
+        entities.append(UnasSensor(coordinator, USER_COUNT))
     for disk in coordinator.data.storage.disks:
         entities.extend(
             UnasDiskSensor(coordinator, disk.slot, description) for description in DISK_SENSORS

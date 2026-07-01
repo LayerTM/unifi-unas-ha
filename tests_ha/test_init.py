@@ -97,6 +97,16 @@ async def test_link_speed_and_last_boot(
     assert state("last_boot").startswith("2026-06-18")  # from fixture startupTime
 
 
+async def test_user_count_sensor(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    await _setup(hass, config_entry)
+    registry = er.async_get(hass)
+    eid = registry.async_get_entity_id("sensor", DOMAIN, "AABBCC000001_user_count")
+    assert eid
+    assert hass.states.get(eid).state == "6"
+
+
 async def test_unload(
     hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
 ) -> None:

@@ -21,6 +21,7 @@ PATH_DEVICE_INFO: Final = "/proxy/drive/api/v2/systems/device-info"
 PATH_NETWORK_IO: Final = "/proxy/drive/api/v2/systems/network-io"
 PATH_FAN_CONTROL: Final = "/proxy/drive/api/v2/systems/fan-control"
 PATH_SHARES: Final = "/proxy/drive/api/v2/drives"  # session-only
+PATH_USERS: Final = "/proxy/drive/api/v1/users"  # session-only; count only (list is PII)
 
 # Write / action endpoints (v2). Power and update paths are well-established;
 # the fan-control payload shape is UNVERIFIED against live hardware.

@@ -55,12 +55,13 @@ def unas_client() -> AsyncMock:
     client.get_shares = AsyncMock(
         return_value=[Share.from_api(x) for x in _load("drives")["drives"]]
     )
+    client.get_user_count = AsyncMock(return_value=6)
     return client
 
 
 @pytest.fixture
 def mock_aiounas(unas_client: AsyncMock) -> Iterator[AsyncMock]:
-    caps = Capabilities(storage=True, device_info=True, network_io=True, shares=True)
+    caps = Capabilities(storage=True, device_info=True, network_io=True, shares=True, users=True)
     action = AsyncMock()
     unas_client.action_mock = action  # exposed for control tests
     with (

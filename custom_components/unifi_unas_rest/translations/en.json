@@ -89,6 +89,7 @@
       "drive_version": { "name": "Drive app version" },
       "last_boot": { "name": "Last boot" },
       "link_speed": { "name": "Link speed" },
+      "user_count": { "name": "Accounts" },
       "disk_temperature": { "name": "Temperature" },
       "disk_power_on_hours": { "name": "Power-on hours" },
       "disk_state": { "name": "State" },
