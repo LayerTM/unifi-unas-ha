@@ -66,7 +66,7 @@ Requires **Home Assistant 2026.6+** (Python 3.14). Config is via the UI (host, p
 
 **Creating a least-privilege credential** is recommended — an API key, or a dedicated limited local admin — rather than your owner account.
 
-> The `aiounas` client is **bundled inside the integration** — there are no external dependencies (Home Assistant already ships `aiohttp`/`yarl`), so HACS installs everything. `src/aiounas/` is the development source of the client; `scripts/vendor_aiounas.py` syncs the bundled copy and CI fails if they drift. See [`docs/API.md`](docs/API.md) for the API and [`docs/design/`](docs/design) / [`docs/plans/`](docs/plans) for the design.
+> The `aiounas` client is **bundled inside the integration** — there are no external dependencies (Home Assistant already ships `aiohttp`/`yarl`), so HACS installs everything. `src/aiounas/` is the development source of the client; `scripts/vendor_aiounas.py` syncs the bundled copy and CI fails if they drift. See [`docs/API.md`](docs/API.md) for the reverse-engineered API reference.
 
 ## License
 
