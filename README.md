@@ -1,7 +1,7 @@
-# UniFi UNAS → Home Assistant (non-invasive)
+# UniFi UNAS for Home Assistant (non-invasive)
 
-> **Agentless, read-only monitoring for Ubiquiti UniFi UNAS in Home Assistant.**
-> Talks to the UniFi OS console **only over HTTPS** — no SSH, no packages installed on the NAS, no on-device agent, **zero footprint**.
+> Agentless, read-only monitoring for the Ubiquiti UniFi UNAS in Home Assistant.
+> Talks to the UniFi OS console over HTTPS only — no SSH, no packages installed on the NAS, no on-device agent.
 
 [![tests](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/tests.yml/badge.svg)](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/tests.yml)
 [![ha-integration](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/ha-integration.yml/badge.svg)](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/ha-integration.yml)
@@ -11,62 +11,62 @@
 
 ---
 
-## Why this exists
+## Why this integration
+
+It reads disk health, temperatures, RAID/pool status, capacity, CPU, memory, and throughput — the same data SSH-based tools expose — but entirely through the console's local REST API, so the NAS is left untouched.
 
 | | This project | `cardouken/homeassistant-unifi-unas` | `memphi2/ha-unifi-drive` |
 |---|:--:|:--:|:--:|
-| No SSH / no packages installed on NAS | ✅ | ❌ (root SSH + `apt`/`pip` + on-NAS agent) | ✅ |
-| Read-only by default | ✅ (v1) | ❌ | partial |
-| **API-key auth** (no password stored) | ✅ | ❌ | plumbed, unverified |
-| **Verified** disk SMART / CPU / memory model | ✅ (from real capture) | via SSH | heuristic guessing |
-| First-class reverse-engineered **API docs** | ✅ (`docs/API.md`) | ❌ | ❌ |
-
-We read the same rich data as SSH-based tools — disk health, temperatures, RAID/pool status, capacity, CPU, memory, throughput — but **entirely through the console's local REST API**, leaving the NAS untouched.
+| No SSH or packages on the NAS | ✅ | ❌ | ✅ |
+| Read-only by default | ✅ | ❌ | partial |
+| API-key auth (no password stored) | ✅ | ❌ | partial |
+| Disk SMART / CPU / memory sensors | ✅ | via SSH | partial |
 
 ## How it works
 
-The UniFi UNAS runs UniFi OS. Its "Drive" application exposes a local REST API behind the console reverse proxy (`https://<host>/proxy/drive/api/...`). This integration authenticates locally — with either a **UniFi OS API key** or a **local account** — and polls that API. See [`docs/API.md`](docs/API.md) for the full, reverse-engineered reference.
+The UniFi UNAS runs UniFi OS, whose Drive application exposes a local REST API behind the console reverse proxy (`https://<host>/proxy/drive/api/...`). The integration authenticates locally and polls that API. See [`docs/API.md`](docs/API.md) for the exact endpoints.
 
-**Two authentication methods (your choice):**
-- **API key** *(recommended for read-only)* — created in the UniFi OS UI. Authorizes core NAS + disk-health + system telemetry, and **cannot** read user/share PII (a security feature).
-- **Local account (username + password)** — adds shares, snapshots and backup visibility.
+Two authentication methods are supported; pick one during setup:
+
+- **API key** (recommended) — created in the UniFi OS UI. Authorizes core NAS, disk-health, and system telemetry, and cannot read user or share PII.
+- **Local account** (username + password) — everything the API key can read, plus shares, snapshots, and backup visibility.
 
 ## Entities
 
-Grouped as one **hub device** (the UNAS) with a **sub-device per disk**:
+Everything is grouped under one hub device (the UNAS), with a sub-device per disk.
 
-- **Storage:** used / total / free, usage %, RAID level, storage status, pool count.
-- **System:** CPU usage %, CPU temperature, memory usage %, network receive/transmit, UniFi OS & Drive app versions.
-- **Health:** disks-at-risk count, average disk temperature; a `storage problem` binary sensor and a connectivity (`online`) binary sensor.
-- **Per disk:** temperature, power-on hours, health score, bad sectors, state, and a per-disk `problem` binary sensor.
-- **Shares** *(local-account auth only)* are visible to the coordinator and used for health.
+- **Storage** — used / total / free, usage %, RAID level, storage status, pool count.
+- **System** — CPU usage %, CPU temperature, memory usage %, network receive/transmit, UniFi OS and Drive app versions.
+- **Health** — disks-at-risk count, average disk temperature, a `storage problem` binary sensor, and a connectivity (`online`) binary sensor.
+- **Per disk** — temperature, power-on hours, health score, bad sectors, state, and a per-disk `problem` binary sensor.
 
-Requires **Home Assistant 2026.6+** (Python 3.14). Config is via the UI (host, port, TLS, and your chosen auth method); re-authentication is supported.
+With local-account auth, shares are also read and factored into health (they are not exposed as their own entities).
 
-## Status & roadmap
-
-- **v1 (current):** read-only monitoring — implemented and tested against real hardware.
-- **v2 (planned):** opt-in control (power, fan mode, snapshots, firmware) **and** a CLI + MCP server so tools/LLMs can query and act — behind a unified safety model.
-
-## Security & privacy
-
-- **Read-only** in v1; least-privilege (works with a restricted account or scoped API key).
-- Credentials live only in the Home Assistant config entry; nothing is sent to third parties.
-- The repository is guarded by an automated **secret/PII scanner** (`scripts/secret_scan.py`) in pre-commit and CI, and diagnostics are redacted.
+Requires **Home Assistant 2026.6+** (Python 3.14). Configuration is through the UI (host, port, TLS, and auth method); re-authentication is supported.
 
 ## Installation
 
-**Via HACS (custom repository):**
+Via HACS (custom repository):
 
-1. HACS → ⋮ → *Custom repositories* → add `https://github.com/LayerTM/unifi-unas-ha` (category: *Integration*).
+1. HACS → ⋮ → **Custom repositories** → add `https://github.com/LayerTM/unifi-unas-ha` (category: **Integration**).
 2. Install **UniFi UNAS (non-invasive)**, then restart Home Assistant.
-3. *Settings → Devices & Services → Add Integration → UniFi UNAS* and follow the flow:
-   - **Host / Port** of the UNAS console, and whether to verify TLS (off by default — UniFi OS uses a self-signed cert).
-   - **Authentication:** an **API key** (create one in the UniFi OS UI — recommended, read-only) or a **local account**.
+3. **Settings → Devices & Services → Add Integration → UniFi UNAS**, then complete the flow:
+   - **Host / Port** of the UNAS console, and whether to verify TLS (off by default — UniFi OS ships a self-signed certificate).
+   - **Authentication** — an API key (recommended, read-only) or a local account.
 
-**Creating a least-privilege credential** is recommended — an API key, or a dedicated limited local admin — rather than your owner account.
+Use a least-privilege credential — an API key or a dedicated limited local admin — rather than your owner account.
 
-> The `aiounas` client is **bundled inside the integration** — there are no external dependencies (Home Assistant already ships `aiohttp`/`yarl`), so HACS installs everything. `src/aiounas/` is the development source of the client; `scripts/vendor_aiounas.py` syncs the bundled copy and CI fails if they drift. See [`docs/API.md`](docs/API.md) for the reverse-engineered API reference.
+The `aiounas` client is bundled inside the integration and has no external dependencies (Home Assistant already ships `aiohttp` and `yarl`), so HACS installs everything. See [`docs/API.md`](docs/API.md) for the API reference.
+
+## Security & privacy
+
+- Read-only in v1; works with a restricted account or a scoped API key.
+- Credentials live only in the Home Assistant config entry; nothing is sent to third parties.
+- A secret/PII scanner (`scripts/secret_scan.py`) runs in pre-commit and CI, and diagnostics are redacted.
+
+## Roadmap
+
+**v2 (planned):** opt-in control (power, fan mode, snapshots, firmware) plus a CLI and MCP server, behind a unified safety model.
 
 ## License
 
