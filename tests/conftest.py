@@ -122,6 +122,7 @@ def make_app(*, api_key: str = FAKE_API_KEY) -> web.Application:
     app.router.add_get("/proxy/drive/api/v2/storage", _data("storage"))
     app.router.add_get("/proxy/drive/api/v2/systems/device-info", _data("device_info"))
     app.router.add_get("/proxy/drive/api/v2/systems/network-io", _data("network_io"))
+    app.router.add_get("/proxy/drive/api/v2/systems/fan-control", _data("fan_control"))
     app.router.add_get("/proxy/drive/api/v2/drives", _data("drives", apikey_status=500))
     app.router.add_get("/proxy/drive/api/v1/users", _users)
     # write / action endpoints

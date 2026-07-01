@@ -434,3 +434,18 @@ class UpdateInfo:
             drive_installed=_s(drive.get("version")),
             drive_latest=(_s(avail) or None) if isinstance(avail, str) else None,
         )
+
+
+@dataclass(frozen=True, slots=True)
+class FanControl:
+    """Fan profile state from the Drive fan-control endpoint."""
+
+    current_profile: str
+    available_profiles: tuple[str, ...]
+
+    @classmethod
+    def from_api(cls, d: dict[str, Any]) -> FanControl:
+        return cls(
+            current_profile=_s(d.get("currentProfile")),
+            available_profiles=tuple(str(p) for p in (d.get("availableProfiles") or [])),
+        )

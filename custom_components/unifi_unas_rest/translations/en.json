@@ -124,6 +124,16 @@
     "update": {
       "unifi_os_update": { "name": "UniFi OS" },
       "drive_update": { "name": "Drive app" }
+    },
+    "select": {
+      "fan_profile": {
+        "name": "Fan profile",
+        "state": {
+          "cooling": "Cooling",
+          "default": "Default",
+          "quiet": "Quiet"
+        }
+      }
     }
   }
 }

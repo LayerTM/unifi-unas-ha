@@ -17,6 +17,7 @@ import pytest
 from custom_components.unifi_unas_rest.aiounas import (
     Capabilities,
     DeviceInfo,
+    FanControl,
     NetworkIO,
     Share,
     Storage,
@@ -58,6 +59,7 @@ def unas_client() -> AsyncMock:
     )
     client.get_user_count = AsyncMock(return_value=6)
     client.get_update_info = AsyncMock(return_value=UpdateInfo.from_api(_load("system_full")))
+    client.get_fan_control = AsyncMock(return_value=FanControl.from_api(_load("fan_control")))
     return client
 
 

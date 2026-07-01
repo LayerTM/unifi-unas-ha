@@ -38,6 +38,9 @@
       "shutdown": { "default": "mdi:power" },
       "update_firmware": { "default": "mdi:package-up" },
       "update_drive_app": { "default": "mdi:update" }
+    },
+    "select": {
+      "fan_profile": { "default": "mdi:fan" }
     }
   }
 }

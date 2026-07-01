@@ -11,6 +11,7 @@ DOMAIN: Final = "unifi_unas_rest"
 PLATFORMS: Final = [
     Platform.BINARY_SENSOR,
     Platform.BUTTON,
+    Platform.SELECT,
     Platform.SENSOR,
     Platform.UPDATE,
 ]

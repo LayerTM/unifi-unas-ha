@@ -16,6 +16,7 @@ from .exceptions import (
 from .models import (
     DeviceInfo,
     Disk,
+    FanControl,
     NetworkIO,
     Pool,
     RaidGroup,
@@ -32,6 +33,7 @@ __all__ = [
     "Capabilities",
     "DeviceInfo",
     "Disk",
+    "FanControl",
     "NetworkIO",
     "Pool",
     "RaidGroup",

@@ -126,6 +126,29 @@ async def test_options_flow_rejects_controls_with_api_key(
     assert entry.options.get(CONF_ENABLE_CONTROLS) is not True
 
 
+async def test_fan_select_present_and_sets_profile(
+    hass: HomeAssistant, mock_aiounas: AsyncMock
+) -> None:
+    await _setup(hass, _entry(controls=True, session=True))
+    registry = er.async_get(hass)
+    eid = registry.async_get_entity_id("select", DOMAIN, "AABBCC000001_fan_profile")
+    assert eid
+    st = hass.states.get(eid)
+    assert st.state == "default"
+    assert set(st.attributes["options"]) == {"cooling", "default", "quiet"}
+
+    await hass.services.async_call(
+        "select", "select_option", {ATTR_ENTITY_ID: eid, "option": "quiet"}, blocking=True
+    )
+    mock_aiounas.action_mock.set_fan_profile.assert_awaited_once_with("quiet")
+
+
+async def test_no_fan_select_without_controls(hass: HomeAssistant, mock_aiounas: AsyncMock) -> None:
+    await _setup(hass, _entry(controls=False, session=True))
+    registry = er.async_get(hass)
+    assert registry.async_get_entity_id("select", DOMAIN, "AABBCC000001_fan_profile") is None
+
+
 async def test_options_flow_toggles_controls(hass: HomeAssistant, mock_aiounas: AsyncMock) -> None:
     entry = _entry(controls=False, session=True)
     await _setup(hass, entry)

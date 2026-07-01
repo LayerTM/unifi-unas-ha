@@ -85,6 +85,13 @@ async def test_get_update_info_api_key_short_payload_has_no_latest(session, unas
     assert info.has_data is False
 
 
+async def test_get_fan_control(session, unas_server) -> None:
+    client = _client(session, unas_server, ApiKeyAuth(unas_server.api_key))
+    fan = await client.get_fan_control()  # readable with either auth
+    assert fan.current_profile == "default"
+    assert fan.available_profiles == ("cooling", "default", "quiet")
+
+
 async def test_base_url_and_prepare(session, unas_server) -> None:
     client = _client(session, unas_server, ApiKeyAuth(unas_server.api_key))
     assert client.base_url == f"http://{unas_server.host}:{unas_server.port}"

@@ -10,6 +10,7 @@ from .const import (
     DEFAULT_TIMEOUT,
     DEFAULT_VERIFY_SSL,
     PATH_DEVICE_INFO,
+    PATH_FAN_CONTROL,
     PATH_NETWORK_IO,
     PATH_SHARES,
     PATH_STORAGE,
@@ -17,7 +18,7 @@ from .const import (
     PATH_USERS,
 )
 from .exceptions import UnasApiError, UnasCapabilityError
-from .models import DeviceInfo, NetworkIO, Share, Storage, SystemIdentity, UpdateInfo
+from .models import DeviceInfo, FanControl, NetworkIO, Share, Storage, SystemIdentity, UpdateInfo
 from .transport import UnasTransport
 
 _SHARES_HINT = "shares require session (username/password) auth"
@@ -67,6 +68,10 @@ class UnasClient:
 
     async def get_network_io(self) -> NetworkIO:
         return NetworkIO.from_api(await self._transport.get_json(PATH_NETWORK_IO))
+
+    async def get_fan_control(self) -> FanControl:
+        """Return the fan profile and available profiles (readable with either auth)."""
+        return FanControl.from_api(await self._transport.get_json(PATH_FAN_CONTROL))
 
     async def get_identity(self) -> SystemIdentity:
         return SystemIdentity.from_api(await self._transport.get_json(PATH_SYSTEM))

@@ -15,11 +15,13 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from .aiounas import (
     Capabilities,
     DeviceInfo,
+    FanControl,
     NetworkIO,
     Share,
     Storage,
     UnasApiError,
     UnasAuthError,
+    UnasCapabilityError,
     UnasClient,
     UnasConnectionError,
     UpdateInfo,
@@ -39,6 +41,7 @@ class UnasData:
     shares: list[Share] | None
     user_count: int | None
     update_info: UpdateInfo | None
+    fan_control: FanControl | None
 
 
 class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
@@ -72,6 +75,10 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
             shares = await self.client.get_shares() if self.capabilities.shares else None
             user_count = await self.client.get_user_count() if self.capabilities.users else None
             update_info = await self.client.get_update_info() if self.capabilities.updates else None
+            try:
+                fan_control = await self.client.get_fan_control()
+            except (UnasCapabilityError, UnasApiError):
+                fan_control = None  # firmware without fan-control
         except UnasAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except (UnasConnectionError, UnasApiError) as err:
@@ -83,4 +90,5 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
             user_count=user_count,
             shares=shares,
             update_info=update_info,
+            fan_control=fan_control,
         )
