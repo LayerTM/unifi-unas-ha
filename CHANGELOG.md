@@ -10,7 +10,7 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 - Write/action layer (`UnasActionClient`): reboot, shutdown, UniFi OS firmware
   update, Drive-app update, set fan profile — separate from the read-only client.
-  The fan payload is not yet verified against hardware.
+  Fan write payload verified against hardware (`PUT {"profile": …}`).
 - Opt-in Home Assistant control buttons (reboot / shutdown / updates) behind an
   `enable_controls` option, default off; v1 stays read-only.
 - `unifi-unas` CLI and `unifi-unas-mcp` MCP server over the shared client, behind

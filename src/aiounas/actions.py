@@ -5,8 +5,10 @@ operations — it is intentionally separate from the read-only :class:`UnasClien
 so read paths (including a read-only MCP mode) keep their no-write guarantee.
 
 Power and firmware/app-update endpoints are well-established. ``set_fan_profile``
-uses an **UNVERIFIED** payload shape; the fan-control endpoint is undocumented and
-must be confirmed against live hardware before it is relied upon.
+targets the undocumented Drive fan-control endpoint; its payload was confirmed
+against live hardware — ``PUT`` expects ``{"profile": <name>}`` (note the GET
+response reports the value under ``currentProfile`` instead). Known profiles:
+``cooling``, ``default``, ``quiet``.
 """
 
 from __future__ import annotations
@@ -75,5 +77,5 @@ class UnasActionClient:
         await self._transport.send("POST", PATH_DRIVE_UPDATE)
 
     async def set_fan_profile(self, profile: str) -> None:
-        """Set the fan profile (UNVERIFIED payload — confirm on live hardware)."""
-        await self._transport.send("PUT", PATH_FAN_CONTROL, json_body={"currentProfile": profile})
+        """Set the fan profile. Known values: 'cooling', 'default', 'quiet'."""
+        await self._transport.send("PUT", PATH_FAN_CONTROL, json_body={"profile": profile})

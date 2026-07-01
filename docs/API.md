@@ -97,8 +97,12 @@ The client reads these five endpoints:
 | GET | `/proxy/drive/api/v2/systems/network-io` | Instantaneous throughput |
 | GET | `/proxy/drive/api/v2/drives` | Shared drives — **session only** |
 
-`GET /proxy/drive/api/v2/systems/fan-control` is a known Drive path that returns
-the active fan **profile** (no RPM); it is not consumed by this client.
+`GET /proxy/drive/api/v2/systems/fan-control` returns the active fan **profile**
+(no RPM): `{"availableProfiles": ["cooling", "default", "quiet"], "currentProfile": "<name>"}`.
+Set it with `PUT` and the body `{"profile": "<name>"}` — the write field is
+`profile`, **not** the `currentProfile` seen in the GET response (verified against
+hardware). Reading accepts an API key; **writing requires session auth** (an API
+key returns `500`).
 
 ### `GET /api/system`
 

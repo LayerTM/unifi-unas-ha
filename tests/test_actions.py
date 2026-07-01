@@ -39,7 +39,7 @@ async def test_set_fan_profile_sends_payload(session, unas_server) -> None:
     call = unas_server.writes[-1]
     assert call["method"] == "PUT"
     assert call["path"] == "/proxy/drive/api/v2/systems/fan-control"
-    assert call["json"] == {"currentProfile": "cooling"}
+    assert call["json"] == {"profile": "cooling"}
 
 
 async def test_write_auth_failure_raises(session, unas_server) -> None:
