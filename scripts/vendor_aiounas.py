@@ -26,7 +26,11 @@ def main() -> int:
         return 1
     if DST.exists():
         shutil.rmtree(DST)
-    shutil.copytree(SRC, DST, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    # cli.py / mcp bring in optional deps (typer, mcp) the HA integration must not
+    # require — exclude them from the vendored copy.
+    shutil.copytree(
+        SRC, DST, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "cli.py", "mcp*")
+    )
     print(f"vendored {SRC} -> {DST}")
     return 0
 

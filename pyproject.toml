@@ -41,6 +41,9 @@ Homepage = "https://github.com/LayerTM/unifi-unas-ha"
 Issues = "https://github.com/LayerTM/unifi-unas-ha/issues"
 Documentation = "https://github.com/LayerTM/unifi-unas-ha/blob/main/docs/API.md"
 
+[project.scripts]
+unifi-unas = "aiounas.cli:app"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/aiounas"]
 
