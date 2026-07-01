@@ -88,9 +88,7 @@ async def async_setup_entry(
             UnasDiskBinarySensor(coordinator, disk.slot, d) for d in DISK_BINARY_SENSORS
         )
     for share in coordinator.data.shares or []:
-        entities.extend(
-            UnasShareBinarySensor(coordinator, share, d) for d in SHARE_BINARY_SENSORS
-        )
+        entities.extend(UnasShareBinarySensor(coordinator, share, d) for d in SHARE_BINARY_SENSORS)
     async_add_entities(entities)
 
 

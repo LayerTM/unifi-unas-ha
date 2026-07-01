@@ -22,6 +22,7 @@ from .aiounas import (
     UnasAuthError,
     UnasClient,
     UnasConnectionError,
+    UpdateInfo,
 )
 from .const import DOMAIN
 
@@ -37,6 +38,7 @@ class UnasData:
     network_io: NetworkIO
     shares: list[Share] | None
     user_count: int | None
+    update_info: UpdateInfo | None
 
 
 class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
@@ -69,6 +71,7 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
             )
             shares = await self.client.get_shares() if self.capabilities.shares else None
             user_count = await self.client.get_user_count() if self.capabilities.users else None
+            update_info = await self.client.get_update_info() if self.capabilities.updates else None
         except UnasAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except (UnasConnectionError, UnasApiError) as err:
@@ -79,4 +82,5 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
             network_io=network_io,
             user_count=user_count,
             shares=shares,
+            update_info=update_info,
         )

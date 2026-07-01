@@ -6,7 +6,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 from .client import UnasClient
-from .exceptions import UnasCapabilityError
+from .exceptions import UnasCapabilityError, UnasError
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,6 +18,15 @@ class Capabilities:
     network_io: bool
     shares: bool
     users: bool
+    updates: bool
+
+
+async def _has_update_data(client: UnasClient) -> bool:
+    """True if the full /api/system (session) exposes firmware update info."""
+    try:
+        return (await client.get_update_info()).has_data
+    except UnasError:
+        return False
 
 
 async def _reachable(call: Callable[[], Awaitable[object]]) -> bool:
@@ -40,4 +49,5 @@ async def probe(client: UnasClient) -> Capabilities:
         network_io=await _reachable(client.get_network_io),
         shares=await _reachable(client.get_shares),
         users=await _reachable(client.get_user_count),
+        updates=await _has_update_data(client),
     )

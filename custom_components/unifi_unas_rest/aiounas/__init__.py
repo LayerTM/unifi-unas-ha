@@ -22,6 +22,7 @@ from .models import (
     Share,
     Storage,
     SystemIdentity,
+    UpdateInfo,
 )
 from .transport import UnasTransport
 
@@ -46,6 +47,7 @@ __all__ = [
     "UnasConnectionError",
     "UnasError",
     "UnasTransport",
+    "UpdateInfo",
     "probe",
 ]
 __version__ = "0.1.0"

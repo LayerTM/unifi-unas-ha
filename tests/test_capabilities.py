@@ -18,6 +18,7 @@ async def test_probe_api_key_denies_shares(session, unas_server) -> None:
     assert caps.network_io is True
     assert caps.shares is False
     assert caps.users is False
+    assert caps.updates is False
 
 
 async def test_probe_session_allows_shares(session, unas_server) -> None:
@@ -25,3 +26,4 @@ async def test_probe_session_allows_shares(session, unas_server) -> None:
     assert caps.storage is True
     assert caps.shares is True
     assert caps.users is True
+    assert caps.updates is True

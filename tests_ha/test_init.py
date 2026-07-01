@@ -133,6 +133,20 @@ async def test_per_share_entities(
     assert registry.async_get_entity_id("sensor", DOMAIN, f"AABBCC000001_share{s1}_quota")
 
 
+async def test_update_entities(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    await _setup(hass, config_entry)
+    registry = er.async_get(hass)
+    eid = registry.async_get_entity_id("update", DOMAIN, "AABBCC000001_unifi_os_update")
+    assert eid
+    st = hass.states.get(eid)
+    assert st.attributes["installed_version"] == "5.1.19"
+    assert st.attributes["latest_version"] == "5.2.0"
+    assert st.state == "on"  # update available (installed != latest)
+    assert registry.async_get_entity_id("update", DOMAIN, "AABBCC000001_drive_update")
+
+
 async def test_unload(
     hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
 ) -> None:

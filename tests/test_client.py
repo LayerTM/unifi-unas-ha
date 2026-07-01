@@ -68,6 +68,23 @@ async def test_get_user_count_api_key_denied(session, unas_server) -> None:
         await client.get_user_count()
 
 
+async def test_get_update_info_session(session, unas_server) -> None:
+    client = _client(session, unas_server, SessionAuth("user", "pass"))
+    info = await client.get_update_info()
+    assert info.unifi_os_installed == "5.1.19"
+    assert info.unifi_os_latest == "5.2.0"
+    assert info.drive_installed == "4.3.6"
+    assert info.drive_latest == "4.4.0"
+    assert info.has_data is True
+
+
+async def test_get_update_info_api_key_short_payload_has_no_latest(session, unas_server) -> None:
+    client = _client(session, unas_server, ApiKeyAuth(unas_server.api_key))
+    info = await client.get_update_info()  # short payload: no firmware/apps data
+    assert info.unifi_os_latest is None
+    assert info.has_data is False
+
+
 async def test_base_url_and_prepare(session, unas_server) -> None:
     client = _client(session, unas_server, ApiKeyAuth(unas_server.api_key))
     assert client.base_url == f"http://{unas_server.host}:{unas_server.port}"

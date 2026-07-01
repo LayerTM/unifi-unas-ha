@@ -1,0 +1,22 @@
+{
+  "mac": "AABBCC000001",
+  "name": "Name-Example",
+  "deviceState": "setup",
+  "hardware": { "shortname": "UNAS2B", "firmwareVersion": "5.1.19" },
+  "firmwareVersion": "5.1.19",
+  "uptime": 3460.47,
+  "firmware": {
+    "releaseChannel": "release",
+    "latest": { "channel": "release", "version": "5.2.0" }
+  },
+  "apps": {
+    "controllers": [
+      {
+        "name": "drive",
+        "version": "4.3.6",
+        "updateAvailable": "4.4.0",
+        "releaseChannel": "release"
+      }
+    ]
+  }
+}

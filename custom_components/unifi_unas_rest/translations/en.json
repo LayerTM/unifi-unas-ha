@@ -120,6 +120,10 @@
       "shutdown": { "name": "Shut down" },
       "update_firmware": { "name": "Install UniFi OS update" },
       "update_drive_app": { "name": "Install Drive app update" }
+    },
+    "update": {
+      "unifi_os_update": { "name": "UniFi OS" },
+      "drive_update": { "name": "Drive app" }
     }
   }
 }

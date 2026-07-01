@@ -100,13 +100,25 @@ def _write() -> Callable[[web.Request], Any]:
     return handler
 
 
+def _system() -> Callable[[web.Request], Any]:
+    async def handler(request: web.Request) -> web.Response:
+        mode = _auth_mode(request)
+        if mode is None:
+            return web.json_response({"error": {"code": 401}}, status=401)
+        # A session gets the full payload (firmware/apps); an API key gets the short one.
+        name = "system_full" if mode == "session" else "system_short"
+        return web.json_response(load_fixture(name))
+
+    return handler
+
+
 def make_app(*, api_key: str = FAKE_API_KEY) -> web.Application:
     app = web.Application()
     app[_API_KEY] = api_key
     app[_WRITES] = []
     app.router.add_get("/", _root)
     app.router.add_post("/api/auth/login", _login)
-    app.router.add_get("/api/system", _data("system_short"))
+    app.router.add_get("/api/system", _system())
     app.router.add_get("/proxy/drive/api/v2/storage", _data("storage"))
     app.router.add_get("/proxy/drive/api/v2/systems/device-info", _data("device_info"))
     app.router.add_get("/proxy/drive/api/v2/systems/network-io", _data("network_io"))

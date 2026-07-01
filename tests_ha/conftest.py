@@ -21,6 +21,7 @@ from custom_components.unifi_unas_rest.aiounas import (
     Share,
     Storage,
     SystemIdentity,
+    UpdateInfo,
 )
 from custom_components.unifi_unas_rest.const import AUTH_API_KEY, CONF_AUTH_METHOD, DOMAIN
 from homeassistant.const import (
@@ -56,12 +57,15 @@ def unas_client() -> AsyncMock:
         return_value=[Share.from_api(x) for x in _load("drives")["drives"]]
     )
     client.get_user_count = AsyncMock(return_value=6)
+    client.get_update_info = AsyncMock(return_value=UpdateInfo.from_api(_load("system_full")))
     return client
 
 
 @pytest.fixture
 def mock_aiounas(unas_client: AsyncMock) -> Iterator[AsyncMock]:
-    caps = Capabilities(storage=True, device_info=True, network_io=True, shares=True, users=True)
+    caps = Capabilities(
+        storage=True, device_info=True, network_io=True, shares=True, users=True, updates=True
+    )
     action = AsyncMock()
     unas_client.action_mock = action  # exposed for control tests
     with (

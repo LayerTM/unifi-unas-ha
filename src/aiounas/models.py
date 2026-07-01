@@ -398,3 +398,39 @@ class SystemIdentity:
             model_shortname=_s(hw.get("shortname")),
             device_state=_s(d.get("deviceState")),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class UpdateInfo:
+    """Firmware / app update availability from the full /api/system payload.
+
+    The full payload is returned to session auth; an API key gets a short payload
+    with no firmware/apps data, so the ``*_latest`` fields come back None.
+    """
+
+    unifi_os_installed: str
+    unifi_os_latest: str | None
+    drive_installed: str
+    drive_latest: str | None
+
+    @property
+    def has_data(self) -> bool:
+        """True when the full (session) payload was parsed."""
+        return bool(self.unifi_os_latest or self.drive_installed)
+
+    @classmethod
+    def from_api(cls, d: dict[str, Any]) -> UpdateInfo:
+        fw = d.get("firmware") or {}
+        latest = fw.get("latest") or {}
+        controllers = (d.get("apps") or {}).get("controllers") or []
+        drive = next(
+            (c for c in controllers if isinstance(c, dict) and c.get("name") == "drive"),
+            {},
+        )
+        avail = drive.get("updateAvailable")
+        return cls(
+            unifi_os_installed=_s(d.get("firmwareVersion")),
+            unifi_os_latest=_s(latest.get("version")) or None,
+            drive_installed=_s(drive.get("version")),
+            drive_latest=(_s(avail) or None) if isinstance(avail, str) else None,
+        )

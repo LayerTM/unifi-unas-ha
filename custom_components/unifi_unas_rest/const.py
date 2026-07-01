@@ -8,7 +8,12 @@ from homeassistant.const import Platform
 
 DOMAIN: Final = "unifi_unas_rest"
 
-PLATFORMS: Final = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.SENSOR]
+PLATFORMS: Final = [
+    Platform.BINARY_SENSOR,
+    Platform.BUTTON,
+    Platform.SENSOR,
+    Platform.UPDATE,
+]
 
 # config-entry option keys (host/port/username/password/api_key/verify_ssl reuse HA consts)
 CONF_AUTH_METHOD: Final = "auth_method"

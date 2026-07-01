@@ -17,7 +17,7 @@ from .const import (
     PATH_USERS,
 )
 from .exceptions import UnasApiError, UnasCapabilityError
-from .models import DeviceInfo, NetworkIO, Share, Storage, SystemIdentity
+from .models import DeviceInfo, NetworkIO, Share, Storage, SystemIdentity, UpdateInfo
 from .transport import UnasTransport
 
 _SHARES_HINT = "shares require session (username/password) auth"
@@ -70,6 +70,14 @@ class UnasClient:
 
     async def get_identity(self) -> SystemIdentity:
         return SystemIdentity.from_api(await self._transport.get_json(PATH_SYSTEM))
+
+    async def get_update_info(self) -> UpdateInfo:
+        """Firmware/app update availability from the full /api/system.
+
+        The full payload is returned to session auth; an API key gets a short
+        payload with no firmware/apps data (the latest-version fields are None).
+        """
+        return UpdateInfo.from_api(await self._transport.get_json(PATH_SYSTEM))
 
     async def get_shares(self) -> list[Share]:
         """Return shared drives (session auth only).
