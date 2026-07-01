@@ -1,0 +1,26 @@
+{
+  "entity": {
+    "sensor": {
+      "storage_usage": {
+        "default": "mdi:gauge",
+        "range": {
+          "0": "mdi:gauge-empty",
+          "30": "mdi:gauge-low",
+          "60": "mdi:gauge",
+          "85": "mdi:gauge-full"
+        }
+      },
+      "storage_status": { "default": "mdi:database-check" },
+      "raid_level": { "default": "mdi:layers-triple" },
+      "pool_count": { "default": "mdi:database" },
+      "disks_at_risk": { "default": "mdi:harddisk-remove" },
+      "cpu_usage": { "default": "mdi:cpu-64-bit" },
+      "memory_usage": { "default": "mdi:memory" },
+      "unifi_os_version": { "default": "mdi:package-variant" },
+      "drive_version": { "default": "mdi:package-variant-closed" },
+      "disk_state": { "default": "mdi:harddisk" },
+      "disk_health_score": { "default": "mdi:heart-pulse" },
+      "disk_bad_sectors": { "default": "mdi:alert-circle-outline" }
+    }
+  }
+}

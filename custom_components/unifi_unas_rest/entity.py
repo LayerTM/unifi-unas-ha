@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
-from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.const import CONF_HOST, CONF_PORT
+from homeassistant.helpers.device_registry import (
+    CONNECTION_NETWORK_MAC,
+    DeviceInfo,
+    format_mac,
+)
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .aiounas import Disk
-from .const import DOMAIN, MANUFACTURER
+from .const import DEFAULT_PORT, DOMAIN, MANUFACTURER
 from .coordinator import UnasDataUpdateCoordinator
 
 
@@ -21,12 +26,20 @@ class UnasEntity(CoordinatorEntity[UnasDataUpdateCoordinator]):
         assert entry is not None
         self._attr_unique_id = f"{entry.unique_id}_{key}"
         info = coordinator.data.device_info
+        host = entry.data[CONF_HOST]
+        port = entry.data.get(CONF_PORT, DEFAULT_PORT)
+        config_url = f"https://{host}" if port == DEFAULT_PORT else f"https://{host}:{port}"
+        connections: set[tuple[str, str]] = set()
+        if entry.unique_id:
+            connections = {(CONNECTION_NETWORK_MAC, format_mac(entry.unique_id))}
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
+            connections=connections,
             manufacturer=MANUFACTURER,
             name=info.name or "UNAS",
             model=info.model or None,
             sw_version=info.firmware_version or None,
+            configuration_url=config_url,
         )
 
 
@@ -48,6 +61,7 @@ class UnasDiskEntity(CoordinatorEntity[UnasDataUpdateCoordinator]):
             via_device=(DOMAIN, entry.entry_id),
             manufacturer=vendor,
             model=disk.model if disk else None,
+            serial_number=disk.serial if disk else None,
             name=f"Disk {slot}",
         )
 
