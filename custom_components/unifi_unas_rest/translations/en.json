@@ -87,6 +87,8 @@
       "network_tx": { "name": "Network transmit" },
       "unifi_os_version": { "name": "UniFi OS version" },
       "drive_version": { "name": "Drive app version" },
+      "last_boot": { "name": "Last boot" },
+      "link_speed": { "name": "Link speed" },
       "disk_temperature": { "name": "Temperature" },
       "disk_power_on_hours": { "name": "Power-on hours" },
       "disk_state": { "name": "State" },

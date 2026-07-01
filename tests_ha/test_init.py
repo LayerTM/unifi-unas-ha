@@ -82,6 +82,21 @@ async def test_disk_io_and_scrub_sensors(
     assert state(f"pool{pool}_scrubbing") == "idle"
 
 
+async def test_link_speed_and_last_boot(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    await _setup(hass, config_entry)
+    registry = er.async_get(hass)
+
+    def state(key: str) -> str | None:
+        eid = registry.async_get_entity_id("sensor", DOMAIN, f"AABBCC000001_{key}")
+        assert eid, key
+        return hass.states.get(eid).state
+
+    assert state("link_speed") == "2.5 GbE"
+    assert state("last_boot").startswith("2026-06-18")  # from fixture startupTime
+
+
 async def test_unload(
     hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
 ) -> None:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -33,7 +34,7 @@ from .entity import UnasDiskEntity, UnasEntity, UnasPoolEntity
 class UnasSensorDescription(SensorEntityDescription):
     """Aggregate/system sensor bound to a UnasData accessor."""
 
-    value_fn: Callable[[UnasData], StateType]
+    value_fn: Callable[[UnasData], StateType | datetime]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -182,6 +183,19 @@ SENSORS: tuple[UnasSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: d.device_info.version or None,
     ),
+    UnasSensorDescription(
+        key="last_boot",
+        translation_key="last_boot",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: d.device_info.startup_time,
+    ),
+    UnasSensorDescription(
+        key="link_speed",
+        translation_key="link_speed",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: d.device_info.link_speed,
+    ),
 )
 
 DISK_SENSORS: tuple[UnasDiskSensorDescription, ...] = (
@@ -323,7 +337,7 @@ class UnasSensor(UnasEntity, SensorEntity):
         self.entity_description = description
 
     @property
-    def native_value(self) -> StateType:
+    def native_value(self) -> StateType | datetime:
         return self.entity_description.value_fn(self.coordinator.data)
 
 

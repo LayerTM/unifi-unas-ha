@@ -7,6 +7,7 @@ API schema documented in ``docs/API.md``.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 _TB = 1_000_000_000_000
@@ -52,6 +53,16 @@ def _s(value: Any, default: str = "") -> str:
 def _b(value: Any) -> bool:
     """True only for a literal boolean True."""
     return value is True
+
+
+def _dt(value: Any) -> datetime | None:
+    """Parse an ISO-8601 timestamp (incl. trailing 'Z'), else None."""
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -234,6 +245,25 @@ class Storage:
 
 
 @dataclass(frozen=True, slots=True)
+class NetworkInterface:
+    """A physical network interface reported by device-info."""
+
+    name: str
+    connected: bool
+    link_speed: str
+    max_speed: str
+
+    @classmethod
+    def from_api(cls, d: dict[str, Any]) -> NetworkInterface:
+        return cls(
+            name=_s(d.get("interfaceName")),
+            connected=_b(d.get("connected")),
+            link_speed=_s(d.get("linkSpeed")),
+            max_speed=_s(d.get("maxSpeed")),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class DeviceInfo:
     """System telemetry from the Drive device-info endpoint."""
 
@@ -247,6 +277,8 @@ class DeviceInfo:
     memory_total_kb: int
     memory_free_kb: int
     memory_available_kb: int
+    startup_time: datetime | None
+    network_interfaces: tuple[NetworkInterface, ...]
 
     @property
     def cpu_percent(self) -> float:
@@ -260,6 +292,18 @@ class DeviceInfo:
     def memory_percent(self) -> float:
         total = self.memory_total_kb
         return round(self.memory_used_kb / total * 100, 1) if total else 0.0
+
+    @property
+    def primary_interface(self) -> NetworkInterface | None:
+        connected = next((n for n in self.network_interfaces if n.connected), None)
+        if connected:
+            return connected
+        return self.network_interfaces[0] if self.network_interfaces else None
+
+    @property
+    def link_speed(self) -> str | None:
+        nic = self.primary_interface
+        return (nic.link_speed or None) if nic else None
 
     @classmethod
     def from_api(cls, d: dict[str, Any]) -> DeviceInfo:
@@ -277,6 +321,10 @@ class DeviceInfo:
             memory_total_kb=_i0(mem.get("total")),
             memory_free_kb=_i0(mem.get("free")),
             memory_available_kb=_i0(mem.get("available")),
+            startup_time=_dt(d.get("startupTime")),
+            network_interfaces=tuple(
+                NetworkInterface.from_api(n) for n in d.get("networkInterfaces") or []
+            ),
         )
 
 
