@@ -27,7 +27,7 @@ async def test_403_maps_to_capability_error(unas_server) -> None:
     async with aiohttp.ClientSession() as session:
         t = _transport(session, unas_server, ApiKeyAuth(unas_server.api_key))
         with pytest.raises(UnasCapabilityError):
-            await t.get_json("/proxy/drive/api/v2/drives")
+            await t.get_json("/proxy/drive/api/v1/users")
 
 
 async def test_401_without_reauth_raises_auth(unas_server) -> None:

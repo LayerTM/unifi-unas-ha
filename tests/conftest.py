@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import aiohttp
 import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestServer
@@ -61,18 +62,29 @@ def _auth_mode(request: web.Request) -> str | None:
     return None
 
 
-def _data(name: str, *, apikey_ok: bool = True) -> Callable[[web.Request], Any]:
+def _data(name: str, *, apikey_status: int = 200) -> Callable[[web.Request], Any]:
     async def handler(request: web.Request) -> web.Response:
         mode = _auth_mode(request)
         if mode is None:
             return web.json_response(
                 {"error": {"code": 401, "message": "Unauthorized"}}, status=401
             )
-        if mode == "apikey" and not apikey_ok:
-            return web.json_response({"error": {"code": 403, "message": "Forbidden"}}, status=403)
+        if mode == "apikey" and apikey_status != 200:
+            # e.g. shares return 500 to an API key on real hardware
+            return web.json_response({"error": {"code": apikey_status}}, status=apikey_status)
         return web.json_response(load_fixture(name))
 
     return handler
+
+
+async def _users(request: web.Request) -> web.Response:
+    # /v1/users: session-only; an API key is forbidden (403) on real hardware.
+    mode = _auth_mode(request)
+    if mode is None:
+        return web.json_response({"error": {"code": 401}}, status=401)
+    if mode == "apikey":
+        return web.json_response({"error": {"code": 403, "message": "Forbidden"}}, status=403)
+    return web.json_response({"data": []})
 
 
 def make_app(*, api_key: str = FAKE_API_KEY) -> web.Application:
@@ -84,7 +96,8 @@ def make_app(*, api_key: str = FAKE_API_KEY) -> web.Application:
     app.router.add_get("/proxy/drive/api/v2/storage", _data("storage"))
     app.router.add_get("/proxy/drive/api/v2/systems/device-info", _data("device_info"))
     app.router.add_get("/proxy/drive/api/v2/systems/network-io", _data("network_io"))
-    app.router.add_get("/proxy/drive/api/v2/drives", _data("drives", apikey_ok=False))
+    app.router.add_get("/proxy/drive/api/v2/drives", _data("drives", apikey_status=500))
+    app.router.add_get("/proxy/drive/api/v1/users", _users)
     return app
 
 
@@ -107,3 +120,9 @@ async def unas_server() -> AsyncIterator[RunningServer]:
         yield RunningServer(str(server.host), int(server.port), FAKE_API_KEY)
     finally:
         await server.close()
+
+
+@pytest.fixture
+async def session() -> AsyncIterator[aiohttp.ClientSession]:
+    async with aiohttp.ClientSession() as client_session:
+        yield client_session
