@@ -141,5 +141,5 @@ def update_firmware(
     console.print("firmware update requested")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     app()

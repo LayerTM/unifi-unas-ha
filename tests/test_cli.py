@@ -54,3 +54,23 @@ def test_reboot_aborts_without_confirmation() -> None:
 def test_missing_host_exits() -> None:
     result = runner.invoke(app, ["status"], env={"UNAS_APIKEY": "k"})
     assert result.exit_code == 2
+
+
+def test_shutdown_and_update_firmware_with_yes() -> None:
+    action = AsyncMock()
+    with patch("aiounas.cli.UnasActionClient", return_value=action):
+        assert runner.invoke(app, ["shutdown", "--yes"], env=ENV).exit_code == 0
+        assert runner.invoke(app, ["update-firmware", "--yes"], env=ENV).exit_code == 0
+    action.shutdown.assert_awaited_once()
+    action.update_firmware.assert_awaited_once()
+
+
+def test_session_auth_and_error_exit() -> None:
+    from aiounas import UnasConnectionError
+
+    client = AsyncMock()
+    client.get_storage = AsyncMock(side_effect=UnasConnectionError("down"))
+    env = {"UNAS_HOST": "192.0.2.10", "UNAS_USER": "u", "UNAS_PASS": "p"}
+    with patch("aiounas.cli.UnasClient", return_value=client):
+        result = runner.invoke(app, ["status"], env=env)
+    assert result.exit_code == 1
