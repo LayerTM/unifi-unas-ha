@@ -13,6 +13,7 @@ Install with the ``cli`` extra: ``pip install aiounas[cli]``.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 from collections.abc import Awaitable, Callable
 
@@ -86,12 +87,42 @@ def _confirm(action: str, yes: bool) -> None:
 
 
 @app.command()
-def status() -> None:
+def status(
+    as_json: bool = typer.Option(False, "--json", help="Output JSON instead of a table."),
+) -> None:
     """Show a summary of storage, disks and system telemetry."""
 
     async def _fetch(client: UnasClient) -> None:
         storage = await client.get_storage()
         info = await client.get_device_info()
+        if as_json:
+            print(
+                json.dumps(
+                    {
+                        "name": info.name,
+                        "model": info.model,
+                        "unifi_os_version": info.firmware_version,
+                        "drive_version": info.version,
+                        "cpu_percent": info.cpu_percent,
+                        "cpu_temperature": info.cpu_temperature,
+                        "memory_percent": info.memory_percent,
+                        "storage_usage_percent": storage.usage_percent,
+                        "disks": [
+                            {
+                                "slot": d.slot,
+                                "state": d.state,
+                                "temperature": d.temperature,
+                                "power_on_hours": d.power_on_hours,
+                                "health_score": d.health_score,
+                                "model": d.model,
+                            }
+                            for d in storage.disks
+                        ],
+                    },
+                    indent=2,
+                )
+            )
+            return
         console.print(
             f"[bold]{info.name or 'UNAS'}[/] ({info.model})  UniFi OS {info.firmware_version} / "
             f"Drive {info.version}"
@@ -139,6 +170,40 @@ def update_firmware(
     _confirm("install a firmware update on", yes)
     _run_action(lambda client: client.update_firmware())
     console.print("firmware update requested")
+
+
+@app.command("update-drive-app")
+def update_drive_app(
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation."),
+) -> None:
+    """Install the available Drive app update (write)."""
+    _confirm("install a Drive app update on", yes)
+    _run_action(lambda client: client.update_drive_app())
+    console.print("drive app update requested")
+
+
+@app.command()
+def fan(
+    profile: str = typer.Argument(
+        None, help="Profile to set (cooling / default / quiet). Omit to just show."
+    ),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation."),
+) -> None:
+    """Show the fan profile, or set it to PROFILE (write)."""
+    if profile is None:
+
+        async def _show(client: UnasClient) -> None:
+            fc = await client.get_fan_control()
+            console.print(
+                f"Fan profile: [bold]{fc.current_profile}[/]  "
+                f"(available: {', '.join(fc.available_profiles)})"
+            )
+
+        _run(_show)
+        return
+    _confirm(f"set the fan profile to '{profile}' on", yes)
+    _run_action(lambda client: client.set_fan_profile(profile))
+    console.print(f"Fan profile set to [bold]{profile}[/].")
 
 
 if __name__ == "__main__":  # pragma: no cover

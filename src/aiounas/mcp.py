@@ -94,6 +94,16 @@ def build_server(*, allow_writes: bool) -> FastMCP:
 
         return await _with_read(fetch)
 
+    @server.tool()
+    async def get_fan_profile() -> dict[str, Any]:
+        """Return the current fan profile and the available profiles."""
+
+        async def fetch(client: UnasClient) -> dict[str, Any]:
+            fan = await client.get_fan_control()
+            return {"current": fan.current_profile, "available": list(fan.available_profiles)}
+
+        return await _with_read(fetch)
+
     if allow_writes:
         _register_write_tools(server)
 
@@ -124,6 +134,22 @@ def _register_write_tools(server: FastMCP) -> None:
             return "Refused: pass confirm=true to install a firmware update."
         await _with_action(lambda client: client.update_firmware())
         return "firmware update requested"
+
+    @server.tool()
+    async def update_drive_app(confirm: bool = False) -> str:
+        """Install the available Drive app update. Requires confirm=true."""
+        if not confirm:
+            return "Refused: pass confirm=true to install a Drive app update."
+        await _with_action(lambda client: client.update_drive_app())
+        return "drive app update requested"
+
+    @server.tool()
+    async def set_fan_profile(profile: str, confirm: bool = False) -> str:
+        """Set the fan profile (cooling / default / quiet). Requires confirm=true."""
+        if not confirm:
+            return "Refused: pass confirm=true to change the fan profile."
+        await _with_action(lambda client: client.set_fan_profile(profile))
+        return f"fan profile set to {profile}"
 
 
 def _writes_enabled() -> bool:

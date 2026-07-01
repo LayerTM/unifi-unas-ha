@@ -59,6 +59,35 @@ async def test_reboot_requires_confirm() -> None:
         action.reboot.assert_awaited_once()
 
 
+async def test_new_write_tools_present() -> None:
+    tools = {t.name for t in await build_server(allow_writes=True).list_tools()}
+    assert {"update_drive_app", "set_fan_profile"} <= tools
+    # read tool available without allow_writes
+    ro = {t.name for t in await build_server(allow_writes=False).list_tools()}
+    assert "get_fan_profile" in ro
+    assert "set_fan_profile" not in ro
+
+
+async def test_set_fan_profile_requires_confirm() -> None:
+    action = AsyncMock()
+    with patch("aiounas.mcp.UnasActionClient", return_value=action):
+        server = build_server(allow_writes=True)
+        await server.call_tool("set_fan_profile", {"profile": "quiet", "confirm": False})
+        action.set_fan_profile.assert_not_awaited()
+        await server.call_tool("set_fan_profile", {"profile": "quiet", "confirm": True})
+        action.set_fan_profile.assert_awaited_once_with("quiet")
+
+
+async def test_get_fan_profile_reads() -> None:
+    from aiounas import FanControl
+
+    client = AsyncMock()
+    client.get_fan_control = AsyncMock(return_value=FanControl.from_api(_load("fan_control")))
+    with patch("aiounas.mcp.UnasClient", return_value=client):
+        result = await build_server(allow_writes=False).call_tool("get_fan_profile", {})
+    assert "default" in str(result)
+
+
 async def test_shutdown_and_update_firmware_confirmed() -> None:
     action = AsyncMock()
     with patch("aiounas.mcp.UnasActionClient", return_value=action):

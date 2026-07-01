@@ -65,6 +65,42 @@ def test_shutdown_and_update_firmware_with_yes() -> None:
     action.update_firmware.assert_awaited_once()
 
 
+def test_status_json() -> None:
+    with patch("aiounas.cli.UnasClient", return_value=_read_client()):
+        result = runner.invoke(app, ["status", "--json"], env=ENV)
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["unifi_os_version"] == "5.1.19"
+    assert data["disks"]
+
+
+def test_fan_show() -> None:
+    from aiounas import FanControl
+
+    client = AsyncMock()
+    client.get_fan_control = AsyncMock(return_value=FanControl.from_api(_load("fan_control")))
+    with patch("aiounas.cli.UnasClient", return_value=client):
+        result = runner.invoke(app, ["fan"], env=ENV)
+    assert result.exit_code == 0, result.output
+    assert "default" in result.output
+
+
+def test_fan_set_with_yes() -> None:
+    action = AsyncMock()
+    with patch("aiounas.cli.UnasActionClient", return_value=action):
+        result = runner.invoke(app, ["fan", "quiet", "--yes"], env=ENV)
+    assert result.exit_code == 0, result.output
+    action.set_fan_profile.assert_awaited_once_with("quiet")
+
+
+def test_update_drive_app_with_yes() -> None:
+    action = AsyncMock()
+    with patch("aiounas.cli.UnasActionClient", return_value=action):
+        result = runner.invoke(app, ["update-drive-app", "--yes"], env=ENV)
+    assert result.exit_code == 0, result.output
+    action.update_drive_app.assert_awaited_once()
+
+
 def test_session_auth_and_error_exit() -> None:
     from aiounas import UnasConnectionError
 
