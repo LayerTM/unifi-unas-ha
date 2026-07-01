@@ -21,6 +21,11 @@
       "disk_state": { "default": "mdi:harddisk" },
       "disk_health_score": { "default": "mdi:heart-pulse" },
       "disk_bad_sectors": { "default": "mdi:alert-circle-outline" }
+    },
+    "button": {
+      "shutdown": { "default": "mdi:power" },
+      "update_firmware": { "default": "mdi:package-up" },
+      "update_drive_app": { "default": "mdi:update" }
     }
   }
 }
