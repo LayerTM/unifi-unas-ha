@@ -1,7 +1,9 @@
-"""GET-only HTTP transport over the UNAS local REST API.
+"""HTTP transport over the UNAS local REST API.
 
-Read-only by construction: only ``GET`` is issued. Maps HTTP status codes to the
-typed exception hierarchy and retries once through the auth strategy on 401.
+Maps HTTP status codes to the typed exception hierarchy and retries once through
+the auth strategy on 401. Reads use :meth:`get_json`; writes use :meth:`send`.
+The read client (``UnasClient``) only ever calls ``get_json`` — that is its
+no-write guarantee; state-changing calls live in ``UnasActionClient``.
 """
 
 from __future__ import annotations
@@ -22,7 +24,7 @@ from .exceptions import (
 
 
 class UnasTransport:
-    """Issue authenticated GET requests and map failures to typed errors."""
+    """Issue authenticated requests and map failures to typed errors."""
 
     def __init__(
         self,
@@ -57,8 +59,34 @@ class UnasTransport:
 
     async def get_json(self, path: str, *, allow_reauth: bool = True) -> Any:
         """GET *path* and return parsed JSON, or raise a typed error."""
+        return await self._call("GET", path, expect_json=True, allow_reauth=allow_reauth)
+
+    async def send(
+        self,
+        method: str,
+        path: str,
+        *,
+        json_body: Any = None,
+        allow_reauth: bool = True,
+    ) -> Any:
+        """Issue a write (POST/PUT/DELETE). Returns parsed JSON if present, else None."""
+        return await self._call(
+            method, path, json_body=json_body, expect_json=False, allow_reauth=allow_reauth
+        )
+
+    async def _call(
+        self,
+        method: str,
+        path: str,
+        *,
+        json_body: Any = None,
+        expect_json: bool = True,
+        allow_reauth: bool = True,
+    ) -> Any:
         await self.async_prepare()
-        status, data = await self._request(path)
+        status, data = await self._request(
+            method, path, json_body=json_body, expect_json=expect_json
+        )
 
         if (
             status == 401
@@ -66,7 +94,9 @@ class UnasTransport:
             and self._auth.can_reauth
             and await self._auth.async_reauth(self._session, self._base_url, ssl=self._ssl)
         ):
-            status, data = await self._request(path)
+            status, data = await self._request(
+                method, path, json_body=json_body, expect_json=expect_json
+            )
 
         if status == 401:
             raise UnasAuthError(f"unauthorized for {path}")
@@ -76,24 +106,36 @@ class UnasTransport:
             raise UnasApiError(f"unexpected status {status} for {path}", status=status)
         return data
 
-    async def _request(self, path: str) -> tuple[int, Any]:
+    async def _request(
+        self, method: str, path: str, *, json_body: Any = None, expect_json: bool = True
+    ) -> tuple[int, Any]:
         url = f"{self._base_url}{path}"
         headers = {"Accept": "application/json", **self._auth.headers()}
         try:
             async with (
                 asyncio.timeout(self._timeout),
-                self._session.get(url, headers=headers, ssl=self._ssl) as resp,
+                self._session.request(
+                    method, url, headers=headers, json=json_body, ssl=self._ssl
+                ) as resp,
             ):
                 status = resp.status
                 if 200 <= status < 300:
+                    if expect_json:
+                        try:
+                            return status, await resp.json()
+                        except aiohttp.ContentTypeError:
+                            # A 2xx with a non-JSON body is the UniFi OS SPA/login
+                            # shell served after a silent session expiry. Surface a
+                            # clean auth error and DO NOT chain the source exception:
+                            # its request_info carries the session cookie / API key.
+                            raise UnasAuthError(
+                                "non-JSON response; session may have expired"
+                            ) from None
+                    # writes: a body is optional
                     try:
-                        return status, await resp.json()
-                    except aiohttp.ContentTypeError:
-                        # A 2xx with a non-JSON body is the UniFi OS SPA/login
-                        # shell served after a silent session expiry. Surface a
-                        # clean auth error and DO NOT chain the source exception:
-                        # its request_info carries the session cookie / API key.
-                        raise UnasAuthError("non-JSON response; session may have expired") from None
+                        return status, await resp.json(content_type=None)
+                    except (aiohttp.ContentTypeError, ValueError):
+                        return status, None
                 await resp.read()
                 return status, None
         except (aiohttp.ClientError, TimeoutError) as err:

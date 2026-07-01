@@ -60,7 +60,7 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up UNAS binary sensors from a config entry."""
-    coordinator = entry.runtime_data
+    coordinator = entry.runtime_data.coordinator
     entities: list[BinarySensorEntity] = [UnasConnectivity(coordinator)]
     entities.extend(UnasBinarySensor(coordinator, d) for d in BINARY_SENSORS)
     for disk in coordinator.data.storage.disks:

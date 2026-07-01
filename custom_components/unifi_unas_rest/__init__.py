@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -22,16 +23,33 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .aiounas import (
     ApiKeyAuth,
     SessionAuth,
+    UnasActionClient,
     UnasAuthError,
     UnasClient,
     UnasConnectionError,
     probe,
 )
 from .aiounas.auth import AbstractAuth
-from .const import DEFAULT_PORT, DEFAULT_SCAN_INTERVAL, DEFAULT_VERIFY_SSL, PLATFORMS
+from .const import (
+    CONF_ENABLE_CONTROLS,
+    DEFAULT_ENABLE_CONTROLS,
+    DEFAULT_PORT,
+    DEFAULT_SCAN_INTERVAL,
+    DEFAULT_VERIFY_SSL,
+    PLATFORMS,
+)
 from .coordinator import UnasDataUpdateCoordinator
 
-type UnasConfigEntry = ConfigEntry[UnasDataUpdateCoordinator]
+
+@dataclass
+class UnasRuntimeData:
+    """Per-entry runtime state."""
+
+    coordinator: UnasDataUpdateCoordinator
+    action_client: UnasActionClient | None
+
+
+type UnasConfigEntry = ConfigEntry[UnasRuntimeData]
 
 
 def build_auth(data: Mapping[str, Any]) -> AbstractAuth:
@@ -45,14 +63,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: UnasConfigEntry) -> bool
     """Set up UniFi UNAS from a config entry."""
     data = entry.data
     verify_ssl = data.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL)
+    port = data.get(CONF_PORT, DEFAULT_PORT)
     session = async_get_clientsession(hass, verify_ssl=verify_ssl)
     client = UnasClient(
-        session,
-        data[CONF_HOST],
-        build_auth(data),
-        port=data.get(CONF_PORT, DEFAULT_PORT),
-        use_ssl=True,
-        verify_ssl=verify_ssl,
+        session, data[CONF_HOST], build_auth(data), port=port, use_ssl=True, verify_ssl=verify_ssl
     )
 
     try:
@@ -66,8 +80,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: UnasConfigEntry) -> bool
     scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
     coordinator = UnasDataUpdateCoordinator(hass, entry, client, capabilities, scan_interval)
     await coordinator.async_config_entry_first_refresh()
-    entry.runtime_data = coordinator
 
+    action_client: UnasActionClient | None = None
+    if entry.options.get(CONF_ENABLE_CONTROLS, DEFAULT_ENABLE_CONTROLS):
+        action_client = UnasActionClient(
+            session,
+            data[CONF_HOST],
+            build_auth(data),
+            port=port,
+            use_ssl=True,
+            verify_ssl=verify_ssl,
+        )
+
+    entry.runtime_data = UnasRuntimeData(coordinator, action_client)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_reload))
     return True

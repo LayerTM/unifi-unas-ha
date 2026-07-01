@@ -61,9 +61,12 @@ def unas_client() -> AsyncMock:
 @pytest.fixture
 def mock_aiounas(unas_client: AsyncMock) -> Iterator[AsyncMock]:
     caps = Capabilities(storage=True, device_info=True, network_io=True, shares=True)
+    action = AsyncMock()
+    unas_client.action_mock = action  # exposed for control tests
     with (
         patch("custom_components.unifi_unas_rest.UnasClient", return_value=unas_client),
         patch("custom_components.unifi_unas_rest.probe", AsyncMock(return_value=caps)),
+        patch("custom_components.unifi_unas_rest.UnasActionClient", return_value=action),
         patch(
             "custom_components.unifi_unas_rest.config_flow.UnasClient",
             return_value=unas_client,

@@ -6,7 +6,12 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
 from homeassistant.const import (
     CONF_API_KEY,
     CONF_HOST,
@@ -15,6 +20,7 @@ from homeassistant.const import (
     CONF_USERNAME,
     CONF_VERIFY_SSL,
 )
+from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     SelectSelector,
@@ -36,6 +42,8 @@ from .const import (
     AUTH_API_KEY,
     AUTH_PASSWORD,
     CONF_AUTH_METHOD,
+    CONF_ENABLE_CONTROLS,
+    DEFAULT_ENABLE_CONTROLS,
     DEFAULT_PORT,
     DEFAULT_VERIFY_SSL,
     DOMAIN,
@@ -57,6 +65,11 @@ class UnifiUnasConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for UniFi UNAS."""
 
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+        return UnasOptionsFlow()
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
@@ -172,3 +185,14 @@ class UnifiUnasConfigFlow(ConfigFlow, domain=DOMAIN):
 def _title(identity: SystemIdentity, data: dict[str, Any]) -> str:
     name = identity.name or "UNAS"
     return f"{name} ({data[CONF_HOST]})"
+
+
+class UnasOptionsFlow(OptionsFlow):
+    """Options: opt in/out of control (write) entities."""
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+        current = self.config_entry.options.get(CONF_ENABLE_CONTROLS, DEFAULT_ENABLE_CONTROLS)
+        schema = vol.Schema({vol.Required(CONF_ENABLE_CONTROLS, default=current): bool})
+        return self.async_show_form(step_id="init", data_schema=schema)

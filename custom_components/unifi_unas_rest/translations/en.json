@@ -47,6 +47,17 @@
       "reauth_successful": "Re-authentication was successful."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options",
+        "description": "Control actions send state-changing requests to the NAS. Leave off for read-only monitoring.",
+        "data": {
+          "enable_controls": "Enable control actions (reboot, shut down, install updates)"
+        }
+      }
+    }
+  },
   "selector": {
     "auth_method": {
       "options": {
@@ -83,6 +94,12 @@
       "device_online": { "name": "Online" },
       "storage_problem": { "name": "Storage problem" },
       "disk_problem": { "name": "Problem" }
+    },
+    "button": {
+      "reboot": { "name": "Reboot" },
+      "shutdown": { "name": "Shut down" },
+      "update_firmware": { "name": "Install UniFi OS update" },
+      "update_drive_app": { "name": "Install Drive app update" }
     }
   }
 }

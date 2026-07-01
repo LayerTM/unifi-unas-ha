@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .actions import UnasActionClient
 from .auth import AbstractAuth, ApiKeyAuth, SessionAuth
 from .capabilities import Capabilities, probe
 from .client import UnasClient
@@ -37,6 +38,7 @@ __all__ = [
     "Share",
     "Storage",
     "SystemIdentity",
+    "UnasActionClient",
     "UnasApiError",
     "UnasAuthError",
     "UnasCapabilityError",
