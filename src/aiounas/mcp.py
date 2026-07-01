@@ -127,7 +127,9 @@ def _register_write_tools(server: FastMCP) -> None:
 
 
 def _writes_enabled() -> bool:
-    return os.environ.get("UNAS_MCP_ALLOW_WRITES", "") not in ("", "0", "false", "False")
+    # Fail closed: only explicit truthy values enable writes; anything else
+    # (unset, "off", "no", "false", a typo) keeps the server read-only.
+    return os.environ.get("UNAS_MCP_ALLOW_WRITES", "").strip().lower() in ("1", "true", "yes", "on")
 
 
 def main() -> None:  # pragma: no cover

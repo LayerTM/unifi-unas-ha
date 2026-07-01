@@ -191,8 +191,17 @@ class UnasOptionsFlow(OptionsFlow):
     """Options: opt in/out of control (write) entities."""
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
         if user_input is not None:
-            return self.async_create_entry(data=user_input)
-        current = self.config_entry.options.get(CONF_ENABLE_CONTROLS, DEFAULT_ENABLE_CONTROLS)
-        schema = vol.Schema({vol.Required(CONF_ENABLE_CONTROLS, default=current): bool})
-        return self.async_show_form(step_id="init", data_schema=schema)
+            if user_input.get(CONF_ENABLE_CONTROLS) and self.config_entry.data.get(CONF_API_KEY):
+                # An API key is read-only; controls need username/password auth.
+                errors["base"] = "controls_need_session"
+            else:
+                return self.async_create_entry(data=user_input)
+        default = (
+            user_input[CONF_ENABLE_CONTROLS]
+            if user_input is not None
+            else self.config_entry.options.get(CONF_ENABLE_CONTROLS, DEFAULT_ENABLE_CONTROLS)
+        )
+        schema = vol.Schema({vol.Required(CONF_ENABLE_CONTROLS, default=default): bool})
+        return self.async_show_form(step_id="init", data_schema=schema, errors=errors)

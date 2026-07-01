@@ -282,7 +282,7 @@ async def async_setup_entry(
         )
     for pool in coordinator.data.storage.pools:
         entities.extend(
-            UnasPoolSensor(coordinator, pool.number, description) for description in POOL_SENSORS
+            UnasPoolSensor(coordinator, pool, description) for description in POOL_SENSORS
         )
     async_add_entities(entities)
 
@@ -331,10 +331,10 @@ class UnasPoolSensor(UnasPoolEntity, SensorEntity):
     def __init__(
         self,
         coordinator: UnasDataUpdateCoordinator,
-        number: int,
+        pool: Pool,
         description: UnasPoolSensorDescription,
     ) -> None:
-        super().__init__(coordinator, number, description.key)
+        super().__init__(coordinator, pool, description.key)
         self.entity_description = description
 
     @property

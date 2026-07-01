@@ -6,7 +6,7 @@
 [![tests](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/tests.yml/badge.svg)](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/tests.yml)
 [![ha-integration](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/ha-integration.yml/badge.svg)](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/ha-integration.yml)
 [![secret-scan](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/secret-scan.yml)
-![Status: beta](https://img.shields.io/badge/status-beta-orange)
+![Status: stable](https://img.shields.io/badge/status-stable-brightgreen)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue)
 
 ---

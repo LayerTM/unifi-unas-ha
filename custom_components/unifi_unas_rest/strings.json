@@ -56,6 +56,9 @@
           "enable_controls": "Enable control actions (reboot, shut down, install updates)"
         }
       }
+    },
+    "error": {
+      "controls_need_session": "Control actions require username/password authentication. Reconfigure the integration with a local account to enable them."
     }
   },
   "selector": {

@@ -49,18 +49,20 @@ async def test_per_pool_sensors(
 ) -> None:
     await _setup(hass, config_entry)
     registry = er.async_get(hass)
+    # Pool sub-devices are keyed on the stable pool id (from the fixture).
+    pool = "00000000-0000-4000-8000-000000000001"
 
     def state_of(key: str) -> str | None:
-        eid = registry.async_get_entity_id("sensor", DOMAIN, f"AABBCC000001_{key}")
+        eid = registry.async_get_entity_id("sensor", DOMAIN, f"AABBCC000001_pool{pool}_{key}")
         assert eid, key
         return hass.states.get(eid).state
 
-    assert state_of("pool1_raid_level") == "raid1"
-    assert state_of("pool1_status") == "fullyOperational"
-    assert state_of("pool1_usage") == "37.1"
+    assert state_of("raid_level") == "raid1"
+    assert state_of("status") == "fullyOperational"
+    assert state_of("usage") == "37.1"
     # capacity + used exist as their own entities too
-    assert registry.async_get_entity_id("sensor", DOMAIN, "AABBCC000001_pool1_capacity")
-    assert registry.async_get_entity_id("sensor", DOMAIN, "AABBCC000001_pool1_used")
+    assert registry.async_get_entity_id("sensor", DOMAIN, f"AABBCC000001_pool{pool}_capacity")
+    assert registry.async_get_entity_id("sensor", DOMAIN, f"AABBCC000001_pool{pool}_used")
 
 
 async def test_unload(

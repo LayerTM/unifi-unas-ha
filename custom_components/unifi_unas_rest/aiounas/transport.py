@@ -9,6 +9,7 @@ no-write guarantee; state-changing calls live in ``UnasActionClient``.
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Any
 
 import aiohttp
@@ -131,11 +132,18 @@ class UnasTransport:
                             raise UnasAuthError(
                                 "non-JSON response; session may have expired"
                             ) from None
-                    # writes: a body is optional
-                    try:
-                        return status, await resp.json(content_type=None)
-                    except (aiohttp.ContentTypeError, ValueError):
+                    # writes: an empty 2xx body is a bodyless success and a JSON
+                    # body is returned as-is; any other non-empty 2xx body is the
+                    # SPA/login shell served after a silent session expiry — surface
+                    # it as an auth error, never a false success (mirrors the read
+                    # path's no-silent-failure guarantee).
+                    raw = await resp.read()
+                    if not raw:
                         return status, None
+                    try:
+                        return status, json.loads(raw)
+                    except (ValueError, UnicodeDecodeError):
+                        raise UnasAuthError("non-JSON response; session may have expired") from None
                 await resp.read()
                 return status, None
         except (aiohttp.ClientError, TimeoutError) as err:

@@ -5,7 +5,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock
 
 import pytest
-from custom_components.unifi_unas_rest.aiounas.exceptions import UnasCapabilityError
+from custom_components.unifi_unas_rest.aiounas.exceptions import UnasApiError, UnasCapabilityError
 from custom_components.unifi_unas_rest.const import (
     AUTH_API_KEY,
     AUTH_PASSWORD,
@@ -97,6 +97,33 @@ async def test_press_permission_error_raises_clear_message(
         await hass.services.async_call(
             "button", "press", {ATTR_ENTITY_ID: _reboot_eid(hass)}, blocking=True
         )
+
+
+async def test_press_api_error_raises_clear_message(
+    hass: HomeAssistant, mock_aiounas: AsyncMock
+) -> None:
+    mock_aiounas.action_mock.reboot = AsyncMock(
+        side_effect=UnasApiError("unexpected status 500", status=500)
+    )
+    await _setup(hass, _entry(controls=True, session=True))
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            "button", "press", {ATTR_ENTITY_ID: _reboot_eid(hass)}, blocking=True
+        )
+
+
+async def test_options_flow_rejects_controls_with_api_key(
+    hass: HomeAssistant, mock_aiounas: AsyncMock
+) -> None:
+    entry = _entry(controls=False, session=False)  # API-key auth
+    await _setup(hass, entry)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {CONF_ENABLE_CONTROLS: True}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "controls_need_session"}
+    assert entry.options.get(CONF_ENABLE_CONTROLS) is not True
 
 
 async def test_options_flow_toggles_controls(hass: HomeAssistant, mock_aiounas: AsyncMock) -> None:

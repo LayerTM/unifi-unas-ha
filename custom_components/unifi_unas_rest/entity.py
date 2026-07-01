@@ -83,25 +83,31 @@ class UnasPoolEntity(CoordinatorEntity[UnasDataUpdateCoordinator]):
 
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator: UnasDataUpdateCoordinator, number: int, key: str) -> None:
+    def __init__(self, coordinator: UnasDataUpdateCoordinator, pool: Pool, key: str) -> None:
         super().__init__(coordinator)
-        self._number = number
+        # Identity uses the stable pool id; `number` can default to 0 on firmware
+        # that omits the field, which would collide across multiple pools.
+        self._pool_key = pool.id or str(pool.number)
         entry = coordinator.config_entry
         assert entry is not None
-        self._attr_unique_id = f"{entry.unique_id}_pool{number}_{key}"
+        self._attr_unique_id = f"{entry.unique_id}_pool{self._pool_key}_{key}"
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{entry.entry_id}_pool{number}")},
+            identifiers={(DOMAIN, f"{entry.entry_id}_pool{self._pool_key}")},
             via_device=(DOMAIN, entry.entry_id),
             manufacturer=MANUFACTURER,
             model="Storage pool",
-            name=f"Pool {number}",
+            name=f"Pool {pool.number}",
         )
 
     @property
     def pool(self) -> Pool | None:
         """Return the current model for this pool, if present."""
         return next(
-            (p for p in self.coordinator.data.storage.pools if p.number == self._number),
+            (
+                p
+                for p in self.coordinator.data.storage.pools
+                if (p.id or str(p.number)) == self._pool_key
+            ),
             None,
         )
 

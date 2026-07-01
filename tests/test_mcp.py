@@ -78,7 +78,28 @@ async def test_get_status_with_session_auth(monkeypatch: pytest.MonkeyPatch) -> 
     assert "UNAS2B" in str(result)
 
 
-def test_writes_enabled_env() -> None:
+@pytest.mark.parametrize(
+    ("value", "enabled"),
+    [
+        ("1", True),
+        ("true", True),
+        ("TRUE", True),
+        ("yes", True),
+        ("on", True),
+        ("", False),
+        ("0", False),
+        ("false", False),
+        ("False", False),
+        ("FALSE", False),
+        ("off", False),
+        ("no", False),
+        ("disabled", False),
+    ],
+)
+def test_writes_enabled_env(monkeypatch: pytest.MonkeyPatch, value: str, enabled: bool) -> None:
+    # Fail closed: only explicit truthy values enable writes; "off"/"no"/"FALSE"
+    # must NOT silently enable the destructive tools.
     from aiounas.mcp import _writes_enabled
 
-    assert _writes_enabled() is False  # unset in the autouse env
+    monkeypatch.setenv("UNAS_MCP_ALLOW_WRITES", value)
+    assert _writes_enabled() is enabled

@@ -128,6 +128,47 @@ async def test_2xx_non_json_raises_auth_without_leaking_credentials() -> None:
         await server.close()
 
 
+async def test_write_2xx_html_shell_raises_auth_but_empty_and_json_ok() -> None:
+    async def root(_: web.Request) -> web.Response:
+        return web.Response(text="", headers={"X-CSRF-Token": "c"})
+
+    async def shell(_: web.Request) -> web.Response:
+        # 200 with the SPA/login shell served on silent session expiry.
+        return web.Response(text="<html>login</html>", content_type="text/html")
+
+    async def empty(_: web.Request) -> web.Response:
+        return web.Response(status=200)  # bodyless success (e.g. reboot)
+
+    async def echo(_: web.Request) -> web.Response:
+        return web.json_response({"profile": "default"})  # JSON success (fan)
+
+    app = web.Application()
+    app.router.add_get("/", root)
+    app.router.add_post("/shell", shell)
+    app.router.add_post("/empty", empty)
+    app.router.add_put("/echo", echo)
+    server = TestServer(app)
+    await server.start_server()
+    try:
+        async with aiohttp.ClientSession() as session:
+            secret = "write-key-must-not-leak-0123456789"
+            t = UnasTransport(
+                session, str(server.host), ApiKeyAuth(secret), port=int(server.port), use_ssl=False
+            )
+            # A 2xx login shell on a WRITE must be a loud auth error, not a false success.
+            with pytest.raises(UnasAuthError) as excinfo:
+                await t.send("POST", "/shell")
+            assert excinfo.value.__cause__ is None
+            assert secret not in repr(excinfo.value.__cause__)
+            # An empty 2xx is a bodyless success; a JSON 2xx is returned as-is.
+            assert await t.send("POST", "/empty") is None
+            assert await t.send("PUT", "/echo", json_body={"profile": "default"}) == {
+                "profile": "default"
+            }
+    finally:
+        await server.close()
+
+
 async def test_non_2xx_below_400_not_treated_as_success() -> None:
     async def root(_: web.Request) -> web.Response:
         return web.Response(text="")

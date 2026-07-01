@@ -17,7 +17,12 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import UnasConfigEntry
 from .aiounas import UnasActionClient
-from .aiounas.exceptions import UnasAuthError, UnasCapabilityError, UnasConnectionError
+from .aiounas.exceptions import (
+    UnasAuthError,
+    UnasCapabilityError,
+    UnasConnectionError,
+    UnasError,
+)
 from .coordinator import UnasDataUpdateCoordinator
 from .entity import UnasEntity
 
@@ -98,3 +103,7 @@ class UnasButton(UnasEntity, ButtonEntity):
             ) from err
         except UnasConnectionError as err:
             raise HomeAssistantError(f"Could not reach the UNAS: {err}") from err
+        except UnasError as err:
+            status = getattr(err, "status", None)
+            detail = f" (HTTP {status})" if status else ""
+            raise HomeAssistantError(f"The UNAS could not complete the action{detail}.") from err
