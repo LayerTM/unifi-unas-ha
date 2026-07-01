@@ -1,0 +1,42 @@
+# ── Secrets & live device captures — NEVER commit ──────────────────────────
+captures/
+.secrets/
+secrets.yaml
+*.local.json
+*.creds
+.env
+.env.*
+!.env.example
+
+# ── Python ─────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# ── Home Assistant / dev runtime ───────────────────────────────────────────
+.HA/
+config/.storage/
+*.log
+
+# ── OS / editors ───────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# ── Local agent / tooling artifacts (not part of the project) ──────────────
+.claude/
+.tldr/
+.tldrignore
