@@ -1,0 +1,20 @@
+name: ha-integration
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Install library + Home Assistant test stack
+        run: pip install -e ".[dev,ha]"
+      - name: Type check integration (Python 3.14)
+        run: mypy --python-version 3.14 custom_components/unifi_unas_rest
+      - name: Integration tests
+        run: PYTHONPATH=. pytest tests_ha/

@@ -18,6 +18,7 @@ __pycache__/
 build/
 dist/
 .venv/
+.venv-ha/
 venv/
 uv.lock
 .mypy_cache/

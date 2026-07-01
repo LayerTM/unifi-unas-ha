@@ -13,6 +13,7 @@ Usage:
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -79,8 +80,33 @@ SKIP_SUFFIX = {
 SKIP_FILES = {Path(__file__).name, "test_secret_scan.py"}
 
 
+def _git_tracked(root: Path) -> list[Path] | None:
+    """Files git would commit (tracked + untracked, excluding .gitignored)."""
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "-c", "-o", "--exclude-standard"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return [root / line for line in out.stdout.splitlines() if line]
+
+
+def _is_binary(path: Path) -> bool:
+    try:
+        return b"\x00" in path.read_bytes()[:2048]
+    except OSError:
+        return True
+
+
 def iter_files(root: Path):
-    for p in sorted(root.rglob("*")):
+    # Scan exactly what git would commit (respects .gitignore, so venvs/caches
+    # are excluded); fall back to a filtered filesystem walk outside a git repo.
+    tracked = _git_tracked(root)
+    candidates = tracked if tracked is not None else sorted(root.rglob("*"))
+    for p in candidates:
         if not p.is_file():
             continue
         if any(part in SKIP_DIRS for part in p.parts):
@@ -88,6 +114,8 @@ def iter_files(root: Path):
         if p.suffix.lower() in SKIP_SUFFIX:
             continue
         if p.name in SKIP_FILES:
+            continue
+        if _is_binary(p):
             continue
         yield p
 
