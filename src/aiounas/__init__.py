@@ -9,8 +9,26 @@ from .exceptions import (
     UnasConnectionError,
     UnasError,
 )
+from .models import (
+    DeviceInfo,
+    Disk,
+    NetworkIO,
+    Pool,
+    RaidGroup,
+    Share,
+    Storage,
+    SystemIdentity,
+)
 
 __all__ = [
+    "DeviceInfo",
+    "Disk",
+    "NetworkIO",
+    "Pool",
+    "RaidGroup",
+    "Share",
+    "Storage",
+    "SystemIdentity",
     "UnasApiError",
     "UnasAuthError",
     "UnasCapabilityError",
