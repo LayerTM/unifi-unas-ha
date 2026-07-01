@@ -23,6 +23,7 @@ _FIXTURES = Path(__file__).parent / "fixtures"
 # A realistic-length placeholder key (>=16 chars) so the client sends X-API-Key.
 FAKE_API_KEY = "test-api-key-0123456789"
 _API_KEY = web.AppKey("api_key", str)
+_WRITES = web.AppKey("writes", list)
 
 
 def load_fixture(name: str) -> dict[str, Any]:
@@ -87,9 +88,21 @@ async def _users(request: web.Request) -> web.Response:
     return web.json_response({"data": []})
 
 
+def _write() -> Callable[[web.Request], Any]:
+    async def handler(request: web.Request) -> web.Response:
+        if _auth_mode(request) is None:
+            return web.json_response({"error": {"code": 401}}, status=401)
+        body = await request.json() if request.can_read_body else None
+        request.app[_WRITES].append({"method": request.method, "path": request.path, "json": body})
+        return web.Response(status=200)  # real writes reply with no JSON body
+
+    return handler
+
+
 def make_app(*, api_key: str = FAKE_API_KEY) -> web.Application:
     app = web.Application()
     app[_API_KEY] = api_key
+    app[_WRITES] = []
     app.router.add_get("/", _root)
     app.router.add_post("/api/auth/login", _login)
     app.router.add_get("/api/system", _data("system_short"))
@@ -98,6 +111,12 @@ def make_app(*, api_key: str = FAKE_API_KEY) -> web.Application:
     app.router.add_get("/proxy/drive/api/v2/systems/network-io", _data("network_io"))
     app.router.add_get("/proxy/drive/api/v2/drives", _data("drives", apikey_status=500))
     app.router.add_get("/proxy/drive/api/v1/users", _users)
+    # write / action endpoints
+    app.router.add_post("/api/system/reboot", _write())
+    app.router.add_post("/api/system/poweroff", _write())
+    app.router.add_post("/api/firmware/update", _write())
+    app.router.add_post("/api/applications/drive/update", _write())
+    app.router.add_put("/proxy/drive/api/v2/systems/fan-control", _write())
     return app
 
 
@@ -106,6 +125,7 @@ class RunningServer:
     host: str
     port: int
     api_key: str
+    writes: list[dict[str, Any]]
 
     @property
     def base_url(self) -> str:
@@ -114,10 +134,11 @@ class RunningServer:
 
 @pytest.fixture
 async def unas_server() -> AsyncIterator[RunningServer]:
-    server = TestServer(make_app())
+    app = make_app()
+    server = TestServer(app)
     await server.start_server()
     try:
-        yield RunningServer(str(server.host), int(server.port), FAKE_API_KEY)
+        yield RunningServer(str(server.host), int(server.port), FAKE_API_KEY, app[_WRITES])
     finally:
         await server.close()
 

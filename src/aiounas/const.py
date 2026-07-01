@@ -22,6 +22,13 @@ PATH_NETWORK_IO: Final = "/proxy/drive/api/v2/systems/network-io"
 PATH_FAN_CONTROL: Final = "/proxy/drive/api/v2/systems/fan-control"
 PATH_SHARES: Final = "/proxy/drive/api/v2/drives"  # session-only
 
+# Write / action endpoints (v2). Power and update paths are well-established;
+# the fan-control payload shape is UNVERIFIED against live hardware.
+PATH_REBOOT: Final = "/api/system/reboot"
+PATH_POWEROFF: Final = "/api/system/poweroff"
+PATH_FIRMWARE_UPDATE: Final = "/api/firmware/update"
+PATH_DRIVE_UPDATE: Final = "/api/applications/drive/update"
+
 HEADER_API_KEY: Final = "X-API-Key"
 HEADER_CSRF: Final = "X-CSRF-Token"
 HEADER_CSRF_UPDATED: Final = "X-Updated-CSRF-Token"
