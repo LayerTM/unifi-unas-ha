@@ -19,7 +19,7 @@ from pathlib import Path
 # Snippets that mark a value as an intentional placeholder (allowed).
 ALLOW = re.compile(
     r"(?i)(redacted|example|placeholder|synthetic|dummy|sample|<[a-z0-9_.\-]+>|"
-    r"aa:bb:cc|00:11:22|de:ad:be|0{6,}|x{4,})"
+    r"aa:bb:cc|aabbcc|00:11:22|de:ad:be|0{6,}|x{4,})"
 )
 
 # name -> compiled pattern. Each matches a *real-looking* secret/PII value.
