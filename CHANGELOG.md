@@ -6,9 +6,34 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Planned
+## [1.1.0] — 2026-07-01
 
-- Fan-mode select and snapshot controls in Home Assistant.
+Richer monitoring plus update entities and a fan-mode selector. All new read
+paths were verified against real hardware.
+
+### Added
+
+- **Sensors**: per-disk read/write rate; pool data-scrubbing status; last-boot
+  (timestamp) and network link speed; a privacy-safe **account count**
+  (session-only — read from the `total` field; the account list, which is PII,
+  is never parsed, returned, stored, or logged).
+- **Per-share sub-devices** (session-only): usage, quota, member count and
+  encryption sensors, plus snapshot-enabled and remote-backup binary sensors.
+- **Update entities** for UniFi OS and the Drive app (session-only): installed
+  and latest versions, with an Install button when control actions are opted in
+  (an owner account is required to install). Versions are normalized so the same
+  release in a different format does not read as an available update.
+- **Fan-mode selector** (opt-in control) using the hardware-verified
+  `{"profile": …}` payload.
+- **CLI/MCP**: a `fan` command, `status --json`, and an `update-drive-app`
+  command; MCP gains confirmation-gated `set_fan_profile` and `update_drive_app`
+  write tools and a `get_fan_profile` read tool.
+
+### Security
+
+- The account-count feature reads only the count; individual user accounts are
+  never exposed. Session-only entities are created only under username/password
+  auth; API-key configs are unaffected.
 
 ## [1.0.0] — 2026-07-01
 

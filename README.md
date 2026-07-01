@@ -33,14 +33,15 @@ Two authentication methods are supported; pick one during setup:
 
 ## Entities
 
-Everything is grouped under one hub device (the UNAS), with a sub-device per disk.
+Everything is grouped under one hub device (the UNAS), with a sub-device per disk, per pool and (with local-account auth) per share.
 
 - **Storage** — used / total / free, usage %, RAID level, storage status, pool count.
-- **System** — CPU usage %, CPU temperature, memory usage %, network receive/transmit, UniFi OS and Drive app versions.
+- **System** — CPU usage %, CPU temperature, memory usage %, network throughput, link speed, last boot, UniFi OS and Drive app versions.
 - **Health** — disks-at-risk count, average disk temperature, a `storage problem` binary sensor, and a connectivity (`online`) binary sensor.
-- **Per disk** — temperature, power-on hours, health score, bad sectors, state, and a per-disk `problem` binary sensor.
-
-With local-account auth, shares are also read and factored into health (they are not exposed as their own entities).
+- **Per disk** — temperature, read/write rate, power-on hours, health score, bad sectors, state, and a per-disk `problem` binary sensor.
+- **Per pool** — RAID level, status, usage %, capacity, used space, data-scrubbing status.
+- **Per share** *(local-account auth)* — usage, quota, member count, encryption, and snapshot / remote-backup binary sensors. A privacy-safe **account count** is also exposed (only the number of accounts — never the accounts themselves).
+- **Updates** *(local-account auth)* — UniFi OS and Drive-app update entities (install requires opt-in controls with an owner account).
 
 Requires **Home Assistant 2026.6+** (Python 3.14). Configuration is through the UI (host, port, TLS, and auth method); re-authentication is supported.
 
@@ -67,9 +68,9 @@ The `aiounas` client is bundled inside the integration and has no external depen
 
 ## Control actions (opt-in)
 
-Off by default. Enable **Configure → Enable control actions** to add buttons for **reboot, shut down, install UniFi OS update, install Drive-app update**. Controls require **username/password** auth — an API key is read-only, and **power/firmware need an owner/admin account**; a refused action reports a clear permissions error.
+Off by default. Enable **Configure → Enable control actions** to add buttons for **reboot, shut down, install UniFi OS update, install Drive-app update**, a **fan-mode selector**, and the **Install** buttons on the update entities. Controls require **username/password** auth — an API key is read-only, and **power/firmware need an owner/admin account**; a refused action reports a clear permissions error.
 
-Planned: a fan-mode selector and snapshot controls.
+Planned: snapshot controls.
 
 ## Beyond Home Assistant: CLI & MCP
 
@@ -78,6 +79,9 @@ The same client also powers a command-line tool and an MCP server for scripts, a
 ```bash
 pip install "aiounas[cli]"        # CLI
 unifi-unas status                 # storage, disks, system summary
+unifi-unas status --json          # machine-readable output
+unifi-unas fan                    # show the fan profile
+unifi-unas fan quiet              # set it (write — asks for confirmation, or --yes)
 unifi-unas reboot                 # write — asks for confirmation (or --yes)
 
 pip install "aiounas[mcp]"        # MCP server for LLMs/agents

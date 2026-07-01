@@ -120,6 +120,19 @@ the device; a MAC-derived value is used as its stable unique id.
 }
 ```
 
+The **full** payload (session auth) additionally carries firmware and app data
+used for update detection:
+
+- `hardware.firmwareVersion` — the **installed** UniFi OS version (e.g. `5.1.19`).
+  Note the top-level `firmwareVersion` is empty on real hardware; use this field.
+- `firmware.latest.version` — the **latest** UniFi OS version, often formatted
+  with a leading `v` and a `+build` suffix (e.g. `v5.1.19+3fbc1da`). Normalize
+  both sides (strip `v` and `+build`) before comparing, or an up-to-date device
+  reads as having an update.
+- `apps.controllers[]` — installed apps; the entry with `name == "drive"` gives
+  the Drive app `version` and its `updateAvailable` (a version string, or null).
+- `uptime` — seconds since boot.
+
 ### `GET /proxy/drive/api/v2/storage`
 
 Pools (RAID), physical disks with SMART-derived fields, and cache slots. Per-disk
