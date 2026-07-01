@@ -68,6 +68,21 @@ Requires **Home Assistant 2026.6+** (Python 3.14). Config is via the UI (host, p
 
 > The `aiounas` client is **bundled inside the integration** — there are no external dependencies (Home Assistant already ships `aiohttp`/`yarl`), so HACS installs everything. `src/aiounas/` is the development source of the client; `scripts/vendor_aiounas.py` syncs the bundled copy and CI fails if they drift. See [`docs/API.md`](docs/API.md) for the API and [`docs/design/`](docs/design) / [`docs/plans/`](docs/plans) for the design.
 
+## Beyond Home Assistant: CLI & MCP (v2, in progress)
+
+The same client also powers a command-line tool and an MCP server for scripts, agents and LLMs. Credentials come from the environment (`UNAS_HOST` + `UNAS_APIKEY`, or `UNAS_USER`/`UNAS_PASS`).
+
+```bash
+pip install "aiounas[cli]"        # CLI
+unifi-unas status                 # storage, disks, system summary
+unifi-unas reboot                 # write — asks for confirmation (or --yes)
+
+pip install "aiounas[mcp]"        # MCP server for LLMs/agents
+unifi-unas-mcp                    # read tools only; set UNAS_MCP_ALLOW_WRITES to expose gated writes
+```
+
+**Safety model:** reads are always open; writes require explicit confirmation — the CLI prompts (or `--yes`), and MCP write tools appear only with `UNAS_MCP_ALLOW_WRITES` set **and** each call must pass `confirm=true`.
+
 ## License
 
 [MIT](LICENSE) © LayerTM

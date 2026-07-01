@@ -5,10 +5,18 @@ All notable changes are documented here. This project adheres to
 
 ## [Unreleased]
 
-### Planned (v2)
-- Write operations: power (reboot / shutdown), fan mode, snapshots, firmware update.
-- A CLI and an MCP server over the shared `aiounas` client, behind a unified
-  agent / write-safety model (read-only default, confirmation-gated writes).
+### Added (v2, in progress)
+- **Write/action layer** (`UnasActionClient`): reboot, shutdown, install UniFi OS
+  update, install Drive-app update, set fan profile — kept separate from the
+  read-only client. Fan payload is unverified pending a live check.
+- **Home Assistant control buttons** (reboot / shutdown / updates) behind an
+  opt-in `enable_controls` option (default off; v1 stays read-only).
+- **`unifi-unas` CLI** and **`unifi-unas-mcp` MCP server** over the shared client,
+  with a unified safety model: reads are open, writes require explicit
+  confirmation (CLI `--yes`/prompt; MCP opt-in env **and** `confirm=true`).
+
+### Planned
+- Fan-mode select and snapshot controls in Home Assistant.
 - Zeroconf discovery; per-pool sensors.
 
 ## [0.1.0] — v1 (read-only)
