@@ -147,6 +147,21 @@ async def test_update_entities(
     assert registry.async_get_entity_id("update", DOMAIN, "AABBCC000001_drive_update")
 
 
+async def test_capability_error_degrades_gracefully(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    from custom_components.unifi_unas_rest.aiounas import UnasCapabilityError
+
+    # A transient scope denial on a supplementary fetch must NOT fail the update.
+    mock_aiounas.get_user_count = AsyncMock(side_effect=UnasCapabilityError("forbidden"))
+    await _setup(hass, config_entry)
+    assert config_entry.state is ConfigEntryState.LOADED
+
+    registry = er.async_get(hass)
+    # core sensors keep working; only the account-count degraded
+    assert registry.async_get_entity_id("sensor", DOMAIN, "AABBCC000001_storage_usage")
+
+
 async def test_unload(
     hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
 ) -> None:

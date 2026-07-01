@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import timedelta
 
@@ -65,6 +66,19 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
         self.client = client
         self.capabilities = capabilities
 
+    async def _optional[T](self, call: Callable[[], Awaitable[T]]) -> T | None:
+        """Run a supplementary (capability-scoped) fetch.
+
+        A scope denial (UnasCapabilityError) or API error degrades that field to
+        None instead of failing the whole update — so a transient 403 on shares/
+        users/updates/fan does not take the core sensors unavailable. Auth (401)
+        and connection errors still propagate so re-auth / retry fire.
+        """
+        try:
+            return await call()
+        except (UnasCapabilityError, UnasApiError):
+            return None
+
     async def _async_update_data(self) -> UnasData:
         try:
             storage, device_info, network_io = await asyncio.gather(
@@ -72,13 +86,20 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
                 self.client.get_device_info(),
                 self.client.get_network_io(),
             )
-            shares = await self.client.get_shares() if self.capabilities.shares else None
-            user_count = await self.client.get_user_count() if self.capabilities.users else None
-            update_info = await self.client.get_update_info() if self.capabilities.updates else None
-            try:
-                fan_control = await self.client.get_fan_control()
-            except (UnasCapabilityError, UnasApiError):
-                fan_control = None  # firmware without fan-control
+            shares = (
+                await self._optional(self.client.get_shares) if self.capabilities.shares else None
+            )
+            user_count = (
+                await self._optional(self.client.get_user_count)
+                if self.capabilities.users
+                else None
+            )
+            update_info = (
+                await self._optional(self.client.get_update_info)
+                if self.capabilities.updates
+                else None
+            )
+            fan_control = await self._optional(self.client.get_fan_control)
         except UnasAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except (UnasConnectionError, UnasApiError) as err:
