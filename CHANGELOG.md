@@ -20,7 +20,6 @@ adheres to [Semantic Versioning](https://semver.org/).
 ### Planned
 
 - Fan-mode select and snapshot controls in Home Assistant.
-- Zeroconf discovery.
 - Per-pool sensors.
 
 ## [0.1.0]
