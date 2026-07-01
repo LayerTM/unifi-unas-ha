@@ -20,7 +20,10 @@
       "drive_version": { "default": "mdi:package-variant-closed" },
       "disk_state": { "default": "mdi:harddisk" },
       "disk_health_score": { "default": "mdi:heart-pulse" },
-      "disk_bad_sectors": { "default": "mdi:alert-circle-outline" }
+      "disk_bad_sectors": { "default": "mdi:alert-circle-outline" },
+      "pool_raid_level": { "default": "mdi:layers-triple" },
+      "pool_status": { "default": "mdi:database-check" },
+      "pool_usage": { "default": "mdi:gauge" }
     },
     "button": {
       "shutdown": { "default": "mdi:power" },

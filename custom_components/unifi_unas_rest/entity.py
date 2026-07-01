@@ -10,7 +10,7 @@ from homeassistant.helpers.device_registry import (
 )
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .aiounas import Disk
+from .aiounas import Disk, Pool
 from .const import DEFAULT_PORT, DOMAIN, MANUFACTURER
 from .coordinator import UnasDataUpdateCoordinator
 
@@ -76,3 +76,35 @@ class UnasDiskEntity(CoordinatorEntity[UnasDataUpdateCoordinator]):
     @property
     def available(self) -> bool:
         return super().available and self.disk is not None
+
+
+class UnasPoolEntity(CoordinatorEntity[UnasDataUpdateCoordinator]):
+    """Base entity attached to a per-pool sub-device (grouped under the hub)."""
+
+    _attr_has_entity_name = True
+
+    def __init__(self, coordinator: UnasDataUpdateCoordinator, number: int, key: str) -> None:
+        super().__init__(coordinator)
+        self._number = number
+        entry = coordinator.config_entry
+        assert entry is not None
+        self._attr_unique_id = f"{entry.unique_id}_pool{number}_{key}"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry.entry_id}_pool{number}")},
+            via_device=(DOMAIN, entry.entry_id),
+            manufacturer=MANUFACTURER,
+            model="Storage pool",
+            name=f"Pool {number}",
+        )
+
+    @property
+    def pool(self) -> Pool | None:
+        """Return the current model for this pool, if present."""
+        return next(
+            (p for p in self.coordinator.data.storage.pools if p.number == self._number),
+            None,
+        )
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.pool is not None

@@ -26,8 +26,9 @@ async def test_setup_creates_entities(
 
     registry = er.async_get(hass)
     entries = er.async_entries_for_config_entry(registry, config_entry.entry_id)
-    # 16 aggregate + 2x5 disk sensors + connectivity + storage_problem + 2x disk_problem
-    assert len(entries) >= 25
+    # 16 aggregate + 2x5 disk + 1x5 pool sensors + connectivity + storage_problem
+    # + 2x disk_problem
+    assert len(entries) >= 30
 
     def state_of(platform: str, key: str) -> str | None:
         eid = registry.async_get_entity_id(platform, DOMAIN, f"AABBCC000001_{key}")
@@ -41,6 +42,25 @@ async def test_setup_creates_entities(
     assert state_of("binary_sensor", "disk1_problem") == "off"
     assert state_of("binary_sensor", "storage_problem") == "off"
     assert state_of("binary_sensor", "device_online") == "on"
+
+
+async def test_per_pool_sensors(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    await _setup(hass, config_entry)
+    registry = er.async_get(hass)
+
+    def state_of(key: str) -> str | None:
+        eid = registry.async_get_entity_id("sensor", DOMAIN, f"AABBCC000001_{key}")
+        assert eid, key
+        return hass.states.get(eid).state
+
+    assert state_of("pool1_raid_level") == "raid1"
+    assert state_of("pool1_status") == "fullyOperational"
+    assert state_of("pool1_usage") == "37.1"
+    # capacity + used exist as their own entities too
+    assert registry.async_get_entity_id("sensor", DOMAIN, "AABBCC000001_pool1_capacity")
+    assert registry.async_get_entity_id("sensor", DOMAIN, "AABBCC000001_pool1_used")
 
 
 async def test_unload(

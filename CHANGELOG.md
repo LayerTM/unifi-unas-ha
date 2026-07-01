@@ -16,11 +16,12 @@ adheres to [Semantic Versioning](https://semver.org/).
 - `unifi-unas` CLI and `unifi-unas-mcp` MCP server over the shared client, behind
   a unified safety model: reads are open, writes require explicit confirmation
   (CLI `--yes` or prompt; MCP an opt-in env var plus `confirm=true`).
+- Per-pool sensors: RAID level, status, usage, capacity and used space as a
+  sub-device per storage pool.
 
 ### Planned
 
 - Fan-mode select and snapshot controls in Home Assistant.
-- Per-pool sensors.
 
 ## [0.1.0]
 

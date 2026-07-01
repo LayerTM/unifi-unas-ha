@@ -88,7 +88,12 @@
       "disk_power_on_hours": { "name": "Power-on hours" },
       "disk_state": { "name": "State" },
       "disk_health_score": { "name": "Health score" },
-      "disk_bad_sectors": { "name": "Bad sectors" }
+      "disk_bad_sectors": { "name": "Bad sectors" },
+      "pool_raid_level": { "name": "RAID level" },
+      "pool_status": { "name": "Status" },
+      "pool_usage": { "name": "Usage" },
+      "pool_capacity": { "name": "Capacity" },
+      "pool_used": { "name": "Used" }
     },
     "binary_sensor": {
       "device_online": { "name": "Online" },

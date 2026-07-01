@@ -24,9 +24,9 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
 from . import UnasConfigEntry
-from .aiounas import Disk
+from .aiounas import Disk, Pool
 from .coordinator import UnasData, UnasDataUpdateCoordinator
-from .entity import UnasDiskEntity, UnasEntity
+from .entity import UnasDiskEntity, UnasEntity, UnasPoolEntity
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -41,6 +41,13 @@ class UnasDiskSensorDescription(SensorEntityDescription):
     """Per-disk sensor bound to a Disk accessor."""
 
     value_fn: Callable[[Disk], StateType]
+
+
+@dataclass(frozen=True, kw_only=True)
+class UnasPoolSensorDescription(SensorEntityDescription):
+    """Per-pool sensor bound to a Pool accessor."""
+
+    value_fn: Callable[[Pool], StateType]
 
 
 def _worst_pool_status(data: UnasData) -> StateType:
@@ -217,6 +224,49 @@ DISK_SENSORS: tuple[UnasDiskSensorDescription, ...] = (
     ),
 )
 
+POOL_SENSORS: tuple[UnasPoolSensorDescription, ...] = (
+    UnasPoolSensorDescription(
+        key="raid_level",
+        translation_key="pool_raid_level",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda p: p.raid_level or None,
+    ),
+    UnasPoolSensorDescription(
+        key="status",
+        translation_key="pool_status",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda p: p.status or None,
+    ),
+    UnasPoolSensorDescription(
+        key="usage",
+        translation_key="pool_usage",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value_fn=lambda p: p.usage_percent,
+    ),
+    UnasPoolSensorDescription(
+        key="capacity",
+        translation_key="pool_capacity",
+        native_unit_of_measurement=UnitOfInformation.BYTES,
+        device_class=SensorDeviceClass.DATA_SIZE,
+        suggested_unit_of_measurement=UnitOfInformation.TEBIBYTES,
+        suggested_display_precision=2,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda p: p.capacity,
+    ),
+    UnasPoolSensorDescription(
+        key="used",
+        translation_key="pool_used",
+        native_unit_of_measurement=UnitOfInformation.BYTES,
+        device_class=SensorDeviceClass.DATA_SIZE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_unit_of_measurement=UnitOfInformation.TEBIBYTES,
+        suggested_display_precision=2,
+        value_fn=lambda p: p.usage,
+    ),
+)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -229,6 +279,10 @@ async def async_setup_entry(
     for disk in coordinator.data.storage.disks:
         entities.extend(
             UnasDiskSensor(coordinator, disk.slot, description) for description in DISK_SENSORS
+        )
+    for pool in coordinator.data.storage.pools:
+        entities.extend(
+            UnasPoolSensor(coordinator, pool.number, description) for description in POOL_SENSORS
         )
     async_add_entities(entities)
 
@@ -267,3 +321,23 @@ class UnasDiskSensor(UnasDiskEntity, SensorEntity):
     def native_value(self) -> StateType:
         disk = self.disk
         return self.entity_description.value_fn(disk) if disk is not None else None
+
+
+class UnasPoolSensor(UnasPoolEntity, SensorEntity):
+    """A per-pool UNAS sensor."""
+
+    entity_description: UnasPoolSensorDescription
+
+    def __init__(
+        self,
+        coordinator: UnasDataUpdateCoordinator,
+        number: int,
+        description: UnasPoolSensorDescription,
+    ) -> None:
+        super().__init__(coordinator, number, description.key)
+        self.entity_description = description
+
+    @property
+    def native_value(self) -> StateType:
+        pool = self.pool
+        return self.entity_description.value_fn(pool) if pool is not None else None
