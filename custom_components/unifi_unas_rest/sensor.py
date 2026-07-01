@@ -222,6 +222,24 @@ DISK_SENSORS: tuple[UnasDiskSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda disk: disk.bad_sector_count,
     ),
+    UnasDiskSensorDescription(
+        key="read_rate",
+        translation_key="disk_read_rate",
+        native_unit_of_measurement=UnitOfDataRate.KIBIBYTES_PER_SECOND,
+        device_class=SensorDeviceClass.DATA_RATE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        value_fn=lambda disk: disk.read_kbps,
+    ),
+    UnasDiskSensorDescription(
+        key="write_rate",
+        translation_key="disk_write_rate",
+        native_unit_of_measurement=UnitOfDataRate.KIBIBYTES_PER_SECOND,
+        device_class=SensorDeviceClass.DATA_RATE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        value_fn=lambda disk: disk.write_kbps,
+    ),
 )
 
 POOL_SENSORS: tuple[UnasPoolSensorDescription, ...] = (
@@ -264,6 +282,12 @@ POOL_SENSORS: tuple[UnasPoolSensorDescription, ...] = (
         suggested_unit_of_measurement=UnitOfInformation.TEBIBYTES,
         suggested_display_precision=2,
         value_fn=lambda p: p.usage,
+    ),
+    UnasPoolSensorDescription(
+        key="scrubbing",
+        translation_key="pool_scrubbing",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda p: p.scrubbing_status or None,
     ),
 )
 

@@ -23,7 +23,8 @@
       "disk_bad_sectors": { "default": "mdi:alert-circle-outline" },
       "pool_raid_level": { "default": "mdi:layers-triple" },
       "pool_status": { "default": "mdi:database-check" },
-      "pool_usage": { "default": "mdi:gauge" }
+      "pool_usage": { "default": "mdi:gauge" },
+      "pool_scrubbing": { "default": "mdi:broom" }
     },
     "button": {
       "shutdown": { "default": "mdi:power" },

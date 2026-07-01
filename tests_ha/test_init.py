@@ -65,6 +65,23 @@ async def test_per_pool_sensors(
     assert registry.async_get_entity_id("sensor", DOMAIN, f"AABBCC000001_pool{pool}_used")
 
 
+async def test_disk_io_and_scrub_sensors(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    await _setup(hass, config_entry)
+    registry = er.async_get(hass)
+    pool = "00000000-0000-4000-8000-000000000001"
+
+    def state(key: str) -> str | None:
+        eid = registry.async_get_entity_id("sensor", DOMAIN, f"AABBCC000001_{key}")
+        assert eid, key
+        return hass.states.get(eid).state
+
+    assert state("disk1_read_rate") == "1536"
+    assert state("disk1_write_rate") == "768"
+    assert state(f"pool{pool}_scrubbing") == "idle"
+
+
 async def test_unload(
     hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
 ) -> None:
