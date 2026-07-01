@@ -12,10 +12,12 @@ from homeassistant.components.button import (
 )
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import UnasConfigEntry
 from .aiounas import UnasActionClient
+from .aiounas.exceptions import UnasAuthError, UnasCapabilityError, UnasConnectionError
 from .coordinator import UnasDataUpdateCoordinator
 from .entity import UnasEntity
 
@@ -83,4 +85,16 @@ class UnasButton(UnasEntity, ButtonEntity):
         self._action_client = action_client
 
     async def async_press(self) -> None:
-        await self.entity_description.press_fn(self._action_client)
+        try:
+            await self.entity_description.press_fn(self._action_client)
+        except UnasCapabilityError as err:
+            raise HomeAssistantError(
+                "The UNAS account is not permitted to perform this action. "
+                "Power and firmware actions require an owner/admin account."
+            ) from err
+        except UnasAuthError as err:
+            raise HomeAssistantError(
+                "Authentication with the UNAS failed; re-authenticate the integration."
+            ) from err
+        except UnasConnectionError as err:
+            raise HomeAssistantError(f"Could not reach the UNAS: {err}") from err

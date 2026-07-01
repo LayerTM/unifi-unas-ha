@@ -6,22 +6,43 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Added (v2, in progress)
-
-- Write/action layer (`UnasActionClient`): reboot, shutdown, UniFi OS firmware
-  update, Drive-app update, set fan profile — separate from the read-only client.
-  Fan write payload verified against hardware (`PUT {"profile": …}`).
-- Opt-in Home Assistant control buttons (reboot / shutdown / updates) behind an
-  `enable_controls` option, default off; v1 stays read-only.
-- `unifi-unas` CLI and `unifi-unas-mcp` MCP server over the shared client, behind
-  a unified safety model: reads are open, writes require explicit confirmation
-  (CLI `--yes` or prompt; MCP an opt-in env var plus `confirm=true`).
-- Per-pool sensors: RAID level, status, usage, capacity and used space as a
-  sub-device per storage pool.
-
 ### Planned
 
 - Fan-mode select and snapshot controls in Home Assistant.
+
+## [1.0.0] — 2026-07-01
+
+First stable release. Builds on the read-only foundation (0.1.0) with opt-in
+control, a CLI and MCP server, per-pool sensors, and integration branding.
+
+### Added
+
+- **Opt-in control (write) layer** (`UnasActionClient`, kept separate from the
+  read-only client): reboot, shutdown, UniFi OS firmware update, Drive-app
+  update, and fan profile. The fan write payload is verified against hardware
+  (`PUT {"profile": <cooling|default|quiet>}`).
+- **Home Assistant control buttons** (reboot / shutdown / updates) behind an
+  `enable_controls` option (default off). Created only for username/password
+  auth — an API key is read-only; power and firmware need an owner account.
+  Refusals surface a clear "insufficient permissions" message.
+- **`unifi-unas` CLI** and **`unifi-unas-mcp` MCP server** over the shared
+  client, behind a unified safety model: reads are open; writes require explicit
+  confirmation (CLI `--yes` or prompt; MCP an opt-in env var plus `confirm=true`).
+- **Per-pool sub-devices**: RAID level, status, usage, capacity and used space
+  per storage pool.
+- **Branding**: an in-repo brand icon (shown in Home Assistant) and MDI entity
+  icons via `icons.json`.
+- **Richer device page**: the UNAS is a `hub` with a MAC connection, a
+  "Visit device" link to the console, and per-disk serial numbers.
+- **CI**: hassfest and HACS validation.
+
+### Security
+
+- Control actions are opt-in and off by default; they need session auth (an
+  owner account for power/firmware), never an API key.
+- No user/account entities are exposed (accounts are personal data).
+- Credentials stay in the Home Assistant config entry; diagnostics redact
+  serials and credentials.
 
 ## [0.1.0]
 

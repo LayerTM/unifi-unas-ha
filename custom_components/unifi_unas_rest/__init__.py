@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -39,6 +40,8 @@ from .const import (
     PLATFORMS,
 )
 from .coordinator import UnasDataUpdateCoordinator
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
@@ -83,14 +86,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: UnasConfigEntry) -> bool
 
     action_client: UnasActionClient | None = None
     if entry.options.get(CONF_ENABLE_CONTROLS, DEFAULT_ENABLE_CONTROLS):
-        action_client = UnasActionClient(
-            session,
-            data[CONF_HOST],
-            build_auth(data),
-            port=port,
-            use_ssl=True,
-            verify_ssl=verify_ssl,
-        )
+        if data.get(CONF_API_KEY):
+            # The UNAS API key is read-only (writes -> 401/500); control actions
+            # require username/password auth. Don't create buttons that can't work.
+            _LOGGER.warning(
+                "UniFi UNAS controls are enabled but this entry uses API-key auth, "
+                "which cannot perform writes. Reconfigure with a username/password "
+                "(an owner account for power/firmware) to use control actions."
+            )
+        else:
+            action_client = UnasActionClient(
+                session,
+                data[CONF_HOST],
+                build_auth(data),
+                port=port,
+                use_ssl=True,
+                verify_ssl=verify_ssl,
+            )
 
     entry.runtime_data = UnasRuntimeData(coordinator, action_client)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

@@ -1,12 +1,12 @@
 # UniFi UNAS for Home Assistant (non-invasive)
 
-> Agentless, read-only monitoring for the Ubiquiti UniFi UNAS in Home Assistant.
+> Agentless monitoring — and opt-in control — for the Ubiquiti UniFi UNAS in Home Assistant.
 > Talks to the UniFi OS console over HTTPS only — no SSH, no packages installed on the NAS, no on-device agent.
 
 [![tests](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/tests.yml/badge.svg)](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/tests.yml)
 [![ha-integration](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/ha-integration.yml/badge.svg)](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/ha-integration.yml)
 [![secret-scan](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/secret-scan.yml)
-![Status: alpha](https://img.shields.io/badge/status-alpha-yellow)
+![Status: beta](https://img.shields.io/badge/status-beta-orange)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue)
 
 ---
@@ -60,15 +60,18 @@ The `aiounas` client is bundled inside the integration and has no external depen
 
 ## Security & privacy
 
-- Read-only in v1; works with a restricted account or a scoped API key.
+- Read-only by default; control actions are opt-in and off by default, and need username/password auth (an owner account for power/firmware) — never an API key.
+- User accounts are never exposed as entities (they are personal data).
 - Credentials live only in the Home Assistant config entry; nothing is sent to third parties.
 - A secret/PII scanner (`scripts/secret_scan.py`) runs in pre-commit and CI, and diagnostics are redacted.
 
-## Roadmap
+## Control actions (opt-in)
 
-**v2 (in progress):** opt-in control from Home Assistant — power, fan mode, snapshots, firmware — behind a unified safety model.
+Off by default. Enable **Configure → Enable control actions** to add buttons for **reboot, shut down, install UniFi OS update, install Drive-app update**. Controls require **username/password** auth — an API key is read-only, and **power/firmware need an owner/admin account**; a refused action reports a clear permissions error.
 
-## Beyond Home Assistant: CLI & MCP (v2, in progress)
+Planned: a fan-mode selector and snapshot controls.
+
+## Beyond Home Assistant: CLI & MCP
 
 The same client also powers a command-line tool and an MCP server for scripts, agents and LLMs. Credentials come from the environment (`UNAS_HOST` + `UNAS_APIKEY`, or `UNAS_USER`/`UNAS_PASS`).
 

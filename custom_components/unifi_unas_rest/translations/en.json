@@ -51,7 +51,7 @@
     "step": {
       "init": {
         "title": "Options",
-        "description": "Control actions send state-changing requests to the NAS. Leave off for read-only monitoring.",
+        "description": "Control actions send state-changing requests to the NAS. Leave off for read-only monitoring. They require username/password auth (an owner account for power and firmware); an API key cannot perform them.",
         "data": {
           "enable_controls": "Enable control actions (reboot, shut down, install updates)"
         }
