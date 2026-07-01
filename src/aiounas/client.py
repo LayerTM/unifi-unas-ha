@@ -83,5 +83,12 @@ class UnasClient:
             if err.status == 500:
                 raise UnasCapabilityError(_SHARES_HINT) from err
             raise
-        drives = data.get("drives") or []
-        return [Share.from_api(item) for item in drives]
+        drives = data.get("drives") if isinstance(data, dict) else None
+        return [Share.from_api(item) for item in (drives or []) if isinstance(item, dict)]
+
+    async def close(self) -> None:
+        """Release client resources.
+
+        A no-op: the ``aiohttp`` session is owned by the caller and is never
+        closed here. Present so consumers (CLI/MCP) can call it unconditionally.
+        """

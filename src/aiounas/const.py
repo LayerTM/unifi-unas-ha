@@ -6,6 +6,9 @@ from typing import Final
 
 DEFAULT_PORT: Final = 443
 DEFAULT_TIMEOUT: Final = 15
+# UniFi OS consoles ship a self-signed certificate, so certificate verification
+# is OFF by default for local access. Callers on a trusted LAN can override with
+# verify_ssl=True (and a pinned CA) — surfaced as an option in the HA config flow.
 DEFAULT_VERIFY_SSL: Final = False
 
 # UniFi OS core

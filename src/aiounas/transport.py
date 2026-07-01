@@ -72,7 +72,7 @@ class UnasTransport:
             raise UnasAuthError(f"unauthorized for {path}")
         if status == 403:
             raise UnasCapabilityError(f"forbidden for {path}")
-        if status >= 400:
+        if not (200 <= status < 300):
             raise UnasApiError(f"unexpected status {status} for {path}", status=status)
         return data
 
@@ -84,9 +84,17 @@ class UnasTransport:
                 asyncio.timeout(self._timeout),
                 self._session.get(url, headers=headers, ssl=self._ssl) as resp,
             ):
-                if resp.status < 400:
-                    return resp.status, await resp.json()
+                status = resp.status
+                if 200 <= status < 300:
+                    try:
+                        return status, await resp.json()
+                    except aiohttp.ContentTypeError:
+                        # A 2xx with a non-JSON body is the UniFi OS SPA/login
+                        # shell served after a silent session expiry. Surface a
+                        # clean auth error and DO NOT chain the source exception:
+                        # its request_info carries the session cookie / API key.
+                        raise UnasAuthError("non-JSON response; session may have expired") from None
                 await resp.read()
-                return resp.status, None
+                return status, None
         except (aiohttp.ClientError, TimeoutError) as err:
             raise UnasConnectionError(str(err)) from err

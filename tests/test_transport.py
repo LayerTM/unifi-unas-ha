@@ -8,7 +8,12 @@ from aiohttp import web
 from aiohttp.test_utils import TestServer
 
 from aiounas.auth import ApiKeyAuth, SessionAuth
-from aiounas.exceptions import UnasAuthError, UnasCapabilityError, UnasConnectionError
+from aiounas.exceptions import (
+    UnasApiError,
+    UnasAuthError,
+    UnasCapabilityError,
+    UnasConnectionError,
+)
 from aiounas.transport import UnasTransport
 
 
@@ -90,5 +95,58 @@ async def test_session_reauth_on_401() -> None:
             data = await t.get_json("/proxy/drive/api/v2/storage")
             assert data == {"pools": [], "disks": []}
             assert state["first"] is False
+    finally:
+        await server.close()
+
+
+async def test_2xx_non_json_raises_auth_without_leaking_credentials() -> None:
+    async def root(_: web.Request) -> web.Response:
+        return web.Response(text="", headers={"X-CSRF-Token": "c"})
+
+    async def storage(_: web.Request) -> web.Response:
+        # 200 with an HTML body: the UniFi OS SPA/login shell on session expiry.
+        return web.Response(text="<html>login</html>", content_type="text/html")
+
+    app = web.Application()
+    app.router.add_get("/", root)
+    app.router.add_get("/proxy/drive/api/v2/storage", storage)
+    server = TestServer(app)
+    await server.start_server()
+    try:
+        async with aiohttp.ClientSession() as session:
+            secret = "api-key-must-not-leak-0123456789"
+            t = UnasTransport(
+                session, str(server.host), ApiKeyAuth(secret), port=int(server.port), use_ssl=False
+            )
+            with pytest.raises(UnasAuthError) as excinfo:
+                await t.get_json("/proxy/drive/api/v2/storage")
+            # The source ContentTypeError carries the request headers (incl. the
+            # API key); it must NOT be chained onto the raised error.
+            assert excinfo.value.__cause__ is None
+            assert secret not in repr(excinfo.value.__cause__)
+    finally:
+        await server.close()
+
+
+async def test_non_2xx_below_400_not_treated_as_success() -> None:
+    async def root(_: web.Request) -> web.Response:
+        return web.Response(text="")
+
+    async def storage(_: web.Request) -> web.Response:
+        # A 3xx carrying a JSON body must not be returned as valid data.
+        return web.json_response({"pools": []}, status=307)
+
+    app = web.Application()
+    app.router.add_get("/", root)
+    app.router.add_get("/proxy/drive/api/v2/storage", storage)
+    server = TestServer(app)
+    await server.start_server()
+    try:
+        async with aiohttp.ClientSession() as session:
+            t = UnasTransport(
+                session, str(server.host), ApiKeyAuth("k"), port=int(server.port), use_ssl=False
+            )
+            with pytest.raises(UnasApiError):
+                await t.get_json("/proxy/drive/api/v2/storage")
     finally:
         await server.close()

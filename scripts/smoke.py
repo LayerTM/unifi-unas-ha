@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Live read-only smoke test against a real UNAS console.
 
-Credentials come from the environment and are never written anywhere. Serials
-and MAC are masked in the output. This is a manual tool, not part of CI.
+Credentials come from the environment and are never written anywhere. Serials,
+MAC, and share names are masked in the output. This is a manual tool, not CI.
 
     UNAS_HOST=192.168.1.x UNAS_APIKEY=... python scripts/smoke.py
     UNAS_HOST=192.168.1.x UNAS_USER=... UNAS_PASS=... python scripts/smoke.py
@@ -80,7 +80,7 @@ async def _run() -> int:
             for share in shares:
                 quota = "unlimited" if share.quota_bytes is None else str(share.quota_bytes)
                 print(
-                    f"  {share.name:<16} {share.usage / 1e9:.1f} GB quota={quota} "
+                    f"  {_mask(share.name):<16} {share.usage / 1e9:.1f} GB quota={quota} "
                     f"snapshot={share.snapshot_enabled}"
                 )
     return 0

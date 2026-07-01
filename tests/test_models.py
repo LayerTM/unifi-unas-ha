@@ -63,3 +63,9 @@ def test_identity(fixture: Fx) -> None:
     ident = SystemIdentity.from_api(fixture("system_short"))
     assert ident.mac == "AABBCC000001"
     assert ident.model_shortname == "UNAS2B"
+
+
+def test_share_quota_accepts_numeric_string() -> None:
+    # some firmware encodes numbers as strings
+    assert Share.from_api({"name": "x", "quota": "5000"}).quota_bytes == 5000
+    assert Share.from_api({"name": "x", "quota": "-1"}).quota_bytes is None

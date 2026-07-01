@@ -22,13 +22,19 @@ def _f(value: Any, default: float = 0.0) -> float:
 
 
 def _i(value: Any) -> int | None:
-    """Coerce to int or None (bools are treated as absent)."""
+    """Coerce to int or None (bools are treated as absent).
+
+    Numeric strings (e.g. ``"5000"``, ``"-1"``) are accepted, since some
+    firmware encodes numbers as strings.
+    """
     if isinstance(value, bool):
         return None
     if isinstance(value, int):
         return value
     if isinstance(value, float):
         return int(value)
+    if isinstance(value, str) and value.strip().lstrip("-").isdigit():
+        return int(value.strip())
     return None
 
 
