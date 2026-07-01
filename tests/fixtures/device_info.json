@@ -1,0 +1,23 @@
+{
+  "networkInterfaces": [
+    {
+      "interface": "ethernet",
+      "interfaceName": "eth0",
+      "connected": true,
+      "maxSpeed": "2.5 GbE",
+      "linkSpeed": "2.5 GbE",
+      "address": "192.0.2.10",
+      "mac": "AA:BB:CC:00:00:01"
+    }
+  ],
+  "usbs": [{ "portId": "1", "connected": false }],
+  "version": "4.3.6",
+  "name": "Name-Example",
+  "model": "UNAS2B",
+  "startupTime": "2026-06-18T10:58:15Z",
+  "memory": { "free": 446720, "total": 3970688, "available": 2406848 },
+  "cpu": { "currentload": 0.098, "temperature": 66.3 },
+  "firmwareVersion": "5.1.19",
+  "status": "STATE_RUNNING",
+  "sfpAggregation": false
+}

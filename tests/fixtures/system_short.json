@@ -1,0 +1,9 @@
+{
+  "hardware": { "shortname": "UNAS2B" },
+  "name": "Name-Example",
+  "mac": "AABBCC000001",
+  "deviceState": "setup",
+  "cloudConnected": true,
+  "isSingleUser": false,
+  "isSsoEnabled": true
+}

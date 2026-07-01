@@ -4,6 +4,8 @@ captures/
 secrets.yaml
 *.local.json
 *.creds
+raw.json
+*.raw.json
 .env
 .env.*
 !.env.example
@@ -17,6 +19,7 @@ build/
 dist/
 .venv/
 venv/
+uv.lock
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/

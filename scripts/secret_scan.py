@@ -17,37 +17,66 @@ import sys
 from pathlib import Path
 
 # Snippets that mark a value as an intentional placeholder (allowed).
+# NOTE: keep these anchored to explicit placeholder tokens. Do NOT add broad
+# substrings like ``0{6,}`` or ``x{4,}`` — a real MAC/serial can contain long
+# zero runs (e.g. ``F492BF000000``) and would then slip past the scanner.
 ALLOW = re.compile(
     r"(?i)(redacted|example|placeholder|synthetic|dummy|sample|<[a-z0-9_.\-]+>|"
-    r"aa:bb:cc|00:11:22|de:ad:be|0{6,}|x{4,})"
+    r"aa:bb:cc|aabbcc|00:11:22|de:ad:be)"
 )
 
 # name -> compiled pattern. Each matches a *real-looking* secret/PII value.
 PATTERNS: dict[str, re.Pattern[str]] = {
-    "UniFi direct-connect domain": re.compile(r"\b[0-9a-f]{16,}\.[0-9a-z.]*id\.ui\.direct\b"),
+    "UniFi direct-connect domain": re.compile(r"(?i)\b[0-9a-z]{8,}\.[0-9a-z.]*id\.ui\.direct\b"),
     "JWT / bearer token": re.compile(
         r"\beyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{4,}"
     ),
     "MAC address": re.compile(r"\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b"),
+    "MAC address (dotted)": re.compile(r"\b[0-9A-Fa-f]{4}\.[0-9A-Fa-f]{4}\.[0-9A-Fa-f]{4}\b"),
+    "MAC/serial (bare 12-hex)": re.compile(
+        r"(?<![0-9A-Fa-f:.\-])[0-9A-Fa-f]{12}(?![0-9A-Fa-f:.\-])"
+    ),
     "GPS coordinate field": re.compile(
-        r'"(?:lat|long|latitude|longitude)"\s*:\s*-?\d{1,3}\.\d{3,}'
+        r'"(?:lat|lon|lng|long|latitude|longitude)"\s*:\s*-?\d{1,3}\.\d{3,}'
     ),
     "device serial field": re.compile(r'"serial(?:no|Number)?"\s*:\s*"[^"<\s][^"<]{2,}"'),
     "MAC field value": re.compile(r'"mac(?:Address)?"\s*:\s*"[^"<\s][^"<]{5,}"'),
     "directConnectDomain field": re.compile(r'"directConnectDomain"\s*:\s*"[^"<\s][^"<]+"'),
     "X-API-Key value": re.compile(r'(?i)x-api-key\s*[:=]\s*["\']?[A-Za-z0-9_\-]{16,}'),
     "TOKEN cookie value": re.compile(r"\bTOKEN=[A-Za-z0-9._\-]{16,}"),
-    "hardcoded password": re.compile(
-        r'(?i)\bpassword\b\s*[:=]\s*["\'][^"\'{}<\s]{4,}["\']'
-    ),
+    "hardcoded password": re.compile(r'(?i)\bpassword\b\s*[:=]\s*["\'][^"\'{}<\s]{4,}["\']'),
 }
 
-SKIP_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__",
-             ".mypy_cache", ".ruff_cache", ".pytest_cache", "captures", ".secrets"}
-SKIP_SUFFIX = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".svg",
-               ".pdf", ".zip", ".gz", ".mo", ".woff", ".woff2"}
-# The scanner defines the patterns as literals; don't scan itself for them.
-SELF = Path(__file__).name
+SKIP_DIRS = {
+    ".git",
+    ".venv",
+    "venv",
+    "node_modules",
+    "__pycache__",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".pytest_cache",
+    "captures",
+    ".secrets",
+}
+SKIP_SUFFIX = {
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".webp",
+    ".ico",
+    ".svg",
+    ".pdf",
+    ".zip",
+    ".gz",
+    ".mo",
+    ".woff",
+    ".woff2",
+}
+# These files legitimately hold pattern literals / synthetic PII test vectors,
+# so they are excluded from scanning (both are small and code-reviewed).
+SKIP_FILES = {Path(__file__).name, "test_secret_scan.py"}
 
 
 def iter_files(root: Path):
@@ -58,7 +87,7 @@ def iter_files(root: Path):
             continue
         if p.suffix.lower() in SKIP_SUFFIX:
             continue
-        if p.name == SELF:
+        if p.name in SKIP_FILES:
             continue
         yield p
 
@@ -75,7 +104,7 @@ def scan_text(text: str) -> list[tuple[str, str]]:
 
 
 def main(argv: list[str]) -> int:
-    root = Path(argv[1]) if len(argv) > 1 else Path(".")
+    root = Path(argv[1]) if len(argv) > 1 else Path()
     problems: list[tuple[Path, str, str]] = []
     for f in iter_files(root):
         try:
