@@ -11,7 +11,6 @@ adheres to [Semantic Versioning](https://semver.org/).
 - Write operations: power (reboot / shutdown), fan mode, snapshots, firmware update.
 - CLI and MCP server over the shared `aiounas` client, behind a unified
   write-safety model (read-only default, confirmation-gated writes).
-- Zeroconf discovery.
 - Per-pool sensors.
 
 ## [0.1.0]

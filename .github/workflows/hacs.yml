@@ -1,0 +1,19 @@
+name: hacs
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "30 4 * * *"
+
+jobs:
+  hacs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hacs/action@main
+        with:
+          category: integration
+          # Brand assets ship in-repo (custom_components/.../brand/, supported on
+          # HA 2026.3+), not via the home-assistant/brands repo, so skip that check.
+          ignore: brands
