@@ -109,3 +109,6 @@ async def test_reauth(
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reauth_successful"
     assert config_entry.data[CONF_API_KEY] == "new-key-value"
+    # async_update_reload_and_abort schedules a reload; let it finish so no
+    # background task lingers past teardown.
+    await hass.async_block_till_done()
