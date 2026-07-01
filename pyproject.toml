@@ -29,6 +29,12 @@ dev = [
   "mypy>=1.11",
   "ruff>=0.6",
 ]
+# Home Assistant integration dev/test. Requires Python 3.14 (HA 2026.6+).
+# pytest-homeassistant-custom-component pins the matching Home Assistant version;
+# let the resolver pick the newest that lines up with a stable HA release.
+ha = [
+  "pytest-homeassistant-custom-component==0.13.340",  # matches stable HA 2026.6.4
+]
 
 [project.urls]
 Homepage = "https://github.com/LayerTM/unifi-unas-ha"
@@ -47,12 +53,15 @@ src = ["src", "custom_components", "tests"]
 select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC", "RUF", "PTH", "TID"]
 
 [tool.mypy]
+# Library (aiounas) targets 3.12+. The HA integration is checked separately with
+# `mypy --python-version 3.14 custom_components/unifi_unas_rest` (needs HA + 3.13+
+# syntax), since Home Assistant itself requires Python 3.14.
 python_version = "3.12"
 strict = true
 warn_unused_ignores = true
 warn_redundant_casts = true
 disallow_any_generics = true
-files = ["src", "custom_components"]
+files = ["src/aiounas"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

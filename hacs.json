@@ -1,5 +1,5 @@
 {
   "name": "UniFi UNAS (non-invasive)",
-  "homeassistant": "2024.12.0",
+  "homeassistant": "2026.6.0",
   "render_readme": true
 }

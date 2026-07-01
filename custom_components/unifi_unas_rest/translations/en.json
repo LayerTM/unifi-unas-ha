@@ -1,0 +1,88 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to your UniFi UNAS",
+        "description": "Read-only monitoring over the local console API. Nothing is installed on the NAS.",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "verify_ssl": "Verify TLS certificate",
+          "auth_method": "Authentication method"
+        },
+        "data_description": {
+          "host": "IP address or hostname of the UNAS console.",
+          "verify_ssl": "UniFi OS uses a self-signed certificate; leave off unless you pin a CA."
+        }
+      },
+      "api_key": {
+        "title": "API key",
+        "description": "Create an API key in the UniFi OS UI. It grants read-only access to storage, disks and system telemetry (it cannot read users or shares).",
+        "data": { "api_key": "API key" }
+      },
+      "password": {
+        "title": "Local account",
+        "description": "Use a least-privilege local account. This also exposes shares and snapshots.",
+        "data": { "username": "Username", "password": "Password" }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate UniFi UNAS",
+        "description": "The stored credentials are no longer valid. Enter them again.",
+        "data": {
+          "api_key": "API key",
+          "username": "Username",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid authentication.",
+      "cannot_connect": "Failed to connect.",
+      "insufficient_permissions": "This credential lacks permission to read the required data.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This UNAS is already configured.",
+      "wrong_device": "The credentials belong to a different UNAS.",
+      "reauth_successful": "Re-authentication was successful."
+    }
+  },
+  "selector": {
+    "auth_method": {
+      "options": {
+        "api_key": "API key (recommended, read-only)",
+        "password": "Username & password"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "storage_used": { "name": "Storage used" },
+      "storage_total": { "name": "Storage total" },
+      "storage_free": { "name": "Storage free" },
+      "storage_usage": { "name": "Storage usage" },
+      "storage_status": { "name": "Storage status" },
+      "raid_level": { "name": "RAID level" },
+      "pool_count": { "name": "Pools" },
+      "disks_at_risk": { "name": "Disks at risk" },
+      "average_disk_temperature": { "name": "Average disk temperature" },
+      "cpu_usage": { "name": "CPU usage" },
+      "cpu_temperature": { "name": "CPU temperature" },
+      "memory_usage": { "name": "Memory usage" },
+      "network_rx": { "name": "Network receive" },
+      "network_tx": { "name": "Network transmit" },
+      "unifi_os_version": { "name": "UniFi OS version" },
+      "drive_version": { "name": "Drive app version" },
+      "disk_temperature": { "name": "Temperature" },
+      "disk_power_on_hours": { "name": "Power-on hours" },
+      "disk_state": { "name": "State" },
+      "disk_health_score": { "name": "Health score" },
+      "disk_bad_sectors": { "name": "Bad sectors" }
+    },
+    "binary_sensor": {
+      "device_online": { "name": "Online" },
+      "storage_problem": { "name": "Storage problem" },
+      "disk_problem": { "name": "Problem" }
+    }
+  }
+}
