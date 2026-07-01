@@ -102,12 +102,18 @@
       "pool_usage": { "name": "Usage" },
       "pool_capacity": { "name": "Capacity" },
       "pool_used": { "name": "Used" },
-      "pool_scrubbing": { "name": "Data scrubbing" }
+      "pool_scrubbing": { "name": "Data scrubbing" },
+      "share_usage": { "name": "Usage" },
+      "share_quota": { "name": "Quota" },
+      "share_members": { "name": "Members" },
+      "share_encryption": { "name": "Encryption" }
     },
     "binary_sensor": {
       "device_online": { "name": "Online" },
       "storage_problem": { "name": "Storage problem" },
-      "disk_problem": { "name": "Problem" }
+      "disk_problem": { "name": "Problem" },
+      "share_snapshot": { "name": "Snapshots" },
+      "share_backup": { "name": "Remote backup" }
     },
     "button": {
       "reboot": { "name": "Reboot" },

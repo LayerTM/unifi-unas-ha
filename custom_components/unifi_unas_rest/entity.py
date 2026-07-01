@@ -10,7 +10,7 @@ from homeassistant.helpers.device_registry import (
 )
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .aiounas import Disk, Pool
+from .aiounas import Disk, Pool, Share
 from .const import DEFAULT_PORT, DOMAIN, MANUFACTURER
 from .coordinator import UnasDataUpdateCoordinator
 
@@ -114,3 +114,35 @@ class UnasPoolEntity(CoordinatorEntity[UnasDataUpdateCoordinator]):
     @property
     def available(self) -> bool:
         return super().available and self.pool is not None
+
+
+class UnasShareEntity(CoordinatorEntity[UnasDataUpdateCoordinator]):
+    """Base entity attached to a per-share sub-device (grouped under the hub)."""
+
+    _attr_has_entity_name = True
+
+    def __init__(self, coordinator: UnasDataUpdateCoordinator, share: Share, key: str) -> None:
+        super().__init__(coordinator)
+        self._share_id = share.id
+        entry = coordinator.config_entry
+        assert entry is not None
+        self._attr_unique_id = f"{entry.unique_id}_share{share.id}_{key}"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry.entry_id}_share{share.id}")},
+            via_device=(DOMAIN, entry.entry_id),
+            manufacturer=MANUFACTURER,
+            model="Shared drive",
+            name=share.name or f"Share {share.id}",
+        )
+
+    @property
+    def share(self) -> Share | None:
+        """Return the current model for this share, if present."""
+        return next(
+            (s for s in (self.coordinator.data.shares or []) if s.id == self._share_id),
+            None,
+        )
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.share is not None

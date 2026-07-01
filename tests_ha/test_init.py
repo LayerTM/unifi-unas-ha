@@ -107,6 +107,32 @@ async def test_user_count_sensor(
     assert hass.states.get(eid).state == "6"
 
 
+async def test_per_share_entities(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    await _setup(hass, config_entry)
+    registry = er.async_get(hass)
+    s1 = "00000000-0000-4000-8000-000000000011"  # Share1 in the fixture
+
+    def sensor(key: str) -> str | None:
+        eid = registry.async_get_entity_id("sensor", DOMAIN, f"AABBCC000001_share{s1}_{key}")
+        assert eid, key
+        return hass.states.get(eid).state
+
+    def binary(key: str) -> str | None:
+        eid = registry.async_get_entity_id("binary_sensor", DOMAIN, f"AABBCC000001_share{s1}_{key}")
+        assert eid, key
+        return hass.states.get(eid).state
+
+    assert sensor("members") == "4"
+    assert sensor("encryption") == "unencrypted"
+    assert binary("snapshot") == "on"  # Share1 has snapshots enabled
+    assert binary("backup") == "off"
+    # usage + quota entities exist (quota is unlimited -> unknown state, still an entity)
+    assert registry.async_get_entity_id("sensor", DOMAIN, f"AABBCC000001_share{s1}_usage")
+    assert registry.async_get_entity_id("sensor", DOMAIN, f"AABBCC000001_share{s1}_quota")
+
+
 async def test_unload(
     hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
 ) -> None:

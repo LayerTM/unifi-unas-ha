@@ -15,9 +15,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import UnasConfigEntry
-from .aiounas import Disk
+from .aiounas import Disk, Share
 from .coordinator import UnasData, UnasDataUpdateCoordinator
-from .entity import UnasDiskEntity, UnasEntity
+from .entity import UnasDiskEntity, UnasEntity, UnasShareEntity
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -28,6 +28,11 @@ class UnasBinaryDescription(BinarySensorEntityDescription):
 @dataclass(frozen=True, kw_only=True)
 class UnasDiskBinaryDescription(BinarySensorEntityDescription):
     value_fn: Callable[[Disk], bool]
+
+
+@dataclass(frozen=True, kw_only=True)
+class UnasShareBinaryDescription(BinarySensorEntityDescription):
+    value_fn: Callable[[Share], bool]
 
 
 def _has_storage_problem(data: UnasData) -> bool:
@@ -53,6 +58,21 @@ DISK_BINARY_SENSORS: tuple[UnasDiskBinaryDescription, ...] = (
     ),
 )
 
+SHARE_BINARY_SENSORS: tuple[UnasShareBinaryDescription, ...] = (
+    UnasShareBinaryDescription(
+        key="snapshot",
+        translation_key="share_snapshot",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda s: s.snapshot_enabled,
+    ),
+    UnasShareBinaryDescription(
+        key="backup",
+        translation_key="share_backup",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda s: s.remote_backup_enabled,
+    ),
+)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -66,6 +86,10 @@ async def async_setup_entry(
     for disk in coordinator.data.storage.disks:
         entities.extend(
             UnasDiskBinarySensor(coordinator, disk.slot, d) for d in DISK_BINARY_SENSORS
+        )
+    for share in coordinator.data.shares or []:
+        entities.extend(
+            UnasShareBinarySensor(coordinator, share, d) for d in SHARE_BINARY_SENSORS
         )
     async_add_entities(entities)
 
@@ -119,3 +143,21 @@ class UnasDiskBinarySensor(UnasDiskEntity, BinarySensorEntity):
     def is_on(self) -> bool | None:
         disk = self.disk
         return self.entity_description.value_fn(disk) if disk is not None else None
+
+
+class UnasShareBinarySensor(UnasShareEntity, BinarySensorEntity):
+    entity_description: UnasShareBinaryDescription
+
+    def __init__(
+        self,
+        coordinator: UnasDataUpdateCoordinator,
+        share: Share,
+        description: UnasShareBinaryDescription,
+    ) -> None:
+        super().__init__(coordinator, share, description.key)
+        self.entity_description = description
+
+    @property
+    def is_on(self) -> bool | None:
+        share = self.share
+        return self.entity_description.value_fn(share) if share is not None else None

@@ -26,7 +26,13 @@
       "pool_raid_level": { "default": "mdi:layers-triple" },
       "pool_status": { "default": "mdi:database-check" },
       "pool_usage": { "default": "mdi:gauge" },
-      "pool_scrubbing": { "default": "mdi:broom" }
+      "pool_scrubbing": { "default": "mdi:broom" },
+      "share_members": { "default": "mdi:account-multiple" },
+      "share_encryption": { "default": "mdi:lock" }
+    },
+    "binary_sensor": {
+      "share_snapshot": { "default": "mdi:file-restore" },
+      "share_backup": { "default": "mdi:cloud-upload-outline" }
     },
     "button": {
       "shutdown": { "default": "mdi:power" },

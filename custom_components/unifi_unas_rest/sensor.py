@@ -25,9 +25,9 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
 from . import UnasConfigEntry
-from .aiounas import Disk, Pool
+from .aiounas import Disk, Pool, Share
 from .coordinator import UnasData, UnasDataUpdateCoordinator
-from .entity import UnasDiskEntity, UnasEntity, UnasPoolEntity
+from .entity import UnasDiskEntity, UnasEntity, UnasPoolEntity, UnasShareEntity
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -49,6 +49,13 @@ class UnasPoolSensorDescription(SensorEntityDescription):
     """Per-pool sensor bound to a Pool accessor."""
 
     value_fn: Callable[[Pool], StateType]
+
+
+@dataclass(frozen=True, kw_only=True)
+class UnasShareSensorDescription(SensorEntityDescription):
+    """Per-share sensor bound to a Share accessor."""
+
+    value_fn: Callable[[Share], StateType]
 
 
 def _worst_pool_status(data: UnasData) -> StateType:
@@ -314,6 +321,42 @@ POOL_SENSORS: tuple[UnasPoolSensorDescription, ...] = (
     ),
 )
 
+SHARE_SENSORS: tuple[UnasShareSensorDescription, ...] = (
+    UnasShareSensorDescription(
+        key="usage",
+        translation_key="share_usage",
+        native_unit_of_measurement=UnitOfInformation.BYTES,
+        device_class=SensorDeviceClass.DATA_SIZE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_unit_of_measurement=UnitOfInformation.GIBIBYTES,
+        suggested_display_precision=1,
+        value_fn=lambda s: s.usage,
+    ),
+    UnasShareSensorDescription(
+        key="quota",
+        translation_key="share_quota",
+        native_unit_of_measurement=UnitOfInformation.BYTES,
+        device_class=SensorDeviceClass.DATA_SIZE,
+        suggested_unit_of_measurement=UnitOfInformation.GIBIBYTES,
+        suggested_display_precision=1,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda s: s.quota_bytes,
+    ),
+    UnasShareSensorDescription(
+        key="members",
+        translation_key="share_members",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda s: s.member_count,
+    ),
+    UnasShareSensorDescription(
+        key="encryption",
+        translation_key="share_encryption",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda s: s.encryption_status or None,
+    ),
+)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -332,6 +375,10 @@ async def async_setup_entry(
     for pool in coordinator.data.storage.pools:
         entities.extend(
             UnasPoolSensor(coordinator, pool, description) for description in POOL_SENSORS
+        )
+    for share in coordinator.data.shares or []:
+        entities.extend(
+            UnasShareSensor(coordinator, share, description) for description in SHARE_SENSORS
         )
     async_add_entities(entities)
 
@@ -390,3 +437,23 @@ class UnasPoolSensor(UnasPoolEntity, SensorEntity):
     def native_value(self) -> StateType:
         pool = self.pool
         return self.entity_description.value_fn(pool) if pool is not None else None
+
+
+class UnasShareSensor(UnasShareEntity, SensorEntity):
+    """A per-share UNAS sensor."""
+
+    entity_description: UnasShareSensorDescription
+
+    def __init__(
+        self,
+        coordinator: UnasDataUpdateCoordinator,
+        share: Share,
+        description: UnasShareSensorDescription,
+    ) -> None:
+        super().__init__(coordinator, share, description.key)
+        self.entity_description = description
+
+    @property
+    def native_value(self) -> StateType:
+        share = self.share
+        return self.entity_description.value_fn(share) if share is not None else None
