@@ -1,0 +1,96 @@
+{
+  "pools": [
+    {
+      "number": 1,
+      "id": "00000000-0000-4000-8000-000000000001",
+      "preferLevel": "raid1",
+      "type": "lvm",
+      "status": "fullyOperational",
+      "capacity": 23991544709120,
+      "usage": 8894504435712,
+      "activeRaidGroupId": "00000000:00000000:00000000:00000001",
+      "raidGroups": [
+        {
+          "number": 1,
+          "id": "00000000:00000000:00000000:00000001",
+          "isSSDCache": false,
+          "currentLevel": "raid1",
+          "configLevel": "raid1",
+          "currentProtection": 1,
+          "expectedProtection": 1,
+          "recommendedDiskSize": 24000277250048,
+          "progress": 0,
+          "estimate": 0
+        }
+      ],
+      "initializingStatus": "successful",
+      "dataScrubbing": {
+        "status": "idle",
+        "estimate": null,
+        "schedule": { "enabled": false },
+        "lastTaskRun": null,
+        "nextRun": null
+      }
+    }
+  ],
+  "disks": [
+    {
+      "slotId": "1",
+      "poolId": "00000000-0000-4000-8000-000000000001",
+      "raidGroupId": "00000000:00000000:00000000:00000001",
+      "type": "HDD",
+      "state": "optimal",
+      "rpm": 7200,
+      "model": "WDC WUH722424ALE6L4",
+      "size": 24000277250048,
+      "sata": "SATA 3.5",
+      "ata": "ACS-5",
+      "nvmeVersion": "",
+      "firmware": "LVGNWHA2",
+      "sectorFormat": "512E",
+      "serial": "SN-EXAMPLE-0001",
+      "temperature": 47,
+      "powerOnHours": 3357,
+      "badSectorCount": 0,
+      "uncorrectableSectorCount": 0,
+      "readErrorRate": 0,
+      "smartReadErrorCount": 0,
+      "riskReasons": [],
+      "incompatibleReasons": [],
+      "readKBPS": 0,
+      "writeKBPS": 0,
+      "smartTestSupported": true,
+      "healthScore": 5
+    },
+    {
+      "slotId": "2",
+      "poolId": "00000000-0000-4000-8000-000000000001",
+      "raidGroupId": "00000000:00000000:00000000:00000001",
+      "type": "HDD",
+      "state": "optimal",
+      "rpm": 7200,
+      "model": "WDC WUH722424ALE6L4",
+      "size": 24000277250048,
+      "sata": "SATA 3.5",
+      "ata": "ACS-5",
+      "nvmeVersion": "",
+      "firmware": "LVGNWHA2",
+      "sectorFormat": "512E",
+      "serial": "SN-EXAMPLE-0002",
+      "temperature": 49,
+      "powerOnHours": 3357,
+      "badSectorCount": 0,
+      "uncorrectableSectorCount": 0,
+      "readErrorRate": 0,
+      "smartReadErrorCount": 0,
+      "riskReasons": [],
+      "incompatibleReasons": [],
+      "readKBPS": 0,
+      "writeKBPS": 0,
+      "smartTestSupported": true,
+      "healthScore": 5
+    }
+  ],
+  "cacheSlots": [],
+  "expansions": null
+}

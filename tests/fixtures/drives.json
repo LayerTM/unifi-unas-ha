@@ -1,0 +1,38 @@
+{
+  "drives": [
+    {
+      "id": "00000000-0000-4000-8000-000000000011",
+      "type": "shared",
+      "name": "Share1",
+      "status": "active",
+      "storagePoolId": "00000000-0000-4000-8000-000000000001",
+      "quota": -1,
+      "usage": 2670956052480,
+      "role": "admin",
+      "protections": {
+        "encryptionStatus": "unencrypted",
+        "remoteBackupEnabled": false,
+        "snapshotEnabled": true
+      },
+      "memberCount": 4,
+      "nfsIsolated": false
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000012",
+      "type": "shared",
+      "name": "Share2",
+      "status": "active",
+      "storagePoolId": "00000000-0000-4000-8000-000000000001",
+      "quota": 5000,
+      "usage": 2141562994688,
+      "role": "admin",
+      "protections": {
+        "encryptionStatus": "unencrypted",
+        "remoteBackupEnabled": false,
+        "snapshotEnabled": false
+      },
+      "memberCount": 4,
+      "nfsIsolated": false
+    }
+  ]
+}

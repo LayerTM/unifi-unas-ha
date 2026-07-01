@@ -37,15 +37,36 @@ PATTERNS: dict[str, re.Pattern[str]] = {
     "directConnectDomain field": re.compile(r'"directConnectDomain"\s*:\s*"[^"<\s][^"<]+"'),
     "X-API-Key value": re.compile(r'(?i)x-api-key\s*[:=]\s*["\']?[A-Za-z0-9_\-]{16,}'),
     "TOKEN cookie value": re.compile(r"\bTOKEN=[A-Za-z0-9._\-]{16,}"),
-    "hardcoded password": re.compile(
-        r'(?i)\bpassword\b\s*[:=]\s*["\'][^"\'{}<\s]{4,}["\']'
-    ),
+    "hardcoded password": re.compile(r'(?i)\bpassword\b\s*[:=]\s*["\'][^"\'{}<\s]{4,}["\']'),
 }
 
-SKIP_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__",
-             ".mypy_cache", ".ruff_cache", ".pytest_cache", "captures", ".secrets"}
-SKIP_SUFFIX = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".svg",
-               ".pdf", ".zip", ".gz", ".mo", ".woff", ".woff2"}
+SKIP_DIRS = {
+    ".git",
+    ".venv",
+    "venv",
+    "node_modules",
+    "__pycache__",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".pytest_cache",
+    "captures",
+    ".secrets",
+}
+SKIP_SUFFIX = {
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".webp",
+    ".ico",
+    ".svg",
+    ".pdf",
+    ".zip",
+    ".gz",
+    ".mo",
+    ".woff",
+    ".woff2",
+}
 # The scanner defines the patterns as literals; don't scan itself for them.
 SELF = Path(__file__).name
 
@@ -75,7 +96,7 @@ def scan_text(text: str) -> list[tuple[str, str]]:
 
 
 def main(argv: list[str]) -> int:
-    root = Path(argv[1]) if len(argv) > 1 else Path(".")
+    root = Path(argv[1]) if len(argv) > 1 else Path()
     problems: list[tuple[Path, str, str]] = []
     for f in iter_files(root):
         try:
