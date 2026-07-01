@@ -4,13 +4,12 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
+from custom_components.unifi_unas_rest.aiounas import UnasAuthError, UnasConnectionError
 from custom_components.unifi_unas_rest.const import DOMAIN
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
-
-from aiounas import UnasAuthError, UnasConnectionError
 
 
 async def _setup(hass: HomeAssistant, entry: MockConfigEntry) -> None:

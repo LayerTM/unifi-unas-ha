@@ -14,6 +14,10 @@ jobs:
           python-version: "3.14"
       - name: Install library + Home Assistant test stack
         run: pip install -e ".[dev,ha]"
+      - name: Vendored aiounas is in sync with src/
+        run: |
+          python scripts/vendor_aiounas.py
+          git diff --exit-code custom_components/unifi_unas_rest/aiounas
       - name: Type check integration (Python 3.14)
         run: mypy --python-version 3.14 custom_components/unifi_unas_rest
       - name: Integration tests

@@ -22,7 +22,7 @@ from homeassistant.helpers.selector import (
     SelectSelectorMode,
 )
 
-from aiounas import (
+from .aiounas import (
     ApiKeyAuth,
     SessionAuth,
     SystemIdentity,
@@ -31,8 +31,7 @@ from aiounas import (
     UnasClient,
     UnasConnectionError,
 )
-from aiounas.auth import AbstractAuth
-
+from .aiounas.auth import AbstractAuth
 from .const import (
     AUTH_API_KEY,
     AUTH_PASSWORD,

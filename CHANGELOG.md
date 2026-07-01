@@ -10,7 +10,6 @@ All notable changes are documented here. This project adheres to
 - A CLI and an MCP server over the shared `aiounas` client, behind a unified
   agent / write-safety model (read-only default, confirmation-gated writes).
 - Zeroconf discovery; per-pool sensors.
-- Publish `aiounas` to PyPI so the integration's manifest requirement resolves.
 
 ## [0.1.0] — v1 (read-only)
 

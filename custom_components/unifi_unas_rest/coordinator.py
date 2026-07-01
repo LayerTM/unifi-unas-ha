@@ -12,7 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from aiounas import (
+from .aiounas import (
     Capabilities,
     DeviceInfo,
     NetworkIO,
@@ -23,7 +23,6 @@ from aiounas import (
     UnasClient,
     UnasConnectionError,
 )
-
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)

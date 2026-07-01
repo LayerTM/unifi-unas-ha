@@ -23,9 +23,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
-from aiounas import Disk
-
 from . import UnasConfigEntry
+from .aiounas import Disk
 from .coordinator import UnasData, UnasDataUpdateCoordinator
 from .entity import UnasDiskEntity, UnasEntity
 

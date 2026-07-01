@@ -19,7 +19,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from aiounas import (
+from .aiounas import (
     ApiKeyAuth,
     SessionAuth,
     UnasAuthError,
@@ -27,8 +27,7 @@ from aiounas import (
     UnasConnectionError,
     probe,
 )
-from aiounas.auth import AbstractAuth
-
+from .aiounas.auth import AbstractAuth
 from .const import DEFAULT_PORT, DEFAULT_SCAN_INTERVAL, DEFAULT_VERIFY_SSL, PLATFORMS
 from .coordinator import UnasDataUpdateCoordinator
 

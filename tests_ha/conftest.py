@@ -14,6 +14,14 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from custom_components.unifi_unas_rest.aiounas import (
+    Capabilities,
+    DeviceInfo,
+    NetworkIO,
+    Share,
+    Storage,
+    SystemIdentity,
+)
 from custom_components.unifi_unas_rest.const import AUTH_API_KEY, CONF_AUTH_METHOD, DOMAIN
 from homeassistant.const import (
     CONF_API_KEY,
@@ -22,15 +30,6 @@ from homeassistant.const import (
     CONF_VERIFY_SSL,
 )
 from pytest_homeassistant_custom_component.common import MockConfigEntry
-
-from aiounas import (
-    Capabilities,
-    DeviceInfo,
-    NetworkIO,
-    Share,
-    Storage,
-    SystemIdentity,
-)
 
 _FX = Path(__file__).resolve().parents[1] / "tests" / "fixtures"
 

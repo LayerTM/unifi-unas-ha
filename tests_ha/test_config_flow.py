@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
+from custom_components.unifi_unas_rest.aiounas import UnasAuthError, UnasConnectionError
 from custom_components.unifi_unas_rest.const import (
     AUTH_API_KEY,
     AUTH_PASSWORD,
@@ -22,8 +23,6 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
-
-from aiounas import UnasAuthError, UnasConnectionError
 
 _HOST = {CONF_HOST: "192.0.2.10", CONF_PORT: 443, CONF_VERIFY_SSL: False}
 
