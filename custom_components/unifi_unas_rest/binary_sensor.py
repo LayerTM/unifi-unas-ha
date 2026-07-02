@@ -17,7 +17,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from . import UnasConfigEntry
 from .aiounas import Disk, Share
 from .coordinator import UnasData, UnasDataUpdateCoordinator
-from .entity import UnasDiskEntity, UnasEntity, UnasShareEntity
+from .entity import UnasDiskEntity, UnasEntity, UnasShareEntity, add_new_entities
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -84,15 +84,32 @@ async def async_setup_entry(
 ) -> None:
     """Set up UNAS binary sensors from a config entry."""
     coordinator = entry.runtime_data.coordinator
-    entities: list[BinarySensorEntity] = [UnasConnectivity(coordinator)]
-    entities.extend(UnasBinarySensor(coordinator, d) for d in BINARY_SENSORS)
-    for disk in coordinator.data.storage.disks:
-        entities.extend(
-            UnasDiskBinarySensor(coordinator, disk.slot, d) for d in DISK_BINARY_SENSORS
-        )
-    for share in coordinator.data.shares or []:
-        entities.extend(UnasShareBinarySensor(coordinator, share, d) for d in SHARE_BINARY_SENSORS)
-    async_add_entities(entities)
+    aggregate: list[BinarySensorEntity] = [UnasConnectivity(coordinator)]
+    aggregate.extend(UnasBinarySensor(coordinator, d) for d in BINARY_SENSORS)
+    async_add_entities(aggregate)
+
+    def _share(key: str) -> Share:
+        return next(s for s in (coordinator.data.shares or []) if s.id == key)
+
+    syncers = [
+        add_new_entities(
+            async_add_entities,
+            set(),
+            lambda: [d.slot for d in coordinator.data.storage.disks],
+            lambda slot: [UnasDiskBinarySensor(coordinator, slot, d) for d in DISK_BINARY_SENSORS],
+        ),
+        add_new_entities(
+            async_add_entities,
+            set(),
+            lambda: [s.id for s in (coordinator.data.shares or [])],
+            lambda key: [
+                UnasShareBinarySensor(coordinator, _share(key), d) for d in SHARE_BINARY_SENSORS
+            ],
+        ),
+    ]
+    for sync in syncers:
+        sync()
+        entry.async_on_unload(coordinator.async_add_listener(sync))
 
 
 class UnasConnectivity(UnasEntity, BinarySensorEntity):

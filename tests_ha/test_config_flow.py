@@ -170,3 +170,57 @@ async def test_reauth_unknown_error(
 ) -> None:
     mock_aiounas.async_prepare = AsyncMock(side_effect=ValueError("boom"))
     await _reauth_error(hass, config_entry, "unknown")
+
+
+async def test_reconfigure_updates_host(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    config_entry.add_to_hass(hass)
+    result = await config_entry.start_reconfigure_flow(hass)
+    assert result["step_id"] == "reconfigure"
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            CONF_HOST: "192.0.2.55",
+            CONF_PORT: 443,
+            CONF_VERIFY_SSL: False,
+            CONF_AUTH_METHOD: AUTH_API_KEY,
+        },
+    )
+    assert result["step_id"] == "api_key"
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_API_KEY: "new-key-000"}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert config_entry.data[CONF_HOST] == "192.0.2.55"
+    await hass.async_block_till_done()
+
+
+async def test_reconfigure_wrong_device_aborts(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    from custom_components.unifi_unas_rest.aiounas import SystemIdentity
+
+    # The probed device reports a different MAC -> must not silently rebind.
+    mock_aiounas.get_identity = AsyncMock(
+        return_value=SystemIdentity.from_api(
+            {"mac": "AABBCC00FFFF", "hardware": {"shortname": "X"}}
+        )
+    )
+    config_entry.add_to_hass(hass)
+    result = await config_entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            CONF_HOST: "192.0.2.55",
+            CONF_PORT: 443,
+            CONF_VERIFY_SSL: False,
+            CONF_AUTH_METHOD: AUTH_API_KEY,
+        },
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_API_KEY: "new-key-000"}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "wrong_device"

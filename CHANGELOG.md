@@ -6,6 +6,28 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.5.0] — 2026-07-02
+
+Quality scale raised to **gold**.
+
+### Added
+
+- **Reconfigure flow**: change host, port, TLS or credentials for an existing
+  entry without deleting it (the device MAC must still match).
+- **Dynamic devices**: disks, pools and shares that appear at runtime get their
+  entities without a reload; sub-devices that vanish can be deleted from the
+  device page (`async_remove_config_entry_device`).
+- **Documentation**: supported devices, supported functions, use cases, data-update
+  behaviour, known limitations, troubleshooting, and automation examples.
+
+### Changed
+
+- **Translated error messages** for every control action (shared `errors.py`
+  helper + an `exceptions` block in the translations).
+- High-churn sensors (network and per-disk throughput) are now **disabled by
+  default**; enable them per entity if wanted.
+- `quality_scale`: **silver → gold**.
+
 ## [1.4.0] — 2026-07-02
 
 Quality scale raised to **silver**.

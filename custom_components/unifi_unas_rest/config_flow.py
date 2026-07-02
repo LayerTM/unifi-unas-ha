@@ -7,6 +7,7 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant.config_entries import (
+    SOURCE_RECONFIGURE,
     ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
@@ -61,6 +62,30 @@ def _auth_from_input(method: str, user_input: dict[str, Any]) -> AbstractAuth:
     return SessionAuth(user_input[CONF_USERNAME], user_input[CONF_PASSWORD])
 
 
+def _connection_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
+    """Host / port / TLS / auth-method form, optionally prefilled (reconfigure)."""
+    d = defaults or {}
+    host = (
+        vol.Required(CONF_HOST, default=d[CONF_HOST]) if CONF_HOST in d else vol.Required(CONF_HOST)
+    )
+    return vol.Schema(
+        {
+            host: str,
+            vol.Required(CONF_PORT, default=d.get(CONF_PORT, DEFAULT_PORT)): int,
+            vol.Required(CONF_VERIFY_SSL, default=d.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL)): bool,
+            vol.Required(CONF_AUTH_METHOD, default=d.get(CONF_AUTH_METHOD, AUTH_API_KEY)): (
+                SelectSelector(
+                    SelectSelectorConfig(
+                        options=[AUTH_API_KEY, AUTH_PASSWORD],
+                        translation_key="auth_method",
+                        mode=SelectSelectorMode.LIST,
+                    )
+                )
+            ),
+        }
+    )
+
+
 class UnifiUnasConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for UniFi UNAS."""
 
@@ -81,22 +106,21 @@ class UnifiUnasConfigFlow(ConfigFlow, domain=DOMAIN):
             if user_input[CONF_AUTH_METHOD] == AUTH_API_KEY:
                 return await self.async_step_api_key()
             return await self.async_step_password()
+        return self.async_show_form(step_id="user", data_schema=_connection_schema())
 
-        schema = vol.Schema(
-            {
-                vol.Required(CONF_HOST): str,
-                vol.Required(CONF_PORT, default=DEFAULT_PORT): int,
-                vol.Required(CONF_VERIFY_SSL, default=DEFAULT_VERIFY_SSL): bool,
-                vol.Required(CONF_AUTH_METHOD, default=AUTH_API_KEY): SelectSelector(
-                    SelectSelectorConfig(
-                        options=[AUTH_API_KEY, AUTH_PASSWORD],
-                        translation_key="auth_method",
-                        mode=SelectSelectorMode.LIST,
-                    )
-                ),
-            }
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Change host / port / TLS / credentials for an existing entry."""
+        if user_input is not None:
+            self._data.update(user_input)
+            if user_input[CONF_AUTH_METHOD] == AUTH_API_KEY:
+                return await self.async_step_api_key()
+            return await self.async_step_password()
+        entry = self._get_reconfigure_entry()
+        return self.async_show_form(
+            step_id="reconfigure", data_schema=_connection_schema(dict(entry.data))
         )
-        return self.async_show_form(step_id="user", data_schema=schema)
 
     async def async_step_api_key(
         self, user_input: dict[str, Any] | None = None
@@ -133,6 +157,11 @@ class UnifiUnasConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "unknown"
             else:
                 await self.async_set_unique_id(identity.mac)
+                if self.source == SOURCE_RECONFIGURE:
+                    self._abort_if_unique_id_mismatch(reason="wrong_device")
+                    return self.async_update_reload_and_abort(
+                        self._get_reconfigure_entry(), data=data
+                    )
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(title=_title(identity, data), data=data)
         return self.async_show_form(step_id=step_id, data_schema=schema, errors=errors)

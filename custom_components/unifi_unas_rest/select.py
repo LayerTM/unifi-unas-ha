@@ -10,19 +10,14 @@ from __future__ import annotations
 from homeassistant.components.select import SelectEntity
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import UnasConfigEntry
 from .aiounas import UnasActionClient
-from .aiounas.exceptions import (
-    UnasAuthError,
-    UnasCapabilityError,
-    UnasConnectionError,
-    UnasError,
-)
+from .aiounas.exceptions import UnasError
 from .coordinator import UnasDataUpdateCoordinator
 from .entity import UnasEntity
+from .errors import action_error
 
 PARALLEL_UPDATES = 1  # serialize write actions
 
@@ -62,16 +57,6 @@ class UnasFanSelect(UnasEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         try:
             await self._action_client.set_fan_profile(option)
-        except UnasCapabilityError as err:
-            raise HomeAssistantError(
-                "The UNAS account is not permitted to change the fan profile."
-            ) from err
-        except UnasAuthError as err:
-            raise HomeAssistantError("Authentication with the UNAS failed.") from err
-        except UnasConnectionError as err:
-            raise HomeAssistantError(f"Could not reach the UNAS: {err}") from err
         except UnasError as err:
-            status = getattr(err, "status", None)
-            detail = f" (HTTP {status})" if status else ""
-            raise HomeAssistantError(f"The UNAS rejected the fan profile{detail}.") from err
+            raise action_error(err) from err
         await self.coordinator.async_request_refresh()

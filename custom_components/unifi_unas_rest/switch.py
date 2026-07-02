@@ -22,14 +22,11 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import UnasConfigEntry
 from .aiounas import Share, UnasActionClient
-from .aiounas.exceptions import (
-    UnasAuthError,
-    UnasCapabilityError,
-    UnasConnectionError,
-    UnasError,
-)
+from .aiounas.exceptions import UnasError
+from .const import DOMAIN
 from .coordinator import UnasDataUpdateCoordinator
-from .entity import UnasShareEntity
+from .entity import UnasShareEntity, add_new_entities
+from .errors import action_error
 
 PARALLEL_UPDATES = 1
 
@@ -41,12 +38,22 @@ async def async_setup_entry(
 ) -> None:
     """Create per-share snapshot switches when controls are opted in."""
     runtime = entry.runtime_data
-    if runtime.action_client is None:
+    action = runtime.action_client
+    if action is None:
         return
-    async_add_entities(
-        UnasShareSnapshotSwitch(runtime.coordinator, share, runtime.action_client)
-        for share in (runtime.coordinator.data.shares or [])
+    coordinator = runtime.coordinator
+
+    def _share(key: str) -> Share:
+        return next(s for s in (coordinator.data.shares or []) if s.id == key)
+
+    sync = add_new_entities(
+        async_add_entities,
+        set(),
+        lambda: [s.id for s in (coordinator.data.shares or [])],
+        lambda key: [UnasShareSnapshotSwitch(coordinator, _share(key), action)],
     )
+    sync()
+    entry.async_on_unload(coordinator.async_add_listener(sync))
 
 
 class UnasShareSnapshotSwitch(UnasShareEntity, SwitchEntity):
@@ -78,19 +85,9 @@ class UnasShareSnapshotSwitch(UnasShareEntity, SwitchEntity):
     async def _set(self, enabled: bool) -> None:
         share = self.share
         if share is None:
-            raise HomeAssistantError("The share is no longer present.")
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="share_gone")
         try:
             await self._action_client.set_share_snapshots(share.id, enabled)
-        except UnasCapabilityError as err:
-            raise HomeAssistantError(
-                "The UNAS account is not permitted to change snapshot settings."
-            ) from err
-        except UnasAuthError as err:
-            raise HomeAssistantError("Authentication with the UNAS failed.") from err
-        except UnasConnectionError as err:
-            raise HomeAssistantError(f"Could not reach the UNAS: {err}") from err
         except UnasError as err:
-            status = getattr(err, "status", None)
-            detail = f" (HTTP {status})" if status else ""
-            raise HomeAssistantError(f"The UNAS rejected the snapshot change{detail}.") from err
+            raise action_error(err) from err
         await self.coordinator.async_request_refresh()

@@ -28,7 +28,18 @@ from homeassistant.helpers.typing import StateType
 from . import UnasConfigEntry
 from .aiounas import Disk, Pool, Share
 from .coordinator import UnasData, UnasDataUpdateCoordinator
-from .entity import UnasDiskEntity, UnasEntity, UnasPoolEntity, UnasShareEntity
+from .entity import (
+    UnasDiskEntity,
+    UnasEntity,
+    UnasPoolEntity,
+    UnasShareEntity,
+    add_new_entities,
+)
+
+
+def _pool_key(pool: Pool) -> str:
+    """Stable per-pool key, identical to UnasPoolEntity's device grouping."""
+    return pool.id or str(pool.number)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -169,6 +180,7 @@ SENSORS: tuple[UnasSensorDescription, ...] = (
         device_class=SensorDeviceClass.DATA_RATE,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
+        entity_registry_enabled_default=False,  # high-churn; opt-in
         value_fn=lambda d: d.network_io.rx_kbps,
     ),
     UnasSensorDescription(
@@ -178,6 +190,7 @@ SENSORS: tuple[UnasSensorDescription, ...] = (
         device_class=SensorDeviceClass.DATA_RATE,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
+        entity_registry_enabled_default=False,  # high-churn; opt-in
         value_fn=lambda d: d.network_io.tx_kbps,
     ),
     UnasSensorDescription(
@@ -300,6 +313,7 @@ DISK_SENSORS: tuple[UnasDiskSensorDescription, ...] = (
         device_class=SensorDeviceClass.DATA_RATE,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
+        entity_registry_enabled_default=False,  # high-churn; opt-in
         value_fn=lambda disk: disk.read_kbps,
     ),
     UnasDiskSensorDescription(
@@ -309,6 +323,7 @@ DISK_SENSORS: tuple[UnasDiskSensorDescription, ...] = (
         device_class=SensorDeviceClass.DATA_RATE,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
+        entity_registry_enabled_default=False,  # high-churn; opt-in
         value_fn=lambda disk: disk.write_kbps,
     ),
 )
@@ -409,29 +424,48 @@ async def async_setup_entry(
 ) -> None:
     """Set up UNAS sensors from a config entry."""
     coordinator = entry.runtime_data.coordinator
-    entities: list[SensorEntity] = [UnasSensor(coordinator, description) for description in SENSORS]
-    if coordinator.capabilities.users:
-        entities.append(UnasSensor(coordinator, USER_COUNT))
-    if coordinator.capabilities.updates:
-        entities.append(UnasSensor(coordinator, APPLICATIONS))
-    if coordinator.capabilities.notifications:
-        entities.append(UnasSensor(coordinator, RECENT_EVENTS))
-        entities.append(UnasSensor(coordinator, LAST_EVENT))
-    if coordinator.capabilities.logs:
-        entities.append(UnasSensor(coordinator, LOG_ENTRIES))
-    for disk in coordinator.data.storage.disks:
-        entities.extend(
-            UnasDiskSensor(coordinator, disk.slot, description) for description in DISK_SENSORS
-        )
-    for pool in coordinator.data.storage.pools:
-        entities.extend(
-            UnasPoolSensor(coordinator, pool, description) for description in POOL_SENSORS
-        )
-    for share in coordinator.data.shares or []:
-        entities.extend(
-            UnasShareSensor(coordinator, share, description) for description in SHARE_SENSORS
-        )
-    async_add_entities(entities)
+    caps = coordinator.capabilities
+    aggregate: list[SensorEntity] = [UnasSensor(coordinator, d) for d in SENSORS]
+    if caps.users:
+        aggregate.append(UnasSensor(coordinator, USER_COUNT))
+    if caps.updates:
+        aggregate.append(UnasSensor(coordinator, APPLICATIONS))
+    if caps.notifications:
+        aggregate.append(UnasSensor(coordinator, RECENT_EVENTS))
+        aggregate.append(UnasSensor(coordinator, LAST_EVENT))
+    if caps.logs:
+        aggregate.append(UnasSensor(coordinator, LOG_ENTRIES))
+    async_add_entities(aggregate)
+
+    def _pool(key: str) -> Pool:
+        return next(p for p in coordinator.data.storage.pools if _pool_key(p) == key)
+
+    def _share(key: str) -> Share:
+        return next(s for s in (coordinator.data.shares or []) if s.id == key)
+
+    syncers = [
+        add_new_entities(
+            async_add_entities,
+            set(),
+            lambda: [d.slot for d in coordinator.data.storage.disks],
+            lambda slot: [UnasDiskSensor(coordinator, slot, d) for d in DISK_SENSORS],
+        ),
+        add_new_entities(
+            async_add_entities,
+            set(),
+            lambda: [_pool_key(p) for p in coordinator.data.storage.pools],
+            lambda key: [UnasPoolSensor(coordinator, _pool(key), d) for d in POOL_SENSORS],
+        ),
+        add_new_entities(
+            async_add_entities,
+            set(),
+            lambda: [s.id for s in (coordinator.data.shares or [])],
+            lambda key: [UnasShareSensor(coordinator, _share(key), d) for d in SHARE_SENSORS],
+        ),
+    ]
+    for sync in syncers:
+        sync()
+        entry.async_on_unload(coordinator.async_add_listener(sync))
 
 
 class UnasSensor(UnasEntity, SensorEntity):

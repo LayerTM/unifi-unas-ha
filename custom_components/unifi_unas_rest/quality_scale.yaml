@@ -61,33 +61,25 @@ rules:
     comment: >-
       The UNAS console broadcasts no zeroconf/SSDP/DHCP identity that can be used
       for discovery; setup is manual by host.
-  docs-data-update: todo
-  docs-examples: todo
-  docs-known-limitations: todo
-  docs-supported-devices: todo
-  docs-supported-functions: todo
-  docs-troubleshooting: todo
-  docs-use-cases: todo
-  dynamic-devices: todo
+  docs-data-update: done
+  docs-examples: done
+  docs-known-limitations: done
+  docs-supported-devices: done
+  docs-supported-functions: done
+  docs-troubleshooting: done
+  docs-use-cases: done
+  dynamic-devices: done
   entity-category: done
   entity-device-class: done
-  entity-disabled-by-default:
-    status: todo
-    comment: >-
-      Consider disabling high-churn rate sensors (network rx/tx, disk
-      read/write rate) and recent_events by default.
+  entity-disabled-by-default: done
   entity-translations: done
-  exception-translations: todo
+  exception-translations: done
   icon-translations: done
-  reconfiguration-flow: todo
+  reconfiguration-flow: done
   repair-issues:
     status: exempt
     comment: There are no known error states that a repair flow could resolve.
-  stale-devices:
-    status: todo
-    comment: >-
-      Disk/pool/share sub-devices that disappear between polls go unavailable
-      but are not yet pruned from the device registry.
+  stale-devices: done
 
   # Platinum
   async-dependency: done

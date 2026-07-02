@@ -80,7 +80,80 @@ Off by default. Enable **Configure → Enable control actions** to add buttons f
 
 > The scheduled-snapshots switch toggles each share's `snapshotEnabled` flag. The UNAS API exposes no snapshot list/create endpoint (only this flag), and the write path is inferred from the share resource and **not yet verified on live hardware** — treat it as experimental.
 
-Quality: the integration self-reports against Home Assistant's Integration Quality Scale at the **silver** tier (see [`quality_scale.yaml`](custom_components/unifi_unas_rest/quality_scale.yaml)).
+Quality: the integration self-reports against Home Assistant's Integration Quality Scale at the **gold** tier (see [`quality_scale.yaml`](custom_components/unifi_unas_rest/quality_scale.yaml)).
+
+## Supported devices
+
+Any Ubiquiti console running **UniFi OS with the UniFi Drive application** and reachable on your LAN. Verified against a UniFi UNAS console (model `UNAS2B`) on **UniFi OS 5.1.19 / Drive 4.3.6**; other UniFi OS consoles that host the Drive app (including the UNAS Pro) are expected to work but have not been verified. Devices are identified by their MAC, so a single Home Assistant can monitor several consoles.
+
+Not supported: cloud-only access (UniFi Site Manager), and consoles without the Drive app (there is no storage API to read).
+
+## Supported functions
+
+- **Monitoring** (either auth method): storage capacity/usage, pool & RAID status, per-disk SMART health (temperature, power-on hours, health score, bad sectors, read/write rate), CPU/memory, network throughput, UniFi OS & Drive versions, update availability, last boot, and link speed. See [Entities](#entities) for the full list.
+- **With a local account**: per-share usage/quota/members/encryption and snapshot/remote-backup status, a privacy-safe account count, and privacy-safe activity aggregates (recent events, last event, log-entry count).
+- **Opt-in control** (local account): reboot, shut down, install updates, fan-mode selection, and per-share scheduled-snapshot toggles.
+
+## Use cases
+
+- **Health alerting** — automate on the `storage problem` / per-disk `problem` binary sensors, `disks at risk`, or a disk temperature threshold to get notified before data loss.
+- **Capacity planning** — track storage usage % and per-share usage over time in the HA history/statistics.
+- **Presence-aware power** — shut the NAS down when everyone leaves and no backups are running, then reboot on a schedule.
+- **Dashboards** — surface RAID status, temperatures, and throughput on a storage dashboard.
+
+## Data updates
+
+The integration **polls** the console's local REST API (`local_polling`) on a fixed interval — **30 seconds** by default, adjustable per entry under **Configure**. Every entity is served from a single shared coordinator fetch, so the poll cost does not grow with the number of entities. Supplementary reads (shares, users, updates, activity) degrade to *unknown* on a transient permission/API error without taking the core sensors unavailable; an authentication failure triggers Home Assistant's re-authentication flow.
+
+## Known limitations
+
+- **API-key auth is device-scoped**: an API key cannot read shares, the account count, or activity aggregates (those need a local account). It also cannot perform control actions.
+- **Snapshots**: the API exposes only a per-share scheduled-snapshot **flag** — there is no snapshot list/create/delete endpoint, so on-demand snapshots are not available, and the scheduled-snapshot toggle's write path is inferred and not yet verified on live hardware.
+- **Firmware install** is implemented but not yet verified against live hardware; power/firmware actions require an owner/admin account.
+- **No cloud**: only local access is supported; the UniFi Site Manager cloud API exposes none of this data.
+- **High-churn sensors** (network and per-disk throughput) are **disabled by default** — enable them per entity if you want them.
+
+## Troubleshooting
+
+- **"Failed to connect"** — check the host/port and that the console is reachable over HTTPS on your LAN. TLS verification is off by default because UniFi OS ships a self-signed certificate; leave it off unless you pin a CA.
+- **Shares / account count / activity sensors missing** — you are using API-key auth; reconfigure with a local account (**Configure → Reconfigure**) to expose them.
+- **Controls don't appear after enabling them** — controls require **username/password** auth; with an API key the option is rejected. Power and firmware actions additionally need an **owner/admin** account.
+- **A control returns an error** — the message states the cause (insufficient permissions, auth failed, or the device rejected it). Owner rights are required for reboot/shutdown/firmware.
+- **A removed disk/share lingers as a device** — it goes *unavailable*; delete it from the device page (the integration allows removing sub-devices that no longer exist).
+- **Diagnostics** — download redacted diagnostics from the device page (serials and credentials are masked) when reporting an issue.
+
+## Examples
+
+Notify when storage has a problem:
+
+```yaml
+automation:
+  - alias: UNAS storage problem
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.unas_storage_problem
+        to: "on"
+    actions:
+      - action: notify.mobile_app_phone
+        data:
+          title: UNAS storage problem
+          message: "Check the NAS — a pool is degraded or a disk is at risk."
+```
+
+Warn on a hot disk:
+
+```yaml
+automation:
+  - alias: UNAS disk too hot
+    triggers:
+      - trigger: numeric_state
+        entity_id: sensor.unas_disk_1_temperature
+        above: 60
+    actions:
+      - action: notify.mobile_app_phone
+        data:
+          message: "UNAS disk 1 is above 60 °C."
+```
 
 ## Beyond Home Assistant: CLI & MCP
 

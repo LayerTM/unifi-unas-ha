@@ -20,6 +20,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.device_registry import DeviceEntry
 
 from .aiounas import (
     ApiKeyAuth,
@@ -37,6 +38,7 @@ from .const import (
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_VERIFY_SSL,
+    DOMAIN,
     PLATFORMS,
 )
 from .coordinator import UnasDataUpdateCoordinator
@@ -113,6 +115,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: UnasConfigEntry) -> bool
 async def async_unload_entry(hass: HomeAssistant, entry: UnasConfigEntry) -> bool:
     """Unload a config entry."""
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant, entry: UnasConfigEntry, device: DeviceEntry
+) -> bool:
+    """Allow deleting a disk/pool/share sub-device that no longer exists.
+
+    The hub device and any sub-device still present in the latest poll are kept;
+    a stale one (a removed disk, pool or share) can be deleted by the user.
+    """
+    data = entry.runtime_data.coordinator.data
+    prefix = f"{entry.entry_id}_"
+    known = {entry.entry_id}
+    known |= {f"{prefix}disk{disk.slot}" for disk in data.storage.disks}
+    known |= {f"{prefix}pool{pool.id or pool.number}" for pool in data.storage.pools}
+    known |= {f"{prefix}share{share.id}" for share in (data.shares or [])}
+    return not any(ident in known for domain, ident in device.identifiers if domain == DOMAIN)
 
 
 async def _async_reload(hass: HomeAssistant, entry: UnasConfigEntry) -> None:

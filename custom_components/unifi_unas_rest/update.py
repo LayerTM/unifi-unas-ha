@@ -24,14 +24,11 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import UnasConfigEntry
 from .aiounas import UnasActionClient, UpdateInfo
-from .aiounas.exceptions import (
-    UnasAuthError,
-    UnasCapabilityError,
-    UnasConnectionError,
-    UnasError,
-)
+from .aiounas.exceptions import UnasError
+from .const import DOMAIN
 from .coordinator import UnasDataUpdateCoordinator
 from .entity import UnasEntity
+from .errors import action_error
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -111,20 +108,10 @@ class UnasUpdate(UnasEntity, UpdateEntity):
     async def async_install(self, version: str | None, backup: bool, **kwargs: Any) -> None:
         if self._action_client is None:
             raise HomeAssistantError(
-                "Enable control actions (with an owner account) to install updates."
+                translation_domain=DOMAIN, translation_key="install_needs_controls"
             )
         try:
             await self.entity_description.install_fn(self._action_client)
-        except UnasCapabilityError as err:
-            raise HomeAssistantError(
-                "The UNAS account is not permitted to install updates (owner account required)."
-            ) from err
-        except UnasAuthError as err:
-            raise HomeAssistantError("Authentication with the UNAS failed.") from err
-        except UnasConnectionError as err:
-            raise HomeAssistantError(f"Could not reach the UNAS: {err}") from err
         except UnasError as err:
-            status = getattr(err, "status", None)
-            detail = f" (HTTP {status})" if status else ""
-            raise HomeAssistantError(f"The UNAS could not install the update{detail}.") from err
+            raise action_error(err) from err
         await self.coordinator.async_request_refresh()

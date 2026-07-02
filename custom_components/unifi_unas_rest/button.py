@@ -12,19 +12,14 @@ from homeassistant.components.button import (
 )
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import UnasConfigEntry
 from .aiounas import UnasActionClient
-from .aiounas.exceptions import (
-    UnasAuthError,
-    UnasCapabilityError,
-    UnasConnectionError,
-    UnasError,
-)
+from .aiounas.exceptions import UnasError
 from .coordinator import UnasDataUpdateCoordinator
 from .entity import UnasEntity
+from .errors import action_error
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -95,18 +90,5 @@ class UnasButton(UnasEntity, ButtonEntity):
     async def async_press(self) -> None:
         try:
             await self.entity_description.press_fn(self._action_client)
-        except UnasCapabilityError as err:
-            raise HomeAssistantError(
-                "The UNAS account is not permitted to perform this action. "
-                "Power and firmware actions require an owner/admin account."
-            ) from err
-        except UnasAuthError as err:
-            raise HomeAssistantError(
-                "Authentication with the UNAS failed; re-authenticate the integration."
-            ) from err
-        except UnasConnectionError as err:
-            raise HomeAssistantError(f"Could not reach the UNAS: {err}") from err
         except UnasError as err:
-            status = getattr(err, "status", None)
-            detail = f" (HTTP {status})" if status else ""
-            raise HomeAssistantError(f"The UNAS could not complete the action{detail}.") from err
+            raise action_error(err) from err

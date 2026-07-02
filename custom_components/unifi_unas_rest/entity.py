@@ -2,17 +2,46 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
+
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.helpers.device_registry import (
     CONNECTION_NETWORK_MAC,
     DeviceInfo,
     format_mac,
 )
+from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .aiounas import Disk, Pool, Share
 from .const import DEFAULT_PORT, DOMAIN, MANUFACTURER
 from .coordinator import UnasDataUpdateCoordinator
+
+
+def add_new_entities(
+    async_add_entities: AddConfigEntryEntitiesCallback,
+    seen: set[str],
+    keys: Callable[[], Iterable[str]],
+    make: Callable[[str], list[Entity]],
+) -> Callable[[], None]:
+    """Build a sync function that adds entities for keys not yet seen.
+
+    Call the returned function once immediately and register it via
+    ``coordinator.async_add_listener`` so disks/pools/shares that appear at
+    runtime get their entities without a reload (the ``dynamic-devices`` rule).
+    """
+
+    def _sync() -> None:
+        fresh: list[Entity] = []
+        for key in keys():
+            if key not in seen:
+                seen.add(key)
+                fresh.extend(make(key))
+        if fresh:
+            async_add_entities(fresh)
+
+    return _sync
 
 
 class UnasEntity(CoordinatorEntity[UnasDataUpdateCoordinator]):

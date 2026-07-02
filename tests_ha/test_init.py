@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from unittest.mock import AsyncMock, patch
 
+from custom_components.unifi_unas_rest import async_remove_config_entry_device
 from custom_components.unifi_unas_rest.aiounas import (
     Capabilities,
     UnasAuthError,
@@ -12,6 +14,7 @@ from custom_components.unifi_unas_rest.aiounas import (
 from custom_components.unifi_unas_rest.const import DOMAIN
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -81,8 +84,11 @@ async def test_disk_io_and_scrub_sensors(
         assert eid, key
         return hass.states.get(eid).state
 
-    assert state("disk1_read_rate") == "1536"
-    assert state("disk1_write_rate") == "768"
+    # Disk I/O rate sensors are high-churn -> registered but disabled by default.
+    for key in ("disk1_read_rate", "disk1_write_rate"):
+        eid = registry.async_get_entity_id("sensor", DOMAIN, f"AABBCC000001_{key}")
+        assert eid, key
+        assert registry.async_get(eid).disabled_by is not None
     assert state(f"pool{pool}_scrubbing") == "idle"
 
 
@@ -255,6 +261,56 @@ async def test_coordinator_connection_error_retries(
     assert not await hass.config_entries.async_setup(config_entry.entry_id)
     await hass.async_block_till_done()
     assert config_entry.state is ConfigEntryState.SETUP_RETRY
+
+
+async def test_high_churn_sensors_disabled_by_default(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    await _setup(hass, config_entry)
+    registry = er.async_get(hass)
+    for key in ("network_rx", "network_tx"):
+        eid = registry.async_get_entity_id("sensor", DOMAIN, f"AABBCC000001_{key}")
+        assert eid, key
+        assert registry.async_get(eid).disabled_by is not None
+
+
+async def test_stale_sub_device_is_removable(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    await _setup(hass, config_entry)
+    dev_reg = dr.async_get(hass)
+    eid = config_entry.entry_id
+
+    hub = dev_reg.async_get_device(identifiers={(DOMAIN, eid)})
+    disk1 = dev_reg.async_get_device(identifiers={(DOMAIN, f"{eid}_disk1")})
+    assert hub and disk1
+    # Present devices are kept; a vanished one can be removed.
+    assert await async_remove_config_entry_device(hass, config_entry, hub) is False
+    assert await async_remove_config_entry_device(hass, config_entry, disk1) is False
+
+    ghost = dev_reg.async_get_or_create(
+        config_entry_id=eid, identifiers={(DOMAIN, f"{eid}_disk99")}
+    )
+    assert await async_remove_config_entry_device(hass, config_entry, ghost) is True
+
+
+async def test_dynamic_disk_added_at_runtime(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    await _setup(hass, config_entry)
+    registry = er.async_get(hass)
+    assert registry.async_get_entity_id("sensor", DOMAIN, "AABBCC000001_disk3_temperature") is None
+
+    coordinator = config_entry.runtime_data.coordinator
+    data = coordinator.data
+    new_disk = replace(data.storage.disks[0], slot="3")
+    new_storage = replace(data.storage, disks=(*data.storage.disks, new_disk))
+    coordinator.async_set_updated_data(replace(data, storage=new_storage))
+    await hass.async_block_till_done()
+
+    # A disk that appears between polls gets its entities without a reload.
+    assert registry.async_get_entity_id("sensor", DOMAIN, "AABBCC000001_disk3_temperature")
+    assert registry.async_get_entity_id("binary_sensor", DOMAIN, "AABBCC000001_disk3_problem")
 
 
 async def test_unload(
