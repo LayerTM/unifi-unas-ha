@@ -4,8 +4,8 @@ Read commands are always available; write commands are safety-gated (they refuse
 to run without ``--yes`` / an interactive confirmation). Credentials come from
 the environment:
 
-    UNAS_HOST=192.168.1.x  UNAS_APIKEY=...            # API key (read-only scope)
-    UNAS_HOST=192.168.1.x  UNAS_USER=...  UNAS_PASS=...  # local account
+    UNAS_HOST=192.0.2.10  UNAS_APIKEY=...            # API key (read-only scope)
+    UNAS_HOST=192.0.2.10  UNAS_USER=...  UNAS_PASS=...  # local account
 
 Install with the ``cli`` extra: ``pip install aiounas[cli]``.
 """

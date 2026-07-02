@@ -4,8 +4,8 @@
 Credentials come from the environment and are never written anywhere. Serials,
 MAC, and share names are masked in the output. This is a manual tool, not CI.
 
-    UNAS_HOST=192.168.1.x UNAS_APIKEY=... python scripts/smoke.py
-    UNAS_HOST=192.168.1.x UNAS_USER=... UNAS_PASS=... python scripts/smoke.py
+    UNAS_HOST=192.0.2.10 UNAS_APIKEY=... python scripts/smoke.py
+    UNAS_HOST=192.0.2.10 UNAS_USER=... UNAS_PASS=... python scripts/smoke.py
 """
 
 from __future__ import annotations

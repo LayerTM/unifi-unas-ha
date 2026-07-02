@@ -6,7 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [1.7.1] — 2026-07-02
+## [1.7.2] — 2026-07-02
+
+### Changed
+
+- Hardened the CI secret/PII scanner: alongside the existing UniFi-specific
+  patterns (MACs, serials, direct-connect domains), it now also catches generic
+  credentials and personal data — Anthropic/GitHub/Slack/AWS/Google keys, private
+  key blocks, `/Users/` paths, gmail addresses, and private LAN IPs
+  (`192.168.*`/`10.0.0.*`). Example hosts in the CLI/smoke docs were switched from
+  a real-LAN-looking `192.168.1.x` to the documentation range `192.0.2.10`.
 
 ### Changed
 

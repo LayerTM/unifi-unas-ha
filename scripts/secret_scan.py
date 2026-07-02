@@ -22,8 +22,8 @@ from pathlib import Path
 # substrings like ``0{6,}`` or ``x{4,}`` — a real MAC/serial can contain long
 # zero runs (e.g. ``F492BF000000``) and would then slip past the scanner.
 ALLOW = re.compile(
-    r"(?i)(redacted|example|placeholder|synthetic|dummy|sample|<[a-z0-9_.\-]+>|"
-    r"aa:bb:cc|aabbcc|00:11:22|de:ad:be)"
+    r"(?i)(redacted|example|placeholder|synthetic|dummy|sample|changeme|your[-_]?|"
+    r"sk-ant-\.\.\.|<[a-z0-9_.\-]+>|aa:bb:cc|aabbcc|00:11:22|de:ad:be)"
 )
 
 # name -> compiled pattern. Each matches a *real-looking* secret/PII value.
@@ -46,6 +46,18 @@ PATTERNS: dict[str, re.Pattern[str]] = {
     "X-API-Key value": re.compile(r'(?i)x-api-key\s*[:=]\s*["\']?[A-Za-z0-9_\-]{16,}'),
     "TOKEN cookie value": re.compile(r"\bTOKEN=[A-Za-z0-9._\-]{16,}"),
     "hardcoded password": re.compile(r'(?i)\bpassword\b\s*[:=]\s*["\'][^"\'{}<\s]{4,}["\']'),
+    # Generic service/cloud credentials and personal data (never belong in a
+    # public repo). These complement the UniFi-specific patterns above.
+    "Anthropic API key": re.compile(r"sk-ant-[A-Za-z0-9_-]{16,}"),
+    "GitHub token (classic)": re.compile(r"\bghp_[A-Za-z0-9]{30,}"),
+    "GitHub token (fine-grained)": re.compile(r"\bgithub_pat_[A-Za-z0-9_]{30,}"),
+    "Slack token": re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}"),
+    "AWS access key id": re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
+    "Google API key": re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b"),
+    "private key block": re.compile(r"BEGIN (RSA |OPENSSH |EC |DSA |PGP )?PRIVATE KEY"),
+    "personal macOS path": re.compile(r"/Users/[a-z]"),
+    "personal email (gmail)": re.compile(r"[A-Za-z0-9._%+-]+@gmail\.com"),
+    "private LAN IP": re.compile(r"\b(?:192\.168|10\.0\.0)\.\d{1,3}\b"),
 }
 
 SKIP_DIRS = {
