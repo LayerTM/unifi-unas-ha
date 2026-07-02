@@ -125,6 +125,9 @@ def make_app(*, api_key: str = FAKE_API_KEY) -> web.Application:
     app.router.add_get("/proxy/drive/api/v2/systems/fan-control", _data("fan_control"))
     app.router.add_get("/proxy/drive/api/v2/drives", _data("drives", apikey_status=500))
     app.router.add_get("/proxy/drive/api/v1/users", _users)
+    # session-only supplementary reads (an API key is denied on real hardware)
+    app.router.add_get("/api/notifications", _data("notifications", apikey_status=403))
+    app.router.add_get("/proxy/drive/api/v2/systems/logs", _data("logs", apikey_status=500))
     # write / action endpoints
     app.router.add_post("/api/system/reboot", _write())
     app.router.add_post("/api/system/poweroff", _write())

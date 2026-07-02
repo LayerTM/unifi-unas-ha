@@ -73,9 +73,14 @@ suite.
 | `GET /proxy/drive/api/v2/systems/network-io` | 200 | 200 |
 | `GET /proxy/drive/api/v2/drives` (shares) | 500 | 200 |
 | `GET /proxy/drive/api/v1/users` | 403 | 200 |
+| `GET /api/notifications` | 403 | 200 |
+| `GET /proxy/drive/api/v2/systems/logs` | 500 | 200 |
 
-`/v1/users` is not consumed by this client; it is listed only as the proof that
-an API key is user-agnostic (a key from the owner account is still denied there).
+`/v1/users` is read only for a **count** of local accounts (never the account
+list, which is personal data); its denial to an API key is also the clearest
+proof that a key is user-agnostic — a key from the owner account is still denied
+there. `/api/notifications` and `/systems/logs` are likewise session-scoped and
+are read only as **aggregates** (see below).
 
 ### Error contract
 
@@ -87,15 +92,19 @@ Non-2xx responses return JSON:
 
 ## Endpoints
 
-The client reads these five endpoints:
+The client reads these endpoints:
 
 | Method | Path | Returns |
 |---|---|---|
-| GET | `/api/system` | Device identity (short payload for key, full for session) |
+| GET | `/api/system` | Device identity + firmware/app versions (short payload for key, full for session) |
 | GET | `/proxy/drive/api/v2/storage` | Pools, disks (SMART-derived fields), cache slots |
 | GET | `/proxy/drive/api/v2/systems/device-info` | CPU, memory, model, firmware, NIC link |
 | GET | `/proxy/drive/api/v2/systems/network-io` | Instantaneous throughput |
+| GET | `/proxy/drive/api/v2/systems/fan-control` | Active fan profile |
 | GET | `/proxy/drive/api/v2/drives` | Shared drives — **session only** |
+| GET | `/proxy/drive/api/v1/users` | Local-account **count** only — **session only** |
+| GET | `/api/notifications` | Recent-notification **aggregate** — **session only** |
+| GET | `/proxy/drive/api/v2/systems/logs` | Recent-log **aggregate** — **session only** |
 
 `GET /proxy/drive/api/v2/systems/fan-control` returns the active fan **profile**
 (no RPM): `{"availableProfiles": ["cooling", "default", "quiet"], "currentProfile": "<name>"}`.
@@ -276,6 +285,35 @@ Shared SMB/NFS drives. An API key is denied here (`500`); use session auth.
 | `drives[].memberCount` | share members |
 | `drives[].protections.snapshotEnabled` | bool |
 | `drives[].protections.encryptionStatus` | e.g. `unencrypted` |
+
+### `GET /api/notifications` — session only
+
+Recent system notifications. An API key is denied (`403`). This client reads the
+response **only to derive an aggregate** — a total, a per-`category` count, and
+the newest `created_at` timestamp. The notification **bodies** (`event_data`,
+`cef_log`, titles) are personal data and are **never parsed or retained**
+(`aiounas.models.NotificationSummary`).
+
+```json
+[
+  { "id": "…", "category": "admins",  "severity": 1, "created_at": "2026-07-02T06:59:20Z" },
+  { "id": "…", "category": "backups", "severity": 1, "created_at": "2026-07-02T05:00:00Z" }
+]
+```
+
+| Retained | Discarded |
+|---|---|
+| count, per-`category` count, latest `created_at` | every body / message / target field |
+
+### `GET /proxy/drive/api/v2/systems/logs` — session only
+
+Recent activity log. An API key is denied (`500`). Read **only as an aggregate**:
+a count and the newest `createdAt`. The log `data` payloads are **never retained**
+(`aiounas.models.LogSummary`).
+
+```json
+{ "logs": [ { "id": "…", "category": "system", "createdAt": "2026-07-02T06:00:00Z" } ] }
+```
 
 ## Not available over this REST API
 

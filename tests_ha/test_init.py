@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
-from custom_components.unifi_unas_rest.aiounas import UnasAuthError, UnasConnectionError
+from custom_components.unifi_unas_rest.aiounas import (
+    Capabilities,
+    UnasAuthError,
+    UnasConnectionError,
+)
 from custom_components.unifi_unas_rest.const import DOMAIN
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
@@ -105,6 +109,56 @@ async def test_user_count_sensor(
     eid = registry.async_get_entity_id("sensor", DOMAIN, "AABBCC000001_user_count")
     assert eid
     assert hass.states.get(eid).state == "6"
+
+
+async def test_applications_and_event_sensors(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    await _setup(hass, config_entry)
+    registry = er.async_get(hass)
+
+    def entity(key: str):
+        eid = registry.async_get_entity_id("sensor", DOMAIN, f"AABBCC000001_{key}")
+        assert eid, key
+        return hass.states.get(eid)
+
+    apps = entity("applications")
+    assert apps.state == "2"
+    assert apps.attributes["drive"] == "4.3.6"
+    assert apps.attributes["users"] == "1.13.6"
+
+    events = entity("recent_events")
+    assert events.state == "4"
+    assert events.attributes["backups"] == 2
+    assert events.attributes["admins"] == 1
+
+    assert entity("last_event").state.startswith("2026-07-02")
+    assert entity("log_entries").state == "2"
+
+
+async def test_supplementary_sensors_absent_without_capability(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    # When the probe reports no notifications/logs scope, those sensors are not created.
+    caps = Capabilities(
+        storage=True,
+        device_info=True,
+        network_io=True,
+        shares=True,
+        users=True,
+        updates=True,
+        notifications=False,
+        logs=False,
+    )
+    with patch("custom_components.unifi_unas_rest.probe", AsyncMock(return_value=caps)):
+        await _setup(hass, config_entry)
+
+    registry = er.async_get(hass)
+    assert registry.async_get_entity_id("sensor", DOMAIN, "AABBCC000001_recent_events") is None
+    assert registry.async_get_entity_id("sensor", DOMAIN, "AABBCC000001_last_event") is None
+    assert registry.async_get_entity_id("sensor", DOMAIN, "AABBCC000001_log_entries") is None
+    # applications is gated on the (still-present) updates capability
+    assert registry.async_get_entity_id("sensor", DOMAIN, "AABBCC000001_applications")
 
 
 async def test_per_share_entities(

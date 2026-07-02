@@ -18,7 +18,9 @@ from custom_components.unifi_unas_rest.aiounas import (
     Capabilities,
     DeviceInfo,
     FanControl,
+    LogSummary,
     NetworkIO,
+    NotificationSummary,
     Share,
     Storage,
     SystemIdentity,
@@ -60,13 +62,24 @@ def unas_client() -> AsyncMock:
     client.get_user_count = AsyncMock(return_value=6)
     client.get_update_info = AsyncMock(return_value=UpdateInfo.from_api(_load("system_full")))
     client.get_fan_control = AsyncMock(return_value=FanControl.from_api(_load("fan_control")))
+    client.get_notification_summary = AsyncMock(
+        return_value=NotificationSummary.from_api(_load("notifications"))
+    )
+    client.get_log_summary = AsyncMock(return_value=LogSummary.from_api(_load("logs")))
     return client
 
 
 @pytest.fixture
 def mock_aiounas(unas_client: AsyncMock) -> Iterator[AsyncMock]:
     caps = Capabilities(
-        storage=True, device_info=True, network_io=True, shares=True, users=True, updates=True
+        storage=True,
+        device_info=True,
+        network_io=True,
+        shares=True,
+        users=True,
+        updates=True,
+        notifications=True,
+        logs=True,
     )
     action = AsyncMock()
     unas_client.action_mock = action  # exposed for control tests

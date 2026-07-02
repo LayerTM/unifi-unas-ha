@@ -1,0 +1,7 @@
+{
+  "logs": [
+    { "id": "l1", "category": "system", "createdAt": "2026-07-02T06:00:00.000Z" },
+    { "id": "l2", "category": "system", "createdAt": "2026-07-01T06:00:00.000Z" }
+  ],
+  "nextToken": null
+}

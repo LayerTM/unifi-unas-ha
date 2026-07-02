@@ -11,18 +11,31 @@ from .const import (
     DEFAULT_VERIFY_SSL,
     PATH_DEVICE_INFO,
     PATH_FAN_CONTROL,
+    PATH_LOGS,
     PATH_NETWORK_IO,
+    PATH_NOTIFICATIONS,
     PATH_SHARES,
     PATH_STORAGE,
     PATH_SYSTEM,
     PATH_USERS,
 )
 from .exceptions import UnasApiError, UnasCapabilityError
-from .models import DeviceInfo, FanControl, NetworkIO, Share, Storage, SystemIdentity, UpdateInfo
+from .models import (
+    DeviceInfo,
+    FanControl,
+    LogSummary,
+    NetworkIO,
+    NotificationSummary,
+    Share,
+    Storage,
+    SystemIdentity,
+    UpdateInfo,
+)
 from .transport import UnasTransport
 
 _SHARES_HINT = "shares require session (username/password) auth"
 _USERS_HINT = "the user count requires session (username/password) auth"
+_SESSION_HINT = "requires session (username/password) auth"
 
 
 class UnasClient:
@@ -123,6 +136,35 @@ class UnasClient:
             rows = data.get("data")
             return len(rows) if isinstance(rows, list) else 0
         return len(data) if isinstance(data, list) else 0
+
+    async def get_notification_summary(self) -> NotificationSummary:
+        """Recent-notification counts by category (session-only).
+
+        Only counts and the latest timestamp are kept; the notification bodies
+        (``event_data`` / ``cef_log``) are PII and are never returned or stored.
+        """
+        try:
+            return NotificationSummary.from_api(await self._transport.get_json(PATH_NOTIFICATIONS))
+        except UnasCapabilityError as err:
+            raise UnasCapabilityError(_SESSION_HINT) from err
+        except UnasApiError as err:
+            if err.status == 500:
+                raise UnasCapabilityError(_SESSION_HINT) from err
+            raise
+
+    async def get_log_summary(self) -> LogSummary:
+        """Recent-log entry count + latest timestamp (session-only).
+
+        Log bodies (the ``data`` field) are PII and are never returned or stored.
+        """
+        try:
+            return LogSummary.from_api(await self._transport.get_json(PATH_LOGS))
+        except UnasCapabilityError as err:
+            raise UnasCapabilityError(_SESSION_HINT) from err
+        except UnasApiError as err:
+            if err.status == 500:
+                raise UnasCapabilityError(_SESSION_HINT) from err
+            raise
 
     async def close(self) -> None:
         """Release client resources.

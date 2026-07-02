@@ -1,0 +1,6 @@
+[
+  { "id": "n1", "category": "admins", "severity": 1, "created_at": "2026-07-02T06:59:20.578Z" },
+  { "id": "n2", "category": "backups", "severity": 1, "created_at": "2026-07-02T05:00:00.000Z" },
+  { "id": "n3", "category": "backups", "severity": 1, "created_at": "2026-07-01T04:00:00.000Z" },
+  { "id": "n4", "category": "updates", "severity": 1, "created_at": "2026-06-30T03:00:00.000Z" }
+]

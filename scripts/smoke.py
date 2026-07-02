@@ -74,6 +74,10 @@ async def _run() -> int:
             f"capabilities   : storage={caps.storage} device_info={caps.device_info} "
             f"network_io={caps.network_io} shares={caps.shares}"
         )
+        print(
+            f"  scoped       : updates={caps.updates} users={caps.users} "
+            f"notifications={caps.notifications} logs={caps.logs}"
+        )
         if caps.shares:
             shares = await client.get_shares()
             print(f"shares         : {len(shares)}")
@@ -83,6 +87,20 @@ async def _run() -> int:
                     f"  {_mask(share.name):<16} {share.usage / 1e9:.1f} GB quota={quota} "
                     f"snapshot={share.snapshot_enabled}"
                 )
+        if caps.updates:
+            upd = await client.get_update_info()
+            apps = ", ".join(f"{a.name} {a.version}" for a in upd.applications)
+            print(f"applications   : {len(upd.applications)} [{apps}]")
+        if caps.users:
+            print(f"accounts       : {await client.get_user_count()}")
+        # Aggregates only — notification/log bodies are PII and never fetched here.
+        if caps.notifications:
+            ns = await client.get_notification_summary()
+            cats = ", ".join(f"{name}:{count}" for name, count in ns.by_category)
+            print(f"notifications  : {ns.total} [{cats}] latest={ns.latest}")
+        if caps.logs:
+            ls = await client.get_log_summary()
+            print(f"log entries    : {ls.total} latest={ls.latest}")
     return 0
 
 

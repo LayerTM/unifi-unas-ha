@@ -16,6 +16,9 @@
         "updateAvailable": "4.4.0",
         "releaseChannel": "release"
       }
+    ],
+    "apps": [
+      { "name": "users", "version": "1.13.6" }
     ]
   }
 }

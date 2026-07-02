@@ -17,7 +17,9 @@ from .aiounas import (
     Capabilities,
     DeviceInfo,
     FanControl,
+    LogSummary,
     NetworkIO,
+    NotificationSummary,
     Share,
     Storage,
     UnasApiError,
@@ -43,6 +45,8 @@ class UnasData:
     user_count: int | None
     update_info: UpdateInfo | None
     fan_control: FanControl | None
+    notification_summary: NotificationSummary | None
+    log_summary: LogSummary | None
 
 
 class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
@@ -100,6 +104,16 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
                 else None
             )
             fan_control = await self._optional(self.client.get_fan_control)
+            notifications = (
+                await self._optional(self.client.get_notification_summary)
+                if self.capabilities.notifications
+                else None
+            )
+            logs = (
+                await self._optional(self.client.get_log_summary)
+                if self.capabilities.logs
+                else None
+            )
         except UnasAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except (UnasConnectionError, UnasApiError) as err:
@@ -112,4 +126,6 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
             shares=shares,
             update_info=update_info,
             fan_control=fan_control,
+            notification_summary=notifications,
+            log_summary=logs,
         )

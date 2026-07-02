@@ -413,6 +413,18 @@ class SystemIdentity:
 
 
 @dataclass(frozen=True, slots=True)
+class Application:
+    """An installed UniFi OS application/integration (name + version)."""
+
+    name: str
+    version: str
+
+    @classmethod
+    def from_api(cls, d: dict[str, Any]) -> Application:
+        return cls(name=_s(d.get("name")), version=_s(d.get("version")))
+
+
+@dataclass(frozen=True, slots=True)
 class UpdateInfo:
     """Firmware / app update availability from the full /api/system payload.
 
@@ -424,6 +436,7 @@ class UpdateInfo:
     unifi_os_latest: str | None
     drive_installed: str
     drive_latest: str | None
+    applications: tuple[Application, ...]
 
     @property
     def has_data(self) -> bool:
@@ -435,12 +448,18 @@ class UpdateInfo:
         fw = d.get("firmware") or {}
         latest = fw.get("latest") or {}
         hw = d.get("hardware") or {}
-        controllers = (d.get("apps") or {}).get("controllers") or []
+        apps = d.get("apps") or {}
+        controllers = apps.get("controllers") or []
         drive = next(
             (c for c in controllers if isinstance(c, dict) and c.get("name") == "drive"),
             {},
         )
         avail = drive.get("updateAvailable")
+        installed = [
+            a
+            for a in (list(controllers) + list(apps.get("apps") or []))
+            if isinstance(a, dict) and a.get("name")
+        ]
         # Installed UniFi OS is under hardware.firmwareVersion (top-level
         # firmwareVersion is empty on real hardware). Normalize both sides so
         # "5.1.19" and "v5.1.19+3fbc1da" don't read as an available update.
@@ -449,6 +468,7 @@ class UpdateInfo:
             unifi_os_latest=_norm_version(latest.get("version")) or None,
             drive_installed=_s(drive.get("version")),
             drive_latest=(_norm_version(avail) or None) if isinstance(avail, str) else None,
+            applications=tuple(Application.from_api(a) for a in installed),
         )
 
 
@@ -465,3 +485,61 @@ class FanControl:
             current_profile=_s(d.get("currentProfile")),
             available_profiles=tuple(str(p) for p in (d.get("availableProfiles") or [])),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class NotificationSummary:
+    """Privacy-safe summary of recent notifications: counts and latest time only.
+
+    The notification bodies (event_data / cef_log) are PII and are never retained.
+    """
+
+    total: int
+    by_category: tuple[tuple[str, int], ...]
+    latest: datetime | None
+
+    @classmethod
+    def from_api(cls, data: Any) -> NotificationSummary:
+        if isinstance(data, list):
+            rows: Any = data
+        elif isinstance(data, dict):
+            rows = data.get("data") or data.get("notifications") or []
+        else:
+            rows = []  # null / unexpected shape -> empty summary (fail closed)
+        items = [i for i in rows if isinstance(i, dict)]
+        counts: dict[str, int] = {}
+        latest: datetime | None = None
+        for i in items:
+            cat = _s(i.get("category")) or "other"
+            counts[cat] = counts.get(cat, 0) + 1
+            ts = _dt(i.get("created_at") or i.get("createdAt"))
+            if ts is not None and (latest is None or ts > latest):
+                latest = ts
+        return cls(total=len(items), by_category=tuple(sorted(counts.items())), latest=latest)
+
+
+@dataclass(frozen=True, slots=True)
+class LogSummary:
+    """Privacy-safe summary of recent log entries: count and latest time only.
+
+    Log bodies (the ``data`` field) are PII and are never retained.
+    """
+
+    total: int
+    latest: datetime | None
+
+    @classmethod
+    def from_api(cls, data: Any) -> LogSummary:
+        if isinstance(data, dict):
+            rows: Any = data.get("logs") or []
+        elif isinstance(data, list):
+            rows = data
+        else:
+            rows = []  # null / unexpected shape -> empty summary (fail closed)
+        logs = [x for x in rows if isinstance(x, dict)]
+        latest: datetime | None = None
+        for x in logs:
+            ts = _dt(x.get("createdAt") or x.get("created_at"))
+            if ts is not None and (latest is None or ts > latest):
+                latest = ts
+        return cls(total=len(logs), latest=latest)

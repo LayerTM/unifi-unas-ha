@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -35,6 +36,7 @@ class UnasSensorDescription(SensorEntityDescription):
     """Aggregate/system sensor bound to a UnasData accessor."""
 
     value_fn: Callable[[UnasData], StateType | datetime]
+    attrs_fn: Callable[[UnasData], Mapping[str, Any] | None] | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -214,6 +216,45 @@ USER_COUNT = UnasSensorDescription(
     value_fn=lambda d: d.user_count,
 )
 
+# Session-only. Installed apps/integrations (name -> version) from /api/system.
+APPLICATIONS = UnasSensorDescription(
+    key="applications",
+    translation_key="applications",
+    state_class=SensorStateClass.MEASUREMENT,
+    entity_category=EntityCategory.DIAGNOSTIC,
+    value_fn=lambda d: len(d.update_info.applications) if d.update_info else None,
+    attrs_fn=lambda d: (
+        {a.name: a.version for a in d.update_info.applications} if d.update_info else None
+    ),
+)
+
+# Session-only. Recent-notification counts by category (no bodies — those are PII).
+RECENT_EVENTS = UnasSensorDescription(
+    key="recent_events",
+    translation_key="recent_events",
+    state_class=SensorStateClass.MEASUREMENT,
+    entity_category=EntityCategory.DIAGNOSTIC,
+    value_fn=lambda d: d.notification_summary.total if d.notification_summary else None,
+    attrs_fn=lambda d: dict(d.notification_summary.by_category) if d.notification_summary else None,
+)
+
+LAST_EVENT = UnasSensorDescription(
+    key="last_event",
+    translation_key="last_event",
+    device_class=SensorDeviceClass.TIMESTAMP,
+    entity_category=EntityCategory.DIAGNOSTIC,
+    value_fn=lambda d: d.notification_summary.latest if d.notification_summary else None,
+)
+
+# Session-only. Recent-log entry count (no log bodies — those are PII).
+LOG_ENTRIES = UnasSensorDescription(
+    key="log_entries",
+    translation_key="log_entries",
+    state_class=SensorStateClass.MEASUREMENT,
+    entity_category=EntityCategory.DIAGNOSTIC,
+    value_fn=lambda d: d.log_summary.total if d.log_summary else None,
+)
+
 DISK_SENSORS: tuple[UnasDiskSensorDescription, ...] = (
     UnasDiskSensorDescription(
         key="temperature",
@@ -368,6 +409,13 @@ async def async_setup_entry(
     entities: list[SensorEntity] = [UnasSensor(coordinator, description) for description in SENSORS]
     if coordinator.capabilities.users:
         entities.append(UnasSensor(coordinator, USER_COUNT))
+    if coordinator.capabilities.updates:
+        entities.append(UnasSensor(coordinator, APPLICATIONS))
+    if coordinator.capabilities.notifications:
+        entities.append(UnasSensor(coordinator, RECENT_EVENTS))
+        entities.append(UnasSensor(coordinator, LAST_EVENT))
+    if coordinator.capabilities.logs:
+        entities.append(UnasSensor(coordinator, LOG_ENTRIES))
     for disk in coordinator.data.storage.disks:
         entities.extend(
             UnasDiskSensor(coordinator, disk.slot, description) for description in DISK_SENSORS
@@ -397,6 +445,11 @@ class UnasSensor(UnasEntity, SensorEntity):
     @property
     def native_value(self) -> StateType | datetime:
         return self.entity_description.value_fn(self.coordinator.data)
+
+    @property
+    def extra_state_attributes(self) -> Mapping[str, Any] | None:
+        attrs_fn = self.entity_description.attrs_fn
+        return attrs_fn(self.coordinator.data) if attrs_fn is not None else None
 
 
 class UnasDiskSensor(UnasDiskEntity, SensorEntity):

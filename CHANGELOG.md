@@ -6,6 +6,34 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-07-02
+
+Privacy-safe activity insight. Three additional session-only endpoints are read
+strictly as aggregates — counts, categories and timestamps — so no notification
+or log content is ever parsed, returned, stored or logged.
+
+### Added
+
+- **Applications sensor** (session-only): the number of installed UniFi OS
+  apps/integrations, with a name→version map as attributes (from the full
+  `/api/system` payload).
+- **Recent events sensor** (session-only): a count of recent notifications with a
+  per-category breakdown (e.g. `admins`, `backups`, `updates`) as attributes, and
+  a **Last event** timestamp sensor — derived from `/api/notifications`. The
+  notification bodies (`event_data`, `cef_log`, titles) are personal data and are
+  never parsed or retained.
+- **Log entries sensor** (session-only): a count of recent activity-log entries
+  from `/proxy/drive/api/v2/systems/logs`; the log payloads are never retained.
+- `aiounas`: `Application`, `NotificationSummary` and `LogSummary` models;
+  `UnasClient.get_notification_summary()` / `get_log_summary()`; `notifications`
+  and `logs` capability probes.
+
+### Security
+
+- The new endpoints are session-scoped; an API key is denied (`403`/`500`) and the
+  sensors are simply absent. Each summary discards every content field at parse
+  time, so PII cannot reach entity state, attributes, diagnostics or logs.
+
 ## [1.1.0] — 2026-07-01
 
 Richer monitoring plus update entities and a fan-mode selector. All new read

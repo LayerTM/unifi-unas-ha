@@ -14,10 +14,13 @@ from .exceptions import (
     UnasError,
 )
 from .models import (
+    Application,
     DeviceInfo,
     Disk,
     FanControl,
+    LogSummary,
     NetworkIO,
+    NotificationSummary,
     Pool,
     RaidGroup,
     Share,
@@ -30,11 +33,14 @@ from .transport import UnasTransport
 __all__ = [
     "AbstractAuth",
     "ApiKeyAuth",
+    "Application",
     "Capabilities",
     "DeviceInfo",
     "Disk",
     "FanControl",
+    "LogSummary",
     "NetworkIO",
+    "NotificationSummary",
     "Pool",
     "RaidGroup",
     "SessionAuth",
@@ -52,4 +58,4 @@ __all__ = [
     "UpdateInfo",
     "probe",
 ]
-__version__ = "1.1.0"
+__version__ = "1.2.0"

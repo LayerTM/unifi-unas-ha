@@ -19,6 +19,8 @@ class Capabilities:
     shares: bool
     users: bool
     updates: bool
+    notifications: bool
+    logs: bool
 
 
 async def _has_update_data(client: UnasClient) -> bool:
@@ -50,4 +52,6 @@ async def probe(client: UnasClient) -> Capabilities:
         shares=await _reachable(client.get_shares),
         users=await _reachable(client.get_user_count),
         updates=await _has_update_data(client),
+        notifications=await _reachable(client.get_notification_summary),
+        logs=await _reachable(client.get_log_summary),
     )
