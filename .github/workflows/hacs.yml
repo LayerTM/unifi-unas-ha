@@ -14,6 +14,3 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
-          # Brand assets ship in-repo (custom_components/.../brand/, supported on
-          # HA 2026.3+), not via the home-assistant/brands repo, so skip that check.
-          ignore: brands
