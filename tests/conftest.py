@@ -134,7 +134,6 @@ def make_app(*, api_key: str = FAKE_API_KEY) -> web.Application:
     app.router.add_post("/api/firmware/update", _write())
     app.router.add_post("/api/applications/drive/update", _write())
     app.router.add_put("/proxy/drive/api/v2/systems/fan-control", _write())
-    app.router.add_patch("/proxy/drive/api/v2/drives/{sid}", _write())
     return app
 
 

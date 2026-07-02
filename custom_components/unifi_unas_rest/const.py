@@ -13,7 +13,6 @@ PLATFORMS: Final = [
     Platform.BUTTON,
     Platform.SELECT,
     Platform.SENSOR,
-    Platform.SWITCH,
     Platform.UPDATE,
 ]
 

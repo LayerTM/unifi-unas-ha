@@ -6,6 +6,25 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.7.0] — 2026-07-02
+
+Live write-verification against real hardware.
+
+### Removed
+
+- **Scheduled-snapshots switch** (added in 1.3.0). A live test showed the only
+  candidate write — `PATCH /drives/{id}` with `protections.snapshotEnabled` —
+  returns `2xx` but is **silently ignored** by the device (the value never
+  changes, confirmed with a delayed read on a fresh session). Rather than ship a
+  control that does nothing, it is removed; the read-only *Snapshots* binary
+  sensor remains. `aiounas.UnasActionClient.set_share_snapshots()` is removed too.
+
+### Verified
+
+- **Firmware install** is confirmed against live hardware: the endpoint is
+  reachable, owner-account auth is accepted, and it safely refuses with `409` when
+  no update is available (no install/reboot is triggered).
+
 ## [1.6.0] — 2026-07-02
 
 Quality scale raised to **platinum** — the top tier.

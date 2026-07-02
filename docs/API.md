@@ -286,12 +286,14 @@ Shared SMB/NFS drives. An API key is denied here (`500`); use session auth.
 | `drives[].protections.snapshotEnabled` | bool |
 | `drives[].protections.encryptionStatus` | e.g. `unencrypted` |
 
-**Scheduled-snapshots toggle (write, inferred).** The API exposes no snapshot
-list/create/delete endpoint — an extensive read-only probe of `/proxy/drive/api/v2`
-found only the per-share `snapshotEnabled` flag. The optional control writes it via
-`PATCH /proxy/drive/api/v2/drives/{id}` with `{"protections": {"snapshotEnabled": <bool>}}`.
-This path is inferred from the confirmed share resource and is **not yet verified
-against live hardware** (`aiounas.actions.set_share_snapshots`).
+**Snapshots are read-only over this API.** An extensive read-only probe of
+`/proxy/drive/api/v2` found no snapshot list/create/delete/schedule endpoint — only
+the per-share `snapshotEnabled` flag (surfaced as the read-only *Snapshots* binary
+sensor). `PATCH /proxy/drive/api/v2/drives/{id}` with
+`{"protections": {"snapshotEnabled": <bool>}}` returns `2xx` **but silently ignores
+the field** — a live flip-and-read-back test (fresh session, delayed read) confirmed
+the value never changes. There is therefore **no working snapshot control**, and none
+is exposed.
 
 ### `GET /api/notifications` — session only
 

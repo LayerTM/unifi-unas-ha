@@ -76,9 +76,9 @@ Nothing is written to or left on the NAS, so no cleanup is needed on the device 
 
 ## Control actions (opt-in)
 
-Off by default. Enable **Configure → Enable control actions** to add buttons for **reboot, shut down, install UniFi OS update, install Drive-app update**, a **fan-mode selector**, per-share **scheduled-snapshots switches**, and the **Install** buttons on the update entities. Controls require **username/password** auth — an API key is read-only, and **power/firmware need an owner/admin account**; a refused action reports a clear permissions error.
+Off by default. Enable **Configure → Enable control actions** to add buttons for **reboot, shut down, install UniFi OS update, install Drive-app update**, a **fan-mode selector**, and the **Install** buttons on the update entities. Controls require **username/password** auth — an API key is read-only, and **power/firmware need an owner/admin account**; a refused action reports a clear permissions error.
 
-> The scheduled-snapshots switch toggles each share's `snapshotEnabled` flag. The UNAS API exposes no snapshot list/create endpoint (only this flag), and the write path is inferred from the share resource and **not yet verified on live hardware** — treat it as experimental.
+> Snapshot control is intentionally **not** offered: the UNAS API exposes no writable snapshot endpoint (a live test showed the only candidate write is silently ignored). The read-only *Snapshots* binary sensor reflects each share's scheduled-snapshot flag.
 
 Quality: the integration self-reports against Home Assistant's Integration Quality Scale at the **platinum** tier (see [`quality_scale.yaml`](custom_components/unifi_unas_rest/quality_scale.yaml)) — fully async, injects Home Assistant's shared HTTP session, and enforces `mypy --strict` in CI.
 
@@ -92,7 +92,7 @@ Not supported: cloud-only access (UniFi Site Manager), and consoles without the 
 
 - **Monitoring** (either auth method): storage capacity/usage, pool & RAID status, per-disk SMART health (temperature, power-on hours, health score, bad sectors, read/write rate), CPU/memory, network throughput, UniFi OS & Drive versions, update availability, last boot, and link speed. See [Entities](#entities) for the full list.
 - **With a local account**: per-share usage/quota/members/encryption and snapshot/remote-backup status, a privacy-safe account count, and privacy-safe activity aggregates (recent events, last event, log-entry count).
-- **Opt-in control** (local account): reboot, shut down, install updates, fan-mode selection, and per-share scheduled-snapshot toggles.
+- **Opt-in control** (local account): reboot, shut down, install updates, and fan-mode selection.
 
 ## Use cases
 
@@ -108,8 +108,8 @@ The integration **polls** the console's local REST API (`local_polling`) on a fi
 ## Known limitations
 
 - **API-key auth is device-scoped**: an API key cannot read shares, the account count, or activity aggregates (those need a local account). It also cannot perform control actions.
-- **Snapshots**: the API exposes only a per-share scheduled-snapshot **flag** — there is no snapshot list/create/delete endpoint, so on-demand snapshots are not available, and the scheduled-snapshot toggle's write path is inferred and not yet verified on live hardware.
-- **Firmware install** is implemented but not yet verified against live hardware; power/firmware actions require an owner/admin account.
+- **Snapshots are read-only**: the API exposes only a per-share scheduled-snapshot **flag** (shown as the *Snapshots* binary sensor). There is no snapshot list/create/delete endpoint, and the only candidate write is silently ignored by the device (confirmed by a live test), so no snapshot control is offered.
+- **Power/firmware actions require an owner/admin account.** The firmware-install endpoint, auth gating, and its "nothing to update" refusal are verified against live hardware; the actual install-and-reboot path only runs when an update is genuinely available.
 - **No cloud**: only local access is supported; the UniFi Site Manager cloud API exposes none of this data.
 - **High-churn sensors** (network and per-disk throughput) are **disabled by default** — enable them per entity if you want them.
 
