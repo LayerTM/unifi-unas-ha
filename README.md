@@ -80,7 +80,7 @@ Off by default. Enable **Configure → Enable control actions** to add buttons f
 
 > The scheduled-snapshots switch toggles each share's `snapshotEnabled` flag. The UNAS API exposes no snapshot list/create endpoint (only this flag), and the write path is inferred from the share resource and **not yet verified on live hardware** — treat it as experimental.
 
-Quality: the integration self-reports against Home Assistant's Integration Quality Scale at the **bronze** tier (see [`quality_scale.yaml`](custom_components/unifi_unas_rest/quality_scale.yaml)).
+Quality: the integration self-reports against Home Assistant's Integration Quality Scale at the **silver** tier (see [`quality_scale.yaml`](custom_components/unifi_unas_rest/quality_scale.yaml)).
 
 ## Beyond Home Assistant: CLI & MCP
 

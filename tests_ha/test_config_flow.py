@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
-from custom_components.unifi_unas_rest.aiounas import UnasAuthError, UnasConnectionError
+from custom_components.unifi_unas_rest.aiounas import (
+    UnasAuthError,
+    UnasCapabilityError,
+    UnasConnectionError,
+)
 from custom_components.unifi_unas_rest.const import (
     AUTH_API_KEY,
     AUTH_PASSWORD,
@@ -79,6 +83,26 @@ async def test_cannot_connect(hass: HomeAssistant, mock_aiounas: AsyncMock) -> N
     assert result["errors"] == {"base": "cannot_connect"}
 
 
+async def test_insufficient_permissions(hass: HomeAssistant, mock_aiounas: AsyncMock) -> None:
+    mock_aiounas.async_prepare = AsyncMock(side_effect=UnasCapabilityError("forbidden"))
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {**_HOST, CONF_AUTH_METHOD: AUTH_API_KEY}
+    )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {CONF_API_KEY: "k"})
+    assert result["errors"] == {"base": "insufficient_permissions"}
+
+
+async def test_unknown_error(hass: HomeAssistant, mock_aiounas: AsyncMock) -> None:
+    mock_aiounas.async_prepare = AsyncMock(side_effect=ValueError("boom"))
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {**_HOST, CONF_AUTH_METHOD: AUTH_API_KEY}
+    )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {CONF_API_KEY: "k"})
+    assert result["errors"] == {"base": "unknown"}
+
+
 async def test_already_configured(
     hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
 ) -> None:
@@ -111,3 +135,38 @@ async def test_reauth(
     # async_update_reload_and_abort schedules a reload; let it finish so no
     # background task lingers past teardown.
     await hass.async_block_till_done()
+
+
+async def _reauth_error(hass: HomeAssistant, config_entry: MockConfigEntry, expected: str) -> None:
+    config_entry.add_to_hass(hass)
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": SOURCE_REAUTH, "entry_id": config_entry.entry_id},
+        data=dict(config_entry.data),
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_API_KEY: "new-key-value"}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": expected}
+
+
+async def test_reauth_invalid_auth(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    mock_aiounas.async_prepare = AsyncMock(side_effect=UnasAuthError("bad"))
+    await _reauth_error(hass, config_entry, "invalid_auth")
+
+
+async def test_reauth_cannot_connect(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    mock_aiounas.async_prepare = AsyncMock(side_effect=UnasConnectionError("down"))
+    await _reauth_error(hass, config_entry, "cannot_connect")
+
+
+async def test_reauth_unknown_error(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    mock_aiounas.async_prepare = AsyncMock(side_effect=ValueError("boom"))
+    await _reauth_error(hass, config_entry, "unknown")

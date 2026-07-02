@@ -6,6 +6,22 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-07-02
+
+Quality scale raised to **silver**.
+
+### Added
+
+- Error-path tests for every write platform (button, select, switch, update) and
+  the config-flow and coordinator error branches, bringing every integration
+  module to ≥95% line coverage (the vendored `aiounas` client keeps its own 90%+
+  suite).
+
+### Changed
+
+- `quality_scale` is now **silver** (all silver rules done or exempt): the
+  `test-coverage` rule is satisfied and `parallel-updates` was already in place.
+
 ## [1.3.0] — 2026-07-02
 
 Snapshot control and a published quality self-assessment.

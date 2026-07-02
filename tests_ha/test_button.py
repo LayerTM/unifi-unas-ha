@@ -5,7 +5,12 @@ from __future__ import annotations
 from unittest.mock import AsyncMock
 
 import pytest
-from custom_components.unifi_unas_rest.aiounas.exceptions import UnasApiError, UnasCapabilityError
+from custom_components.unifi_unas_rest.aiounas.exceptions import (
+    UnasApiError,
+    UnasAuthError,
+    UnasCapabilityError,
+    UnasConnectionError,
+)
 from custom_components.unifi_unas_rest.const import (
     AUTH_API_KEY,
     AUTH_PASSWORD,
@@ -29,6 +34,12 @@ from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 _BASE = {CONF_HOST: "192.0.2.10", CONF_PORT: 443, CONF_VERIFY_SSL: False}
+_ERRORS = [
+    UnasCapabilityError("forbidden"),
+    UnasAuthError("bad"),
+    UnasConnectionError("down"),
+    UnasApiError("boom", status=500),
+]
 
 
 def _entry(controls: bool, *, session: bool = False) -> MockConfigEntry:
@@ -109,6 +120,55 @@ async def test_press_api_error_raises_clear_message(
     with pytest.raises(HomeAssistantError):
         await hass.services.async_call(
             "button", "press", {ATTR_ENTITY_ID: _reboot_eid(hass)}, blocking=True
+        )
+
+
+@pytest.mark.parametrize("exc", _ERRORS)
+async def test_press_error_raises_clear_message(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, exc: Exception
+) -> None:
+    mock_aiounas.action_mock.reboot = AsyncMock(side_effect=exc)
+    await _setup(hass, _entry(controls=True, session=True))
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            "button", "press", {ATTR_ENTITY_ID: _reboot_eid(hass)}, blocking=True
+        )
+
+
+@pytest.mark.parametrize("exc", _ERRORS)
+async def test_fan_select_error_raises_clear_message(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, exc: Exception
+) -> None:
+    mock_aiounas.action_mock.set_fan_profile = AsyncMock(side_effect=exc)
+    await _setup(hass, _entry(controls=True, session=True))
+    eid = er.async_get(hass).async_get_entity_id("select", DOMAIN, "AABBCC000001_fan_profile")
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            "select", "select_option", {ATTR_ENTITY_ID: eid, "option": "quiet"}, blocking=True
+        )
+
+
+def _update_eid(hass: HomeAssistant) -> str | None:
+    return er.async_get(hass).async_get_entity_id("update", DOMAIN, "AABBCC000001_unifi_os_update")
+
+
+async def test_update_install_calls_action(hass: HomeAssistant, mock_aiounas: AsyncMock) -> None:
+    await _setup(hass, _entry(controls=True, session=True))
+    await hass.services.async_call(
+        "update", "install", {ATTR_ENTITY_ID: _update_eid(hass)}, blocking=True
+    )
+    mock_aiounas.action_mock.update_firmware.assert_awaited_once()
+
+
+@pytest.mark.parametrize("exc", _ERRORS)
+async def test_update_install_error_raises_clear_message(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, exc: Exception
+) -> None:
+    mock_aiounas.action_mock.update_firmware = AsyncMock(side_effect=exc)
+    await _setup(hass, _entry(controls=True, session=True))
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            "update", "install", {ATTR_ENTITY_ID: _update_eid(hass)}, blocking=True
         )
 
 

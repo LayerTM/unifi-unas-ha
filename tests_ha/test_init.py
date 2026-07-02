@@ -216,6 +216,47 @@ async def test_capability_error_degrades_gracefully(
     assert registry.async_get_entity_id("sensor", DOMAIN, "AABBCC000001_storage_usage")
 
 
+async def test_no_update_entities_without_capability(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    caps = Capabilities(
+        storage=True,
+        device_info=True,
+        network_io=True,
+        shares=True,
+        users=True,
+        updates=False,
+        notifications=True,
+        logs=True,
+    )
+    with patch("custom_components.unifi_unas_rest.probe", AsyncMock(return_value=caps)):
+        await _setup(hass, config_entry)
+    registry = er.async_get(hass)
+    assert registry.async_get_entity_id("update", DOMAIN, "AABBCC000001_unifi_os_update") is None
+
+
+async def test_coordinator_auth_error_sets_setup_error(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    # An auth error during the coordinator's data fetch -> ConfigEntryAuthFailed.
+    mock_aiounas.get_storage = AsyncMock(side_effect=UnasAuthError("expired"))
+    config_entry.add_to_hass(hass)
+    assert not await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert config_entry.state is ConfigEntryState.SETUP_ERROR
+
+
+async def test_coordinator_connection_error_retries(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    # A connection error during the fetch -> UpdateFailed -> setup retry.
+    mock_aiounas.get_storage = AsyncMock(side_effect=UnasConnectionError("down"))
+    config_entry.add_to_hass(hass)
+    assert not await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert config_entry.state is ConfigEntryState.SETUP_RETRY
+
+
 async def test_unload(
     hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
 ) -> None:

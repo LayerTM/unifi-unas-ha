@@ -5,7 +5,12 @@ from __future__ import annotations
 from unittest.mock import AsyncMock
 
 import pytest
-from custom_components.unifi_unas_rest.aiounas.exceptions import UnasCapabilityError
+from custom_components.unifi_unas_rest.aiounas.exceptions import (
+    UnasApiError,
+    UnasAuthError,
+    UnasCapabilityError,
+    UnasConnectionError,
+)
 from custom_components.unifi_unas_rest.const import (
     AUTH_API_KEY,
     AUTH_PASSWORD,
@@ -86,10 +91,19 @@ async def test_switch_reflects_state_and_toggles(
     mock_aiounas.action_mock.set_share_snapshots.assert_awaited_with(_SHARE1, True)
 
 
-async def test_switch_permission_error_raises(hass: HomeAssistant, mock_aiounas: AsyncMock) -> None:
-    mock_aiounas.action_mock.set_share_snapshots = AsyncMock(
-        side_effect=UnasCapabilityError("forbidden")
-    )
+@pytest.mark.parametrize(
+    "exc",
+    [
+        UnasCapabilityError("forbidden"),
+        UnasAuthError("bad"),
+        UnasConnectionError("down"),
+        UnasApiError("boom", status=500),
+    ],
+)
+async def test_switch_error_raises(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, exc: Exception
+) -> None:
+    mock_aiounas.action_mock.set_share_snapshots = AsyncMock(side_effect=exc)
     await _setup(hass, _entry(controls=True, session=True))
     with pytest.raises(HomeAssistantError):
         await hass.services.async_call(
