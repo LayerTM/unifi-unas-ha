@@ -14,8 +14,8 @@ adheres to [Semantic Versioning](https://semver.org/).
   patterns (MACs, serials, direct-connect domains), it now also catches generic
   credentials and personal data — Anthropic/GitHub/Slack/AWS/Google keys, private
   key blocks, `/Users/` paths, gmail addresses, and private LAN IPs
-  (`192.168.*`/`10.0.0.*`). Example hosts in the CLI/smoke docs were switched from
-  a real-LAN-looking `192.168.1.x` to the documentation range `192.0.2.10`.
+  (private RFC-1918 ranges). Example hosts in the CLI/smoke docs were switched from
+  a real-LAN-looking private-range address to the documentation range `192.0.2.10`.
 
 ### Changed
 
