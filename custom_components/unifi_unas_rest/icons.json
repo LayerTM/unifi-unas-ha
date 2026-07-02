@@ -44,6 +44,9 @@
     },
     "select": {
       "fan_profile": { "default": "mdi:fan" }
+    },
+    "switch": {
+      "share_snapshots": { "default": "mdi:camera-timer" }
     }
   }
 }

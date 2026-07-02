@@ -6,6 +6,24 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-07-02
+
+Snapshot control and a published quality self-assessment.
+
+### Added
+
+- **Scheduled-snapshots switch** per share (opt-in control, session auth): toggles
+  the share's `snapshotEnabled` flag. The UNAS local REST API exposes no snapshot
+  list/create endpoint — an extensive read-only probe found only this per-share
+  flag — so scheduling is the sole snapshot control surface. The write path is
+  inferred from the confirmed share resource and is **not yet verified against live
+  hardware**; it is off unless control actions are enabled.
+- **`quality_scale.yaml`** and a `quality_scale: bronze` manifest declaration
+  documenting the integration against Home Assistant's Integration Quality Scale.
+- `PARALLEL_UPDATES` declared on every platform (0 for the read-only coordinator
+  platforms, 1 for the write platforms).
+- `aiounas`: `UnasActionClient.set_share_snapshots()`.
+
 ## [1.2.0] — 2026-07-02
 
 Privacy-safe activity insight. Three additional session-only endpoints are read

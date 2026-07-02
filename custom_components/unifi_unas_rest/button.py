@@ -61,6 +61,9 @@ BUTTONS: tuple[UnasButtonDescription, ...] = (
 )
 
 
+PARALLEL_UPDATES = 1  # serialize write actions
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: UnasConfigEntry,

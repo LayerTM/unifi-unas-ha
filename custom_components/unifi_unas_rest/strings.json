@@ -138,6 +138,9 @@
           "quiet": "Quiet"
         }
       }
+    },
+    "switch": {
+      "share_snapshots": { "name": "Scheduled snapshots" }
     }
   }
 }

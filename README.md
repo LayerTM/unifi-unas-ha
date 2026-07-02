@@ -60,6 +60,13 @@ Use a least-privilege credential — an API key or a dedicated limited local adm
 
 The `aiounas` client is bundled inside the integration and has no external dependencies (Home Assistant already ships `aiohttp` and `yarl`), so HACS installs everything. See [`docs/API.md`](docs/API.md) for the API reference.
 
+## Removal
+
+1. **Settings → Devices & Services → UniFi UNAS**, open the ⋮ menu on the integration entry and choose **Delete**. This removes the config entry and all its devices and entities; the stored credential is discarded.
+2. Optional — to remove the integration itself, delete it in **HACS → UniFi UNAS (non-invasive) → Remove**, then restart Home Assistant.
+
+Nothing is written to or left on the NAS, so no cleanup is needed on the device side.
+
 ## Security & privacy
 
 - Read-only by default; control actions are opt-in and off by default, and need username/password auth (an owner account for power/firmware) — never an API key.
@@ -69,9 +76,11 @@ The `aiounas` client is bundled inside the integration and has no external depen
 
 ## Control actions (opt-in)
 
-Off by default. Enable **Configure → Enable control actions** to add buttons for **reboot, shut down, install UniFi OS update, install Drive-app update**, a **fan-mode selector**, and the **Install** buttons on the update entities. Controls require **username/password** auth — an API key is read-only, and **power/firmware need an owner/admin account**; a refused action reports a clear permissions error.
+Off by default. Enable **Configure → Enable control actions** to add buttons for **reboot, shut down, install UniFi OS update, install Drive-app update**, a **fan-mode selector**, per-share **scheduled-snapshots switches**, and the **Install** buttons on the update entities. Controls require **username/password** auth — an API key is read-only, and **power/firmware need an owner/admin account**; a refused action reports a clear permissions error.
 
-Planned: snapshot controls.
+> The scheduled-snapshots switch toggles each share's `snapshotEnabled` flag. The UNAS API exposes no snapshot list/create endpoint (only this flag), and the write path is inferred from the share resource and **not yet verified on live hardware** — treat it as experimental.
+
+Quality: the integration self-reports against Home Assistant's Integration Quality Scale at the **bronze** tier (see [`quality_scale.yaml`](custom_components/unifi_unas_rest/quality_scale.yaml)).
 
 ## Beyond Home Assistant: CLI & MCP
 

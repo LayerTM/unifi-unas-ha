@@ -61,6 +61,9 @@ UPDATES: tuple[UnasUpdateDescription, ...] = (
 )
 
 
+PARALLEL_UPDATES = 0  # read-only; install actions are user-initiated and serialized by HA
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: UnasConfigEntry,

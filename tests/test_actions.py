@@ -42,6 +42,19 @@ async def test_set_fan_profile_sends_payload(session, unas_server) -> None:
     assert call["json"] == {"profile": "cooling"}
 
 
+async def test_set_share_snapshots_sends_patch(session, unas_server) -> None:
+    await _client(session, unas_server).set_share_snapshots("share-123", True)
+    call = unas_server.writes[-1]
+    assert call["method"] == "PATCH"
+    assert call["path"] == "/proxy/drive/api/v2/drives/share-123"
+    assert call["json"] == {"protections": {"snapshotEnabled": True}}
+
+
+async def test_set_share_snapshots_disable(session, unas_server) -> None:
+    await _client(session, unas_server).set_share_snapshots("share-9", False)
+    assert unas_server.writes[-1]["json"] == {"protections": {"snapshotEnabled": False}}
+
+
 async def test_write_auth_failure_raises(session, unas_server) -> None:
     with pytest.raises(UnasAuthError):
         await _client(session, unas_server, key="wrong-key-000000000000").reboot()

@@ -24,6 +24,8 @@ from .aiounas.exceptions import (
 from .coordinator import UnasDataUpdateCoordinator
 from .entity import UnasEntity
 
+PARALLEL_UPDATES = 1  # serialize write actions
+
 
 async def async_setup_entry(
     hass: HomeAssistant,

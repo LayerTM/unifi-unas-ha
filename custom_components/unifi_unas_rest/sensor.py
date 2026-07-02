@@ -399,6 +399,9 @@ SHARE_SENSORS: tuple[UnasShareSensorDescription, ...] = (
 )
 
 
+PARALLEL_UPDATES = 0  # read-only; all data comes from the shared coordinator
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: UnasConfigEntry,

@@ -25,6 +25,7 @@ from .const import (
     PATH_FIRMWARE_UPDATE,
     PATH_POWEROFF,
     PATH_REBOOT,
+    PATH_SHARES,
 )
 from .transport import UnasTransport
 
@@ -79,3 +80,19 @@ class UnasActionClient:
     async def set_fan_profile(self, profile: str) -> None:
         """Set the fan profile. Known values: 'cooling', 'default', 'quiet'."""
         await self._transport.send("PUT", PATH_FAN_CONTROL, json_body={"profile": profile})
+
+    async def set_share_snapshots(self, share_id: str, enabled: bool) -> None:
+        """Enable or disable scheduled snapshots for a share (session auth).
+
+        Toggles the share's ``protections.snapshotEnabled`` flag via a PATCH to the
+        share resource. The UNAS local REST API exposes no snapshot list/create/
+        delete endpoint (an extensive read-only probe of ``/proxy/drive/api/v2``
+        found only this per-share flag), so scheduling is the sole snapshot control
+        surface. This write path is inferred from the confirmed share resource and
+        is **not yet verified against live hardware** — treat as experimental.
+        """
+        await self._transport.send(
+            "PATCH",
+            f"{PATH_SHARES}/{share_id}",
+            json_body={"protections": {"snapshotEnabled": enabled}},
+        )
