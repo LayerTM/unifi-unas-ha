@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aiounas"
-version = "1.5.0"
+version = "1.6.0"
 description = "Async client for the Ubiquiti UniFi UNAS (UniFi Drive) local REST API — non-invasive monitoring with opt-in control."
 readme = "README.md"
 license = "MIT"

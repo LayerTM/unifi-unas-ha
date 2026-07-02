@@ -85,8 +85,9 @@ rules:
   async-dependency: done
   inject-websession: done
   strict-typing:
-    status: todo
+    status: done
     comment: >-
-      Strict mypy runs in this repo's CI, but the integration is not yet
-      registered in Home Assistant core's .strict-typing list that the
-      hassfest validator checks.
+      Fully typed; CI enforces `mypy --strict` on both the library (aiounas) and
+      the integration (Python 3.14). Home Assistant core's `.strict-typing`
+      registry is a core-only enforcement mechanism and does not apply to a HACS
+      custom component, which enforces the same standard in its own CI instead.

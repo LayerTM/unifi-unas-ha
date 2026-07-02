@@ -19,6 +19,6 @@ jobs:
       - name: Install
         run: pip install -e ".[dev,cli,mcp]"
       - name: Type check (strict)
-        run: mypy src/aiounas
+        run: mypy --strict src/aiounas
       - name: Tests + coverage gate
         run: pytest --cov=aiounas --cov-report=term-missing --cov-fail-under=90

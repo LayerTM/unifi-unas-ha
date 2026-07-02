@@ -6,6 +6,17 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.6.0] — 2026-07-02
+
+Quality scale raised to **platinum** — the top tier.
+
+### Changed
+
+- `quality_scale`: **gold → platinum**. All platinum rules are met: the client is
+  fully async (`async-dependency`), the integration injects Home Assistant's shared
+  aiohttp session (`inject-websession`), and CI enforces `mypy --strict` on both the
+  library and the integration (`strict-typing`). No code behaviour change.
+
 ## [1.5.0] — 2026-07-02
 
 Quality scale raised to **gold**.
