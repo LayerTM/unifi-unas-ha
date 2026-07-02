@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.7.1] — 2026-07-02
+
+### Changed
+
+- CI: the HACS validation now runs **without** the `ignore: brands` key. Since Home
+  Assistant 2026.3, custom integrations serve their brand icon in-repo
+  (`custom_components/unifi_unas_rest/brand/`) via the brands proxy, and the HACS
+  action validates it directly — so the ignore is no longer needed. No functional
+  change to the integration.
+
 ## [1.7.0] — 2026-07-02
 
 Live write-verification against real hardware.
