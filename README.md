@@ -1,7 +1,11 @@
-# UniFi UNAS for Home Assistant (non-invasive)
+<h1 align="center">UniFi UNAS for Home Assistant (non-invasive)</h1>
 
-> Agentless monitoring — and opt-in control — for the Ubiquiti UniFi UNAS in Home Assistant.
-> Talks to the UniFi OS console over HTTPS only — no SSH, no packages installed on the NAS, no on-device agent.
+<p align="center">
+  <em>Agentless monitoring — and opt-in control — for the Ubiquiti UniFi UNAS in Home Assistant.<br>
+  Talks to the UniFi OS console over HTTPS only — no SSH, no packages installed on the NAS, no on-device agent.</em>
+</p>
+
+<div align="center">
 
 [![release](https://img.shields.io/github/v/release/LayerTM/unifi-unas-ha?sort=semver&color=41BDF5)](https://github.com/LayerTM/unifi-unas-ha/releases)
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
@@ -15,6 +19,8 @@
 [![hacs](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/hacs.yml/badge.svg)](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/hacs.yml)
 [![lint](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/lint.yml/badge.svg)](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/lint.yml)
 [![secret-scan](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/secret-scan.yml)
+
+</div>
 
 ---
 
