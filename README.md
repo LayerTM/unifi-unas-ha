@@ -13,6 +13,7 @@
 [![ha-integration](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/ha-integration.yml/badge.svg)](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/ha-integration.yml)
 [![hassfest](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/hassfest.yml/badge.svg)](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/hassfest.yml)
 [![hacs](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/hacs.yml/badge.svg)](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/hacs.yml)
+[![lint](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/lint.yml/badge.svg)](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/lint.yml)
 [![secret-scan](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/secret-scan.yml)
 
 ---
