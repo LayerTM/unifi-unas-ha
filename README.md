@@ -3,11 +3,17 @@
 > Agentless monitoring — and opt-in control — for the Ubiquiti UniFi UNAS in Home Assistant.
 > Talks to the UniFi OS console over HTTPS only — no SSH, no packages installed on the NAS, no on-device agent.
 
+[![release](https://img.shields.io/github/v/release/LayerTM/unifi-unas-ha?sort=semver&color=41BDF5)](https://github.com/LayerTM/unifi-unas-ha/releases)
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![quality scale: platinum](https://img.shields.io/badge/quality%20scale-platinum-8A2BE2)](custom_components/unifi_unas_rest/quality_scale.yaml)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2026.6%2B-41BDF5?logo=home-assistant&logoColor=white)](https://www.home-assistant.io/)
+![License: MIT](https://img.shields.io/badge/license-MIT-blue)
+
 [![tests](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/tests.yml/badge.svg)](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/tests.yml)
 [![ha-integration](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/ha-integration.yml/badge.svg)](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/ha-integration.yml)
+[![hassfest](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/hassfest.yml/badge.svg)](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/hassfest.yml)
+[![hacs](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/hacs.yml/badge.svg)](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/hacs.yml)
 [![secret-scan](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/secret-scan.yml)
-![Status: stable](https://img.shields.io/badge/status-stable-brightgreen)
-![License: MIT](https://img.shields.io/badge/license-MIT-blue)
 
 ---
 
