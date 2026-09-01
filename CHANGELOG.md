@@ -6,6 +6,42 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.7.3]
+
+### Fixed
+
+- **The integration no longer loses authorization on its own.** The transport
+  classified two non-authorization conditions as auth failures, and the coordinator
+  turns any auth failure into `ConfigEntryAuthFailed` — which Home Assistant treats
+  as terminal: polling stops and the entry waits for a manual re-authentication that
+  never becomes necessary, because the credential was valid the whole time. This is
+  the defect behind a repair notice reading *"Authentication expired"* that reappears
+  around firmware updates.
+  - A **2xx carrying the console's web UI instead of JSON** was reported as
+    "session may have expired". It means the console is not serving the API — it is
+    booting, updating or restarting. It is now a retryable `UnasApiError`. A
+    session-based login still gets its one re-login attempt first, since the body
+    may genuinely be a login shell.
+  - **Redirects are no longer followed.** `aiohttp` follows them by default; a
+    UniFi OS console can answer an API path with a redirect to its web UI while the
+    application behind the proxy is down, and following it produces a
+    `200 text/html` indistinguishable from an expired session. Redirects now surface
+    as a `UnasApiError` naming the target, so the cause is visible in the log.
+
+### Changed
+
+- **Minimum Home Assistant lowered from 2026.6.0 to 2025.3.0.** The floor was far
+  above what the code needs and hid the integration from everyone on an older
+  release. 2025.3.0 is the release that introduced `AddConfigEntryEntitiesCallback`,
+  the newest core API in use — measured against the Home Assistant sources at each
+  tag, with every other imported symbol confirmed present there.
+- **`quality_scale` removed from the manifest.** It is a Home Assistant core field,
+  is not evaluated for custom integrations, and read as an official rating. Raised
+  by a HACS maintainer on the sibling integration; the same applies here.
+- **`mcp` extra pinned to `<2`.** mcp 2.x renamed `FastMCP` to `MCPServer`, which
+  broke the unpinned install of the optional MCP server.
+
+
 ## [1.7.2] — 2026-07-02
 
 ### Changed

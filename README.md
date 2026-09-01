@@ -10,7 +10,7 @@
 [![release](https://img.shields.io/github/v/release/LayerTM/unifi-unas-ha?sort=semver&color=41BDF5)](https://github.com/LayerTM/unifi-unas-ha/releases)
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![quality scale: platinum](https://img.shields.io/badge/quality%20scale-platinum-8A2BE2)](custom_components/unifi_unas_rest/quality_scale.yaml)
-[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2026.6%2B-41BDF5?logo=home-assistant&logoColor=white)](https://www.home-assistant.io/)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2025.3%2B-41BDF5?logo=home-assistant&logoColor=white)](https://www.home-assistant.io/)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue)
 
 [![tests](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/tests.yml/badge.svg)](https://github.com/LayerTM/unifi-unas-ha/actions/workflows/tests.yml)
@@ -57,7 +57,9 @@ Everything is grouped under one hub device (the UNAS), with a sub-device per dis
 - **Updates** *(local-account auth)* — UniFi OS and Drive-app update entities (install requires opt-in controls with an owner account). An **Applications** sensor lists installed apps/integrations and their versions.
 - **Activity** *(local-account auth)* — recent-event count (with a per-category breakdown), latest-event time, and recent-log-entry count. Only counts, categories and timestamps are read — notification and log **bodies are personal data and are never retained**.
 
-Requires **Home Assistant 2026.6+** (Python 3.14). Configuration is through the UI (host, port, TLS, and auth method); re-authentication is supported.
+Requires **Home Assistant 2025.3+** — the release that introduced
+`AddConfigEntryEntitiesCallback`, the newest core API this integration uses.
+Development and CI run against the current release. Configuration is through the UI (host, port, TLS, and auth method); re-authentication is supported.
 
 ## Installation
 

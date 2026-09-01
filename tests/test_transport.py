@@ -99,12 +99,20 @@ async def test_session_reauth_on_401() -> None:
         await server.close()
 
 
-async def test_2xx_non_json_raises_auth_without_leaking_credentials() -> None:
+async def test_2xx_non_json_is_api_error_without_leaking_credentials() -> None:
+    """The console serving its UI is unavailability, not a rejected credential.
+
+    Classifying it as auth makes Home Assistant raise ConfigEntryAuthFailed, which
+    is terminal: one such response during a firmware update permanently detaches
+    the config entry even though the credential is still valid.
+    """
+
     async def root(_: web.Request) -> web.Response:
         return web.Response(text="", headers={"X-CSRF-Token": "c"})
 
     async def storage(_: web.Request) -> web.Response:
-        # 200 with an HTML body: the UniFi OS SPA/login shell on session expiry.
+        # 200 with an HTML body: the UniFi OS UI shell served while the
+        # application behind the proxy is booting, updating or restarting.
         return web.Response(text="<html>login</html>", content_type="text/html")
 
     app = web.Application()
@@ -118,7 +126,7 @@ async def test_2xx_non_json_raises_auth_without_leaking_credentials() -> None:
             t = UnasTransport(
                 session, str(server.host), ApiKeyAuth(secret), port=int(server.port), use_ssl=False
             )
-            with pytest.raises(UnasAuthError) as excinfo:
+            with pytest.raises(UnasApiError) as excinfo:
                 await t.get_json("/proxy/drive/api/v2/storage")
             # The source ContentTypeError carries the request headers (incl. the
             # API key); it must NOT be chained onto the raised error.
@@ -128,58 +136,63 @@ async def test_2xx_non_json_raises_auth_without_leaking_credentials() -> None:
         await server.close()
 
 
-async def test_write_2xx_html_shell_raises_auth_but_empty_and_json_ok() -> None:
+async def test_2xx_non_json_reauths_once_when_supported() -> None:
+    """A session-based auth still gets its one re-login: the body may be a login shell."""
+    state = {"served_shell": False}
+
     async def root(_: web.Request) -> web.Response:
         return web.Response(text="", headers={"X-CSRF-Token": "c"})
 
-    async def shell(_: web.Request) -> web.Response:
-        # 200 with the SPA/login shell served on silent session expiry.
-        return web.Response(text="<html>login</html>", content_type="text/html")
+    async def login(_: web.Request) -> web.Response:
+        return web.json_response(
+            {"ok": True},
+            headers={"Set-Cookie": "TOKEN=t; Path=/", "X-CSRF-Token": "c"},
+        )
 
-    async def empty(_: web.Request) -> web.Response:
-        return web.Response(status=200)  # bodyless success (e.g. reboot)
-
-    async def echo(_: web.Request) -> web.Response:
-        return web.json_response({"profile": "default"})  # JSON success (fan)
+    async def storage(_: web.Request) -> web.Response:
+        if not state["served_shell"]:
+            state["served_shell"] = True
+            return web.Response(text="<html>login</html>", content_type="text/html")
+        return web.json_response({"pools": [], "disks": []})
 
     app = web.Application()
     app.router.add_get("/", root)
-    app.router.add_post("/shell", shell)
-    app.router.add_post("/empty", empty)
-    app.router.add_put("/echo", echo)
+    app.router.add_post("/api/auth/login", login)
+    app.router.add_get("/proxy/drive/api/v2/storage", storage)
     server = TestServer(app)
     await server.start_server()
     try:
         async with aiohttp.ClientSession() as session:
-            secret = "write-key-must-not-leak-0123456789"
             t = UnasTransport(
-                session, str(server.host), ApiKeyAuth(secret), port=int(server.port), use_ssl=False
+                session,
+                str(server.host),
+                SessionAuth("u", "p"),
+                port=int(server.port),
+                use_ssl=False,
             )
-            # A 2xx login shell on a WRITE must be a loud auth error, not a false success.
-            with pytest.raises(UnasAuthError) as excinfo:
-                await t.send("POST", "/shell")
-            assert excinfo.value.__cause__ is None
-            assert secret not in repr(excinfo.value.__cause__)
-            # An empty 2xx is a bodyless success; a JSON 2xx is returned as-is.
-            assert await t.send("POST", "/empty") is None
-            assert await t.send("PUT", "/echo", json_body={"profile": "default"}) == {
-                "profile": "default"
-            }
+            assert await t.get_json("/proxy/drive/api/v2/storage") == {"pools": [], "disks": []}
+            assert state["served_shell"] is True
     finally:
         await server.close()
 
 
-async def test_non_2xx_below_400_not_treated_as_success() -> None:
+async def test_redirect_to_ui_is_api_error_not_auth() -> None:
+    """aiohttp follows redirects by default; a redirect to the UI would then arrive
+    as a 200 text/html and be misread as an expired session."""
+
     async def root(_: web.Request) -> web.Response:
-        return web.Response(text="")
+        return web.Response(text="", headers={"X-CSRF-Token": "c"})
 
     async def storage(_: web.Request) -> web.Response:
-        # A 3xx carrying a JSON body must not be returned as valid data.
-        return web.json_response({"pools": []}, status=307)
+        raise web.HTTPFound(location="/manage")
+
+    async def manage(_: web.Request) -> web.Response:
+        return web.Response(text="<html>ui</html>", content_type="text/html")
 
     app = web.Application()
     app.router.add_get("/", root)
     app.router.add_get("/proxy/drive/api/v2/storage", storage)
+    app.router.add_get("/manage", manage)
     server = TestServer(app)
     await server.start_server()
     try:
@@ -187,7 +200,9 @@ async def test_non_2xx_below_400_not_treated_as_success() -> None:
             t = UnasTransport(
                 session, str(server.host), ApiKeyAuth("k"), port=int(server.port), use_ssl=False
             )
-            with pytest.raises(UnasApiError):
+            with pytest.raises(UnasApiError) as excinfo:
                 await t.get_json("/proxy/drive/api/v2/storage")
+            assert excinfo.value.status == 302
+            assert "/manage" in str(excinfo.value)
     finally:
         await server.close()

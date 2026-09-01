@@ -5,10 +5,14 @@ from __future__ import annotations
 from dataclasses import replace
 from unittest.mock import AsyncMock, patch
 
+import aiohttp
+import yarl
 from custom_components.unifi_unas_rest import async_remove_config_entry_device
 from custom_components.unifi_unas_rest.aiounas import (
+    ApiKeyAuth,
     Capabilities,
     UnasAuthError,
+    UnasClient,
     UnasConnectionError,
 )
 from custom_components.unifi_unas_rest.const import DOMAIN
@@ -16,6 +20,7 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from multidict import CIMultiDict
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 
@@ -340,3 +345,91 @@ async def test_connection_error_retries(
     assert not await hass.config_entries.async_setup(config_entry.entry_id)
     await hass.async_block_till_done()
     assert config_entry.state is ConfigEntryState.SETUP_RETRY
+
+
+class _UiResponse:
+    """Response serving the UniFi OS UI shell instead of JSON."""
+
+    def __init__(self, status: int) -> None:
+        self.status = status
+        self.headers: dict[str, str] = {}
+
+    async def __aenter__(self) -> _UiResponse:
+        return self
+
+    async def __aexit__(self, *exc: object) -> bool:
+        return False
+
+    async def json(self) -> object:
+        info = aiohttp.RequestInfo(yarl.URL("https://192.0.2.10/x"), "GET", CIMultiDict(), None)
+        raise aiohttp.ContentTypeError(info, (), message="text/html")
+
+    async def read(self) -> bytes:
+        return b"<!doctype html><html><head><title>UniFi OS</title></head></html>"
+
+
+class _UiSession:
+    """Session whose console answers every path with its web UI (or a status)."""
+
+    def __init__(self, status: int = 200) -> None:
+        self._status = status
+
+    def request(self, method: str, url: str, **kwargs: object) -> _UiResponse:
+        return _UiResponse(self._status)
+
+
+async def test_console_serving_ui_does_not_trigger_reauth(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    """A console answering an API path with its web UI must not detach the entry.
+
+    End-to-end through the real transport, because the defect lived there: it
+    classified a 2xx-non-JSON body as an auth failure, and the coordinator turns
+    an auth failure into ConfigEntryAuthFailed -- terminal in Home Assistant. One
+    such response during a firmware update permanently detached the entry while
+    the credential was still valid. The console is merely unavailable, so this has
+    to surface as UpdateFailed and be retried.
+    """
+    await _setup(hass, config_entry)
+    assert config_entry.state is ConfigEntryState.LOADED
+
+    coordinator = config_entry.runtime_data.coordinator
+    coordinator.client = UnasClient(
+        _UiSession(),  # type: ignore[arg-type]
+        "192.0.2.10",
+        ApiKeyAuth("still-valid-key"),
+        verify_ssl=False,
+    )
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    assert coordinator.last_update_success is False
+    assert config_entry.state is ConfigEntryState.LOADED
+    assert not [
+        flow
+        for flow in hass.config_entries.flow.async_progress()
+        if flow["context"].get("source") == "reauth"
+    ]
+
+
+async def test_real_401_still_triggers_reauth(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    """The other half of the contract: a rejected credential must still reauth."""
+    await _setup(hass, config_entry)
+
+    coordinator = config_entry.runtime_data.coordinator
+    coordinator.client = UnasClient(
+        _UiSession(status=401),  # type: ignore[arg-type]
+        "192.0.2.10",
+        ApiKeyAuth("revoked-key"),
+        verify_ssl=False,
+    )
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    assert [
+        flow
+        for flow in hass.config_entries.flow.async_progress()
+        if flow["context"].get("source") == "reauth"
+    ]
