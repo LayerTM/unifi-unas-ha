@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aiounas"
-version = "1.7.3"
+version = "1.7.4"
 description = "Async client for the Ubiquiti UniFi UNAS (UniFi Drive) local REST API — non-invasive monitoring with opt-in control."
 readme = "README.md"
 license = "MIT"
@@ -30,11 +30,13 @@ dev = [
   "mypy>=1.11",
   "ruff>=0.6",
 ]
-# Home Assistant integration dev/test. Requires Python 3.14 (HA 2026.6+).
-# pytest-homeassistant-custom-component pins the matching Home Assistant version;
-# let the resolver pick the newest that lines up with a stable HA release.
+# Home Assistant integration dev/test. The harness pins a Home Assistant that
+# requires Python 3.14.2, while the library itself supports 3.12+ — so the
+# marker is what makes this extra resolvable across the whole `requires-python`
+# range. Without it a universal resolver (uv) correctly reports the project as
+# unsatisfiable; pip only ever noticed because it resolves for one interpreter.
 ha = [
-  "pytest-homeassistant-custom-component==0.13.340",  # matches stable HA 2026.6.4
+  "pytest-homeassistant-custom-component==0.13.340; python_full_version >= '3.14.2'",
 ]
 
 [project.urls]

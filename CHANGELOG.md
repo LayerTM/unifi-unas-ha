@@ -6,6 +6,34 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.7.4]
+
+### Fixed
+
+- **The `ha` extra is resolvable again across the declared Python range.** It pulls
+  a Home Assistant test harness that requires **Python 3.14.2**, while the library
+  itself supports 3.12+, and the dependency carried no marker saying so. `pip` never
+  noticed — it resolves for the one interpreter it runs on — but a universal resolver
+  (`uv`) correctly reported the whole project as unsatisfiable, so `uv run` failed in
+  a checkout. The requirement now carries
+  `; python_full_version >= '3.14.2'`, which states that fact once.
+
+### Documentation
+
+- **README, *Data updates*:** "an authentication failure triggers re-authentication"
+  no longer describes what the code does. It now says what actually counts as one —
+  only a 401 that survives a re-login — and that a booting/updating console is
+  treated as unavailable and retried.
+- **README, *Troubleshooting*:** an entry for the symptom itself, "it keeps asking to
+  re-authenticate but the credential still works", naming the version that fixes it
+  and the entry reload that clears the stale repair.
+- **docs/API.md:** a new *Responses that are not the API* section recording what the
+  console answers while the application behind the proxy is down, and why redirects
+  are not followed.
+- The **quality-scale badge** now reads *self-reported*. `quality_scale` was dropped
+  from the manifest in 1.7.3 precisely because it reads as an official rating; a
+  badge claiming the same thing was the same claim in another place.
+
 ## [1.7.3]
 
 ### Fixed

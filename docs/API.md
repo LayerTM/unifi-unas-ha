@@ -25,6 +25,23 @@ cookie) and a **device API key** (`X-API-Key`). Use an API key for read-only
 telemetry; use a session only if you need shares. Their differing scope is in the
 [capability matrix](#auth-scope-capability-matrix).
 
+### Responses that are not the API
+
+While the application behind the UniFi OS proxy is down — booting, mid firmware
+update, restarting — the console can still answer, but with its **web UI** rather
+than the API: a `2xx` carrying `text/html`, or a redirect to the UI which
+`aiohttp` follows by default and so turns into the same thing. Neither is an
+authentication signal, and both are indistinguishable from an expired session if
+read as one. The client sets `allow_redirects=False` and classifies both as
+*unavailable* (retryable). **A rejected credential is a `401`, and nothing else.**
+
+Measured on a healthy UNAS: unauthenticated API paths answer a clean
+`401 application/json` with **no** redirect — so the redirect shape is not
+something this device does while its application is up. The sibling gateway
+integration measured it directly (`302 → /manage`); the handling here is the same
+because the failure it guards against is a property of the UniFi OS proxy, not of
+one device.
+
 ### Session (local account)
 
 ```

@@ -9,7 +9,7 @@
 
 [![release](https://img.shields.io/github/v/release/LayerTM/unifi-unas-ha?sort=semver&color=41BDF5)](https://github.com/LayerTM/unifi-unas-ha/releases)
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
-[![quality scale: platinum](https://img.shields.io/badge/quality%20scale-platinum-8A2BE2)](custom_components/unifi_unas_rest/quality_scale.yaml)
+[![quality scale: platinum (self-reported)](https://img.shields.io/badge/quality%20scale-platinum%20(self--reported)-8A2BE2)](custom_components/unifi_unas_rest/quality_scale.yaml)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2025.3%2B-41BDF5?logo=home-assistant&logoColor=white)](https://www.home-assistant.io/)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue)
 
@@ -118,7 +118,9 @@ Not supported: cloud-only access (UniFi Site Manager), and consoles without the 
 
 ## Data updates
 
-The integration **polls** the console's local REST API (`local_polling`) on a fixed interval — **30 seconds** by default, adjustable per entry under **Configure**. Every entity is served from a single shared coordinator fetch, so the poll cost does not grow with the number of entities. Supplementary reads (shares, users, updates, activity) degrade to *unknown* on a transient permission/API error without taking the core sensors unavailable; an authentication failure triggers Home Assistant's re-authentication flow.
+The integration **polls** the console's local REST API (`local_polling`) on a fixed interval — **30 seconds** by default, adjustable per entry under **Configure**. Every entity is served from a single shared coordinator fetch, so the poll cost does not grow with the number of entities. Supplementary reads (shares, users, updates, activity) degrade to *unknown* on a transient permission/API error without taking the core sensors unavailable.
+
+**Only a rejected credential asks you to re-authenticate.** A console that is booting, updating or restarting answers differently — a page of HTML where JSON belongs, or a redirect to its web UI — and that is treated as *unavailable*, so the poll simply retries and recovers on its own. A local-account session still gets one silent re-login first, since such a response can also be a genuine login page. Re-authentication is requested only for a 401 that survives that re-login.
 
 ## Known limitations
 
@@ -132,6 +134,7 @@ The integration **polls** the console's local REST API (`local_polling`) on a fi
 
 - **"Failed to connect"** — check the host/port and that the console is reachable over HTTPS on your LAN. TLS verification is off by default because UniFi OS ships a self-signed certificate; leave it off unless you pin a CA.
 - **Shares / account count / activity sensors missing** — you are using API-key auth; reconfigure with a local account (**Configure → Reconfigure**) to expose them.
+- **It keeps asking to re-authenticate, but the credential still works** — fixed in **v1.7.3**. Earlier versions read a console that was busy restarting (typically during a firmware update) as an expired session, and Home Assistant treats that as final: polling stops until you click through re-authentication. Update, then reload the entry — reloading also clears the stale *"Authentication expired"* repair.
 - **Controls don't appear after enabling them** — controls require **username/password** auth; with an API key the option is rejected. Power and firmware actions additionally need an **owner/admin** account.
 - **A control returns an error** — the message states the cause (insufficient permissions, auth failed, or the device rejected it). Owner rights are required for reboot/shutdown/firmware.
 - **A removed disk/share lingers as a device** — it goes *unavailable*; delete it from the device page (the integration allows removing sub-devices that no longer exist).
