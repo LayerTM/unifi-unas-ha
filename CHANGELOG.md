@@ -8,6 +8,10 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Installation is through the HACS default list.** The integration was accepted into
+  it, so no custom repository has to be added first — the badge and the installation
+  steps said otherwise and now match. No code change; this ships with the next release.
+
 - **The test-suite fails on any deprecated Home Assistant API, not only the one that
   was known about.** Core announces a deprecation through three fixed log sentences
   of its own; the integration suite now watches those sentences for every test,
