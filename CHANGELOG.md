@@ -22,6 +22,19 @@ adheres to [Semantic Versioning](https://semver.org/).
   it, so no custom repository has to be added first — the badge and the installation
   steps said otherwise and now match. No code change; this ships with the next release.
 
+- **Workflow actions are pinned to a commit, and dependency updates are proposed
+  automatically.** `actions/checkout` and `actions/setup-python` now reference the
+  commit behind the release rather than a moving tag — `setup-python` was a major
+  behind — and a Dependabot configuration proposes updates for both the Python
+  dependencies and the actions weekly, with no version held back by rule.
+
+  The `hassfest` and HACS validators stay on their branch on purpose: they check
+  against what Home Assistant and HACS require today, so pinning them would freeze
+  the check rather than the code it runs.
+
+- **The package declares the Python versions it is actually tested on** — 3.13 and
+  3.14 were in the CI matrix but missing from the metadata.
+
 - **The test-suite fails on any deprecated Home Assistant API, not only the one that
   was known about.** Core announces a deprecation through three fixed log sentences
   of its own; the integration suite now watches those sentences for every test,

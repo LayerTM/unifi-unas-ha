@@ -1,0 +1,42 @@
+# Dependency updates.
+#
+# The groups carry no `update-types` filter on purpose. With `patterns: ["*"]`,
+# adding one silently stops major-version pull requests from being opened at all
+# (dependabot/dependabot-core#14202) — so majors group in with the rest and get
+# reviewed like anything else. There is no `ignore` list either: a major that
+# does not work is a red build to look at, while one that is never offered is a
+# version nobody knows they are behind.
+#
+# Two actions stay outside these updates because they track a branch —
+# `hacs/action@main` and `home-assistant/actions/hassfest@master`. They validate
+# against what HACS and Home Assistant require today, so a pin would freeze the
+# check rather than the code it runs, and their newest release tags (2022 and
+# 2020) predate the branches they publish from, so following releases would move
+# them backwards. The reason is repeated next to each of them in the workflow.
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "ci"
+    labels: ["dependencies"]
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  # `pyproject.toml` is PEP 621, which the pip ecosystem parses. Every runtime
+  # and extra requirement is a lower bound, so expect a pull request here only
+  # when a release falls outside a declared range.
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps"
+    labels: ["dependencies"]
+    groups:
+      python-dependencies:
+        patterns: ["*"]
