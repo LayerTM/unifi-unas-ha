@@ -6,6 +6,30 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.7.5]
+
+### Changed
+
+- **Sub-devices are attached to the hub by device-registry id, not by identifiers.**
+  Home Assistant 2026.8 replaced `DeviceInfo(via_device=…)` with `via_device_id` and
+  removes the old key in **2027.8**; until then core logs a warning naming this
+  integration every time a device is created that way — 47 of them in one run of the
+  integration test-suite (core de-duplicates per call site, so a running Home
+  Assistant shows the line rather than the count).
+  `async_setup_entry` now registers the hub device before the platforms load, so a
+  hub id exists to point at, and every disk / pool / share sub-device carries it.
+
+  **No new minimum Home Assistant version.** Which spelling to send is asked of
+  `DeviceInfo` itself rather than of a version number, so the 2025.3 floor is
+  unchanged and nothing needs revisiting when the old key is finally removed. The
+  hub device definition also lives in one place now, shared by the hub entities and
+  by setup, instead of being written twice.
+- **The Home Assistant test harness floats instead of being pinned exactly.** The
+  `==0.13.340` pin held CI on Home Assistant 2026.6 while users ran 2026.9, so the
+  deprecation warnings core logs against this integration could not appear in any
+  test run — the warning above reached a user before it reached the build. It is a
+  floor now, and the integration suite asserts that no deprecation is reported.
+
 ## [1.7.4]
 
 ### Fixed

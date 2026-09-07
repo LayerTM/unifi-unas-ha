@@ -6,6 +6,7 @@ from dataclasses import replace
 from unittest.mock import AsyncMock, patch
 
 import aiohttp
+import pytest
 import yarl
 from custom_components.unifi_unas_rest import async_remove_config_entry_device
 from custom_components.unifi_unas_rest.aiounas import (
@@ -22,6 +23,23 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from multidict import CIMultiDict
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+
+def _device(hass: HomeAssistant, entry: MockConfigEntry, ident: str) -> dr.DeviceEntry | None:
+    """Find one of this entry's devices by identifier.
+
+    Not `async_get_device`: that is deprecated in HA 2026.9 because identifiers
+    are no longer unique across config entries, and its replacement does not
+    exist on the older cores this integration still supports.
+    """
+    return next(
+        (
+            device
+            for device in dr.async_entries_for_config_entry(dr.async_get(hass), entry.entry_id)
+            if (DOMAIN, ident) in device.identifiers
+        ),
+        None,
+    )
 
 
 async def _setup(hass: HomeAssistant, entry: MockConfigEntry) -> None:
@@ -286,8 +304,8 @@ async def test_stale_sub_device_is_removable(
     dev_reg = dr.async_get(hass)
     eid = config_entry.entry_id
 
-    hub = dev_reg.async_get_device(identifiers={(DOMAIN, eid)})
-    disk1 = dev_reg.async_get_device(identifiers={(DOMAIN, f"{eid}_disk1")})
+    hub = _device(hass, config_entry, eid)
+    disk1 = _device(hass, config_entry, f"{eid}_disk1")
     assert hub and disk1
     # Present devices are kept; a vanished one can be removed.
     assert await async_remove_config_entry_device(hass, config_entry, hub) is False
@@ -433,3 +451,24 @@ async def test_real_401_still_triggers_reauth(
         for flow in hass.config_entries.flow.async_progress()
         if flow["context"].get("source") == "reauth"
     ]
+
+
+async def test_subdevices_link_to_hub_without_deprecated_api(
+    hass: HomeAssistant,
+    mock_aiounas: AsyncMock,
+    config_entry: MockConfigEntry,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Every disk / pool / share sub-device hangs off the hub, using no deprecated API.
+
+    `via_device` (an identifiers tuple) is deprecated in favour of `via_device_id`
+    (a device-registry id) and is removed in Home Assistant 2027.8; core logs a
+    warning naming the integration whenever it is passed.
+    """
+    await _setup(hass, config_entry)
+    devices = dr.async_entries_for_config_entry(dr.async_get(hass), config_entry.entry_id)
+    hub = next(d for d in devices if (DOMAIN, config_entry.entry_id) in d.identifiers)
+    children = [device for device in devices if device.id != hub.id]
+    assert children, "expected disk / pool / share sub-devices"
+    assert all(device.via_device_id == hub.id for device in children)
+    assert "deprecated `via_device`" not in caplog.text

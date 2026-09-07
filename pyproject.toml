@@ -35,8 +35,13 @@ dev = [
 # marker is what makes this extra resolvable across the whole `requires-python`
 # range. Without it a universal resolver (uv) correctly reports the project as
 # unsatisfiable; pip only ever noticed because it resolves for one interpreter.
+#
+# Deliberately a floor and not a pin: an exact pin held CI on Home Assistant
+# 2026.6 while users ran 2026.9, so the deprecation warnings core logs against
+# this integration could not appear in any test run. A floating harness makes
+# those the build's problem instead of the user's.
 ha = [
-  "pytest-homeassistant-custom-component==0.13.340; python_full_version >= '3.14.2'",
+  "pytest-homeassistant-custom-component>=0.13.340; python_full_version >= '3.14.2'",
 ]
 
 [project.urls]
