@@ -1,0 +1,23 @@
+# Dependency updates. Both ecosystems are unrestricted on purpose: no `ignore`
+# entries and no `update-types` filter, so a major release is offered as a pull
+# request with its CI result attached rather than being silently held back. A
+# bump that does not work is a red build to look at, which is information; one
+# that is never offered is a version nobody knows they are behind.
+version: 2
+
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "build"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "ci"
