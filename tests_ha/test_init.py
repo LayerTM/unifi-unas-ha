@@ -6,7 +6,6 @@ from dataclasses import replace
 from unittest.mock import AsyncMock, patch
 
 import aiohttp
-import pytest
 import yarl
 from custom_components.unifi_unas_rest import async_remove_config_entry_device
 from custom_components.unifi_unas_rest.aiounas import (
@@ -457,13 +456,13 @@ async def test_subdevices_link_to_hub_without_deprecated_api(
     hass: HomeAssistant,
     mock_aiounas: AsyncMock,
     config_entry: MockConfigEntry,
-    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Every disk / pool / share sub-device hangs off the hub, using no deprecated API.
+    """Every disk / pool / share sub-device hangs off the hub by device-registry id.
 
     `via_device` (an identifiers tuple) is deprecated in favour of `via_device_id`
-    (a device-registry id) and is removed in Home Assistant 2027.8; core logs a
-    warning naming the integration whenever it is passed.
+    and is removed in Home Assistant 2027.8. That core says nothing about it is
+    asserted for every test at once by the `ha_deprecation_log` guard; what is
+    left here is the behaviour itself — the sub-devices really do hang off the hub.
     """
     await _setup(hass, config_entry)
     devices = dr.async_entries_for_config_entry(dr.async_get(hass), config_entry.entry_id)
@@ -471,4 +470,3 @@ async def test_subdevices_link_to_hub_without_deprecated_api(
     children = [device for device in devices if device.id != hub.id]
     assert children, "expected disk / pool / share sub-devices"
     assert all(device.via_device_id == hub.id for device in children)
-    assert "deprecated `via_device`" not in caplog.text

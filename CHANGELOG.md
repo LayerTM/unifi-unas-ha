@@ -6,6 +6,23 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **The test-suite fails on any deprecated Home Assistant API, not only the one that
+  was known about.** Core announces a deprecation through three fixed log sentences
+  of its own; the integration suite now watches those sentences for every test,
+  rather than asserting the absence of one API's warning in one test. An API core
+  deprecates next year turns the suite red the first time the floating test harness
+  carries that release, naming the call site in core's own words — with nothing to
+  add here in advance. The suite also treats `DeprecationWarning` as an error, which
+  covers what the standard library and the runtime dependencies deprecate through
+  Python's own channel instead of through logs.
+
+  Verified against Home Assistant 2026.9.1: nothing here is deprecated today, on a
+  run exercising 97–100% of every integration module. The guard is checked in both
+  directions — it fails when core really does report, and it re-reads core's source
+  so that a rewording turns the suite red instead of silently blinding it.
+
 ## [1.7.5]
 
 ### Changed
