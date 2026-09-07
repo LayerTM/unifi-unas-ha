@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **One version number.** Three files stated it and they had drifted apart —
+  `1.7.5` in the integration manifest, `1.7.4` in the package metadata, `1.7.2` in
+  the library, against a released `v1.7.5`. The package version is now read from the
+  manifest, the file Home Assistant and HACS actually show and the one a release tag
+  is cut from, so a release changes it in one place. The library's `__version__` is
+  gone rather than corrected: nothing read it, it was documented nowhere, and the
+  package is not published — a copy that only ever drifts.
+
 ### Changed
 
 - **Installation is through the HACS default list.** The integration was accepted into
