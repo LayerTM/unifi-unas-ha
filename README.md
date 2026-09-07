@@ -8,7 +8,7 @@
 <div align="center">
 
 [![release](https://img.shields.io/github/v/release/LayerTM/unifi-unas-ha?sort=semver&color=41BDF5)](https://github.com/LayerTM/unifi-unas-ha/releases)
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![HACS Default](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/default)
 [![quality scale: platinum (self-reported)](https://img.shields.io/badge/quality%20scale-platinum%20(self--reported)-8A2BE2)](custom_components/unifi_unas_rest/quality_scale.yaml)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2025.3%2B-41BDF5?logo=home-assistant&logoColor=white)](https://www.home-assistant.io/)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue)
@@ -63,10 +63,10 @@ Development and CI run against the current release. Configuration is through the
 
 ## Installation
 
-Via HACS (custom repository):
+This integration is in the HACS default list, so no custom repository is needed:
 
-1. HACS → ⋮ → **Custom repositories** → add `https://github.com/LayerTM/unifi-unas-ha` (category: **Integration**).
-2. Install **UniFi UNAS (non-invasive)**, then restart Home Assistant.
+1. **HACS → Integrations**, search for **UniFi UNAS (non-invasive)** and download it.
+2. Restart Home Assistant.
 3. **Settings → Devices & Services → Add Integration → UniFi UNAS**, then complete the flow:
    - **Host / Port** of the UNAS console, and whether to verify TLS (off by default — UniFi OS ships a self-signed certificate).
    - **Authentication** — an API key (recommended, read-only) or a local account.
