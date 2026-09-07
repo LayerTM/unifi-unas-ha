@@ -79,6 +79,13 @@ files = ["src/aiounas"]
 asyncio_mode = "auto"
 addopts = "-q --strict-markers"
 testpaths = ["tests"]
+# Home Assistant reports the deprecations it catches an integration using through
+# its logs, which `tests_ha/conftest.py` watches. Everything else — the standard
+# library, aiohttp, the test harness — deprecates through this channel instead,
+# and a floating harness is what carries those releases in. An unrelated project
+# deprecating something is a real reason for this to go red; scope an `ignore`
+# to that warning, with the reason, rather than lowering the setting.
+filterwarnings = ["error::DeprecationWarning"]
 
 [tool.coverage.run]
 branch = true
