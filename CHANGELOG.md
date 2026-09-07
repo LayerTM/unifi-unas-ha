@@ -18,6 +18,12 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **The MCP server runs on the current SDK.** Version 2 renamed `FastMCP` to
+  `MCPServer` and moved it, so the old import stopped resolving; the dependency was
+  capped below 2 rather than following it. The server is ported and the cap is gone —
+  the extra now asks for `mcp>=2`, checked against both 2.0.0 and 2.1.1. Tool names,
+  arguments and the write-confirmation gate are unchanged.
+
 - **Installation is through the HACS default list.** The integration was accepted into
   it, so no custom repository has to be added first — the badge and the installation
   steps said otherwise and now match. No code change; this ships with the next release.

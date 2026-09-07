@@ -17,7 +17,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 import aiohttp
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from .actions import UnasActionClient
 from .auth import AbstractAuth, ApiKeyAuth, SessionAuth
@@ -49,9 +49,9 @@ async def _with_action(func: Callable[[UnasActionClient], Awaitable[None]]) -> N
         await func(UnasActionClient(session, _host(), _auth(), verify_ssl=False))
 
 
-def build_server(*, allow_writes: bool) -> FastMCP:
+def build_server(*, allow_writes: bool) -> MCPServer:
     """Build the MCP server. Write tools are present only when *allow_writes*."""
-    server = FastMCP("unifi-unas")
+    server = MCPServer("unifi-unas")
 
     @server.tool()
     async def get_status() -> dict[str, Any]:
@@ -110,7 +110,7 @@ def build_server(*, allow_writes: bool) -> FastMCP:
     return server
 
 
-def _register_write_tools(server: FastMCP) -> None:
+def _register_write_tools(server: MCPServer) -> None:
     @server.tool()
     async def reboot(confirm: bool = False) -> str:
         """Reboot the console. Requires confirm=true."""
