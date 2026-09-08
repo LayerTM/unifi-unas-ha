@@ -18,6 +18,17 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **The oldest supported Home Assistant is tested, not just claimed.** The
+  integration suite now runs against two cores: the floor declared in `hacs.json`
+  and the newest release. The floor is read from that file in CI, so the version
+  advertised and the version proved cannot drift apart, and the matching test
+  harness is resolved from its own metadata rather than from a list kept by hand.
+
+- **Integration coverage is a build gate**, set to the level measured on this code
+  rather than a target, and compared against the real figure — coverage rounds
+  before comparing by default, which let a threshold pass on a project that had not
+  reached it.
+
 - **The MCP server runs on the current SDK.** Version 2 renamed `FastMCP` to
   `MCPServer` and moved it, so the old import stopped resolving; the dependency was
   capped below 2 rather than following it. The server is ported and the cap is gone —

@@ -100,3 +100,14 @@ filterwarnings = ["error::DeprecationWarning"]
 [tool.coverage.run]
 branch = true
 source = ["src/aiounas", "custom_components/unifi_unas_rest"]
+# The vendored client is a byte-for-byte copy of `src/aiounas`, kept in step by a
+# CI check, and it is measured there by the library suite. The integration suite
+# mocks it, so counting it a second time here would put most of the misses in a
+# copy nobody intends to exercise from this side.
+omit = ["custom_components/unifi_unas_rest/aiounas/*"]
+
+[tool.coverage.report]
+# Compare `--cov-fail-under` against the real total, not the rounded one. At the
+# default precision coverage rounds first, so 98.65% displays — and compares — as
+# 99, and a threshold of 99 passes on a project that has not reached it.
+precision = 2
