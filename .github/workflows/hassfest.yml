@@ -11,6 +11,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The registry answers `toomanyrequests` to anonymous pulls often enough to
+      # colour a run red before any of our code runs. The step below is a
+      # composite whose only action is `docker run`, which pulls implicitly and
+      # never retries, so a single refusal is fatal. Warm the image first, spread
+      # over a minute; once it is local, `docker run` reaches no registry at all.
+      # Best effort by design — a failure here is left to the step below, which
+      # is the real gate.
+      - name: Warm the action image cache
+        run: |
+          image=ghcr.io/home-assistant/hassfest  # what home-assistant/actions/hassfest runs
+          for attempt in 1 2 3; do
+            if docker pull --quiet "$image"; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "::notice::pull attempt $attempt failed for $image; retrying in 30s"
+              sleep 30
+            fi
+          done
+          echo "::warning::could not pre-pull $image after 3 attempts"
       # Deliberately not pinned. These validate against what Home Assistant and
       # HACS require *today*, so a pin freezes the check rather than the code it
       # runs — and its newest release tag (1.0.0, from 2020) long predates the
