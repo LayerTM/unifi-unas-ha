@@ -47,6 +47,7 @@ from .const import (
 )
 from .coordinator import UnasDataUpdateCoordinator
 from .entity import hub_device_info
+from .issues import raise_cert_mismatch
 from .tls import ssl_for_entry, tls_mode_of
 
 _LOGGER = logging.getLogger(__name__)
@@ -90,7 +91,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: UnasConfigEntry) -> bool
         # again would teach the user to retype a password at exactly the moment
         # something may be impersonating their console. Raise a repair instead,
         # which shows both fingerprints and lets them accept the new one.
-        async_raise_cert_mismatch(hass, entry, err)
+        raise_cert_mismatch(hass, entry, err)
         raise ConfigEntryNotReady(str(err)) from err
     except UnasAuthError as err:
         raise ConfigEntryAuthFailed(str(err)) from err
@@ -160,30 +161,6 @@ async def async_remove_config_entry_device(
 async def _async_reload(hass: HomeAssistant, entry: UnasConfigEntry) -> None:
     """Reload the entry when its options change."""
     await hass.config_entries.async_reload(entry.entry_id)
-
-
-def async_raise_cert_mismatch(
-    hass: HomeAssistant, entry: UnasConfigEntry, err: UnasCertificateMismatch
-) -> None:
-    """Raise the repair that shows both fingerprints and offers the new one."""
-    ir.async_create_issue(
-        hass,
-        DOMAIN,
-        f"{ISSUE_CERT_MISMATCH}_{entry.entry_id}",
-        is_fixable=True,
-        severity=ir.IssueSeverity.ERROR,
-        translation_key=ISSUE_CERT_MISMATCH,
-        translation_placeholders={
-            "host": entry.data[CONF_HOST],
-            "expected": err.expected,
-            "got": err.got,
-        },
-        data={
-            "entry_id": entry.entry_id,
-            "expected": err.expected,
-            "fingerprint": err.got,
-        },
-    )
 
 
 def _async_review_tls(hass: HomeAssistant, entry: UnasConfigEntry) -> None:

@@ -27,6 +27,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import hashlib
+import os
 import re
 import ssl
 from enum import StrEnum
@@ -176,3 +177,20 @@ def mismatch_from(err: aiohttp.ServerFingerprintMismatch) -> UnasCertificateMism
     wrong.
     """
     return UnasCertificateMismatch(format_fingerprint(err.expected), format_fingerprint(err.got))
+
+
+def ssl_from_env() -> bool | aiohttp.Fingerprint:
+    """TLS trust for the command-line tools, read from the environment.
+
+    ``UNAS_CERT_FINGERPRINT`` pins that SHA-256; ``UNAS_VERIFY_SSL=1`` verifies
+    against the CA store; with neither set the connection is **unverified**,
+    which is the historical behaviour of these developer tools against local
+    hardware and is why it is documented rather than assumed. Home Assistant
+    does not take this path — it stores a pinned fingerprint per entry.
+    """
+    fingerprint = os.environ.get("UNAS_CERT_FINGERPRINT")
+    if fingerprint:
+        return ssl_param(TlsMode.FINGERPRINT, fingerprint)
+    if os.environ.get("UNAS_VERIFY_SSL", "").lower() in ("1", "true", "yes"):
+        return ssl_param(TlsMode.CA)
+    return ssl_param(TlsMode.INSECURE)

@@ -16,7 +16,7 @@ import sys
 
 import aiohttp
 
-from aiounas import ApiKeyAuth, SessionAuth, UnasClient
+from aiounas import ApiKeyAuth, SessionAuth, UnasClient, ssl_from_env
 from aiounas.auth import AbstractAuth
 from aiounas.capabilities import probe
 
@@ -40,7 +40,7 @@ async def _run() -> int:
         method = "session"
 
     async with aiohttp.ClientSession() as session:
-        client = UnasClient(session, host, auth, verify_ssl=False)
+        client = UnasClient(session, host, auth, ssl=ssl_from_env())
         ident = await client.get_identity()
         info = await client.get_device_info()
         storage = await client.get_storage()

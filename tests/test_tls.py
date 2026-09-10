@@ -309,3 +309,45 @@ async def test_a_certificate_swapped_between_the_two_login_requests(
         )
     assert caught.value.expected == format_fingerprint(expected)
     assert caught.value.got == format_fingerprint(got)
+
+
+# --- the environment-driven trust used by the CLI and MCP server ---------------
+
+
+def test_ssl_from_env_pins_when_a_fingerprint_is_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    from aiounas.tls import ssl_from_env
+
+    monkeypatch.setenv("UNAS_CERT_FINGERPRINT", _OTHER)
+    monkeypatch.delenv("UNAS_VERIFY_SSL", raising=False)
+    assert isinstance(ssl_from_env(), aiohttp.Fingerprint)
+
+
+@pytest.mark.parametrize("value", ["1", "true", "YES"])
+def test_ssl_from_env_verifies_against_the_ca_store(
+    monkeypatch: pytest.MonkeyPatch, value: str
+) -> None:
+    from aiounas.tls import ssl_from_env
+
+    monkeypatch.delenv("UNAS_CERT_FINGERPRINT", raising=False)
+    monkeypatch.setenv("UNAS_VERIFY_SSL", value)
+    assert ssl_from_env() is True
+
+
+def test_ssl_from_env_defaults_to_unverified(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Documented rather than accidental: these are developer tools."""
+    from aiounas.tls import ssl_from_env
+
+    monkeypatch.delenv("UNAS_CERT_FINGERPRINT", raising=False)
+    monkeypatch.delenv("UNAS_VERIFY_SSL", raising=False)
+    assert ssl_from_env() is False
+
+
+def test_a_pinned_fingerprint_wins_over_ca_verification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Both set is not ambiguous: the specific certificate is the stronger claim."""
+    from aiounas.tls import ssl_from_env
+
+    monkeypatch.setenv("UNAS_CERT_FINGERPRINT", _OTHER)
+    monkeypatch.setenv("UNAS_VERIFY_SSL", "1")
+    assert isinstance(ssl_from_env(), aiohttp.Fingerprint)

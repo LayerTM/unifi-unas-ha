@@ -88,7 +88,10 @@ strict = true
 warn_unused_ignores = true
 warn_redundant_casts = true
 disallow_any_generics = true
-files = ["src/aiounas"]
+# scripts/ is included because it is not throwaway: smoke.py is the only tool
+# that exercises the library against real hardware, and a public-API change
+# broke it without any gate noticing.
+files = ["src/aiounas", "scripts"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

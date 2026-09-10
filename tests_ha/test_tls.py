@@ -228,16 +228,19 @@ async def test_the_insecure_repair_pins_what_the_console_serves(
         hass, f"{ISSUE_TLS_INSECURE}_{config_entry.entry_id}", {"entry_id": config_entry.entry_id}
     )
     flow.hass = hass
-    with patch(
-        "custom_components.unifi_unas_rest.repairs.async_probe_fingerprint",
-        AsyncMock(return_value=_FP),
-    ):
+    # Two different answers on purpose. The certificate the user compared against
+    # the console is the one shown; if the flow probes again on confirmation, it
+    # would store something nobody looked at — which is the whole property this
+    # feature exists to provide. A single return_value cannot catch that.
+    probe = AsyncMock(side_effect=[_FP, _OTHER_FP])
+    with patch("custom_components.unifi_unas_rest.repairs.async_probe_fingerprint", probe):
         result = await flow.async_step_init()
         assert result["description_placeholders"]["fingerprint"] == _FP
         result = await flow.async_step_confirm({})
     await hass.async_block_till_done()
     assert config_entry.data[CONF_TLS_MODE] == TlsMode.FINGERPRINT
     assert config_entry.data[CONF_CERT_FINGERPRINT] == _FP
+    assert probe.await_count == 1, "the certificate must be read once, and pinned as shown"
 
 
 async def test_the_insecure_repair_gives_up_when_the_console_is_unreachable(
@@ -306,3 +309,97 @@ async def test_reauth_surfaces_a_mismatch_as_its_own_error(
     )
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": "cert_mismatch"}
+
+
+async def test_a_certificate_that_changes_while_running_also_raises_the_repair(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    """A swap after setup must reach the user the same way as one before it.
+
+    ``UnasCertificateMismatch`` is a ``UnasConnectionError``, so the coordinator's
+    ordinary branch would turn it into a plain ``UpdateFailed``: the entities go
+    unavailable and the reason stays buried in the log.
+    """
+    config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = config_entry.runtime_data.coordinator
+    mock_aiounas.get_storage = AsyncMock(side_effect=UnasCertificateMismatch(_FP, _OTHER_FP))
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    assert coordinator.last_update_success is False
+    issue = ir.async_get(hass).async_get_issue(
+        DOMAIN, f"{ISSUE_CERT_MISMATCH}_{config_entry.entry_id}"
+    )
+    assert issue is not None
+    assert issue.translation_placeholders["got"] == _OTHER_FP
+    assert not [
+        flow
+        for flow in hass.config_entries.flow.async_progress()
+        if flow["context"].get("source") == "reauth"
+    ]
+
+
+async def test_reconfigure_says_when_the_certificate_is_not_the_stored_one(
+    hass: HomeAssistant, mock_aiounas: AsyncMock
+) -> None:
+    """Reconfigure must not re-pin silently.
+
+    Someone opening reconfigure to change an API key while their console is being
+    impersonated would otherwise accept a stranger's certificate with nothing on
+    screen to notice.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="AABBCC000001",
+        data={
+            **_HOST,
+            CONF_TLS_MODE: TlsMode.FINGERPRINT,
+            CONF_CERT_FINGERPRINT: _FP,
+            CONF_API_KEY: "k123456789",
+            CONF_AUTH_METHOD: AUTH_API_KEY,
+        },
+    )
+    entry.add_to_hass(hass)
+    result = await entry.start_reconfigure_flow(hass)
+    with patch(
+        "custom_components.unifi_unas_rest.config_flow.async_probe_fingerprint",
+        AsyncMock(return_value=_OTHER_FP),
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {**_HOST, CONF_TLS_MODE: TlsMode.FINGERPRINT, CONF_AUTH_METHOD: AUTH_API_KEY},
+        )
+    assert result["step_id"] == "tls_fingerprint_changed"
+    assert result["description_placeholders"]["previous"] == _FP
+    assert result["description_placeholders"]["fingerprint"] == _OTHER_FP
+
+
+async def test_reconfigure_is_quiet_when_the_certificate_is_unchanged(
+    hass: HomeAssistant, mock_aiounas: AsyncMock
+) -> None:
+    """The other half: an unchanged certificate must not raise an alarm."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="AABBCC000001",
+        data={
+            **_HOST,
+            CONF_TLS_MODE: TlsMode.FINGERPRINT,
+            CONF_CERT_FINGERPRINT: _FP,
+            CONF_API_KEY: "k123456789",
+            CONF_AUTH_METHOD: AUTH_API_KEY,
+        },
+    )
+    entry.add_to_hass(hass)
+    result = await entry.start_reconfigure_flow(hass)
+    with patch(
+        "custom_components.unifi_unas_rest.config_flow.async_probe_fingerprint",
+        AsyncMock(return_value=_FP),
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {**_HOST, CONF_TLS_MODE: TlsMode.FINGERPRINT, CONF_AUTH_METHOD: AUTH_API_KEY},
+        )
+    assert result["step_id"] == "tls_fingerprint"

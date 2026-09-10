@@ -22,7 +22,7 @@ from mcp.server.mcpserver import MCPServer
 from .actions import UnasActionClient
 from .auth import AbstractAuth, ApiKeyAuth, SessionAuth
 from .client import UnasClient
-from .tls import TlsMode, ssl_param
+from .tls import ssl_from_env
 
 
 def _auth() -> AbstractAuth:
@@ -40,30 +40,14 @@ def _host() -> str:
     return host
 
 
-def _ssl() -> bool | aiohttp.Fingerprint:
-    """TLS trust for the CLI/MCP, from the environment.
-
-    ``UNAS_CERT_FINGERPRINT`` pins that SHA-256; ``UNAS_VERIFY_SSL=1`` verifies
-    against the CA store; with neither set the connection is unverified, which
-    is the historical behaviour of these developer tools against local hardware.
-    Home Assistant does not take this path — it stores a pinned fingerprint.
-    """
-    fingerprint = os.environ.get("UNAS_CERT_FINGERPRINT")
-    if fingerprint:
-        return ssl_param(TlsMode.FINGERPRINT, fingerprint)
-    if os.environ.get("UNAS_VERIFY_SSL", "").lower() in ("1", "true", "yes"):
-        return ssl_param(TlsMode.CA)
-    return ssl_param(TlsMode.INSECURE)
-
-
 async def _with_read[T](func: Callable[[UnasClient], Awaitable[T]]) -> T:
     async with aiohttp.ClientSession() as session:
-        return await func(UnasClient(session, _host(), _auth(), ssl=_ssl()))
+        return await func(UnasClient(session, _host(), _auth(), ssl=ssl_from_env()))
 
 
 async def _with_action(func: Callable[[UnasActionClient], Awaitable[None]]) -> None:
     async with aiohttp.ClientSession() as session:
-        await func(UnasActionClient(session, _host(), _auth(), ssl=_ssl()))
+        await func(UnasActionClient(session, _host(), _auth(), ssl=ssl_from_env()))
 
 
 def build_server(*, allow_writes: bool) -> MCPServer:

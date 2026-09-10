@@ -33,6 +33,10 @@
         "title": "Trust this certificate",
         "description": "The console at this address is serving a certificate with the SHA-256 fingerprint below. Compare it with the one shown by the console itself if you can, then continue to accept it. From then on this integration refuses any other certificate.\n\n`{fingerprint}`"
       },
+      "tls_fingerprint_changed": {
+        "title": "This is not the certificate on file",
+        "description": "The console at this address is serving a different certificate than the one saved for it. That is expected if you reissued it or reset the console. If you changed neither, do not continue — something else may be answering at this address.\n\nSaved:\n`{previous}`\n\nNow served:\n`{fingerprint}`"
+      },
       "api_key": {
         "title": "API key",
         "description": "Create an API key in the UniFi OS UI. It grants read-only access to storage, disks and system telemetry (it cannot read users or shares).",

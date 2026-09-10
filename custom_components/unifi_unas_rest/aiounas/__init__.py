@@ -34,6 +34,7 @@ from .tls import (
     async_probe_fingerprint,
     format_fingerprint,
     parse_fingerprint,
+    ssl_from_env,
     ssl_param,
 )
 from .transport import UnasTransport
@@ -70,5 +71,6 @@ __all__ = [
     "format_fingerprint",
     "parse_fingerprint",
     "probe",
+    "ssl_from_env",
     "ssl_param",
 ]

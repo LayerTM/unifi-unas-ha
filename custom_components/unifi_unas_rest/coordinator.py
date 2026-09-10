@@ -25,11 +25,13 @@ from .aiounas import (
     UnasApiError,
     UnasAuthError,
     UnasCapabilityError,
+    UnasCertificateMismatch,
     UnasClient,
     UnasConnectionError,
     UpdateInfo,
 )
 from .const import DOMAIN
+from .issues import raise_cert_mismatch
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -119,6 +121,16 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
             )
         except UnasAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
+        except UnasCertificateMismatch as err:
+            # Must precede UnasConnectionError, its base class. A certificate that
+            # changes while the integration is running is the same event as one
+            # that changes before setup, and it has to reach the user the same
+            # way: as a repair naming both fingerprints. Left to the branch
+            # below it becomes an ordinary UpdateFailed, and the entities simply
+            # go unavailable with the reason buried in the log.
+            if self.config_entry is not None:
+                raise_cert_mismatch(self.hass, self.config_entry, err)
+            raise UpdateFailed(str(err)) from err
         except (UnasConnectionError, UnasApiError) as err:
             raise UpdateFailed(str(err)) from err
         return UnasData(

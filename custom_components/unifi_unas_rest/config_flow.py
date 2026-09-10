@@ -146,6 +146,12 @@ class UnifiUnasConfigFlow(ConfigFlow, domain=DOMAIN):
             return await self.async_step_api_key()
         return await self.async_step_password()
 
+    async def async_step_tls_fingerprint_changed(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Same step, shown when the certificate differs from the stored one."""
+        return await self.async_step_tls_fingerprint(user_input)
+
     async def async_step_tls_fingerprint(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -167,12 +173,27 @@ class UnifiUnasConfigFlow(ConfigFlow, domain=DOMAIN):
                 data_schema=_connection_schema(self._data),
                 errors={"base": "cannot_connect"},
             )
+        # Reconfiguring an already-pinned entry must say so when the certificate
+        # is not the one on file. Without it, someone who opened reconfigure to
+        # change an API key during an impersonation would accept a stranger's
+        # certificate with nothing on screen to notice.
+        previous = self._previous_fingerprint()
         self._data[CONF_CERT_FINGERPRINT] = fingerprint
         return self.async_show_form(
-            step_id="tls_fingerprint",
+            step_id="tls_fingerprint_changed"
+            if previous and previous != fingerprint
+            else "tls_fingerprint",
             data_schema=vol.Schema({}),
-            description_placeholders={"fingerprint": fingerprint},
+            description_placeholders={"fingerprint": fingerprint, "previous": previous or ""},
         )
+
+    def _previous_fingerprint(self) -> str | None:
+        """The fingerprint already stored for this entry, when reconfiguring one."""
+        if self.source != SOURCE_RECONFIGURE:
+            return None
+        entry = self._get_reconfigure_entry()
+        stored = entry.data.get(CONF_CERT_FINGERPRINT)
+        return str(stored) if stored else None
 
     async def async_step_api_key(
         self, user_input: dict[str, Any] | None = None

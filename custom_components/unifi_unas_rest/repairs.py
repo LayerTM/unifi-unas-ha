@@ -76,25 +76,35 @@ class CertMismatchRepairFlow(_PinCertificateFlow):
 class TlsInsecureRepairFlow(_PinCertificateFlow):
     """Start pinning on an entry that currently verifies nothing."""
 
+    def __init__(self, entry_id: str) -> None:
+        super().__init__(entry_id)
+        self._fingerprint: str | None = None
+
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         return await self.async_step_confirm()
 
     async def async_step_confirm(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        # Read the certificate ONCE, when building the form, and pin exactly what
+        # was shown. Probing again on confirmation would store a certificate the
+        # user never compared against the console — which is the property this
+        # whole feature exists to provide.
+        if user_input is not None:
+            if self._fingerprint is None:  # pragma: no cover - form precedes confirm
+                return self.async_abort(reason="cannot_connect")
+            return await self._async_pin(self.hass, self._fingerprint)
         entry = self.hass.config_entries.async_get_entry(self._entry_id)
         if entry is None:
             return self.async_abort(reason="entry_not_found")
         try:
-            fingerprint = await async_probe_fingerprint(
+            self._fingerprint = await async_probe_fingerprint(
                 entry.data[CONF_HOST], entry.data.get(CONF_PORT, DEFAULT_PORT)
             )
         except UnasConnectionError:
             return self.async_abort(reason="cannot_connect")
-        if user_input is not None:
-            return await self._async_pin(self.hass, fingerprint)
         return self.async_show_form(
             step_id="confirm",
             data_schema=vol.Schema({}),
-            description_placeholders={"fingerprint": fingerprint},
+            description_placeholders={"fingerprint": self._fingerprint},
         )
 
 

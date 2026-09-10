@@ -93,6 +93,7 @@ Nothing is written to or left on the NAS, so no cleanup is needed on the device 
 ## Security & privacy
 
 - Read-only by default; control actions are opt-in and off by default, and need username/password auth (an owner account for power/firmware) — never an API key.
+- The console's certificate is **pinned**: the one it serves at setup is recorded, and any other is refused. Because UniFi OS ships a self-signed certificate, this is *trust on first use* — it assumes the first contact is not already intercepted, and it is not equivalent to a certificate signed by a real authority. That is exactly why the fingerprint is shown during setup: compare it with the one the console displays, and the assumption stops being one.
 - User accounts are never exposed as entities (they are personal data).
 - Credentials live only in the Home Assistant config entry; nothing is sent to third parties.
 - A secret/PII scanner (`scripts/secret_scan.py`) runs in pre-commit and CI, and diagnostics are redacted.
@@ -137,6 +138,8 @@ The integration **polls** the console's local REST API (`local_polling`) on a fi
 - **Power/firmware actions require an owner/admin account.** The firmware-install endpoint, auth gating, and its "nothing to update" refusal are verified against live hardware; the actual install-and-reboot path only runs when an update is genuinely available.
 - **No cloud**: only local access is supported; the UniFi Site Manager cloud API exposes none of this data.
 - **High-churn sensors** (network and per-disk throughput) are **disabled by default** — enable them per entity if you want them.
+- **Certificate pinning is trust on first use.** It detects a certificate that changes later, and it stops credentials reaching a host presenting a different one. It cannot detect interception that was already in place the first time the console was contacted — only comparing the fingerprint against the console's own display closes that.
+- **The CLI and MCP server do not verify anything unless told to** (see below). They are developer tools; the Home Assistant integration pins per entry and is unaffected.
 
 ## Troubleshooting
 
@@ -190,6 +193,16 @@ automation:
 ## Beyond Home Assistant: CLI & MCP
 
 The same client also powers a command-line tool and an MCP server for scripts, agents and LLMs. Credentials come from the environment (`UNAS_HOST` + `UNAS_APIKEY`, or `UNAS_USER`/`UNAS_PASS`).
+
+TLS trust comes from the environment too, and **defaults to unverified** — unlike the integration, these tools have nowhere to record a certificate you accepted:
+
+| variable | effect |
+|---|---|
+| `UNAS_CERT_FINGERPRINT=aa:bb:…` | accept only the certificate with that SHA-256 |
+| `UNAS_VERIFY_SSL=1` | verify against the system CA store |
+| *(neither set)* | accept any certificate |
+
+Read the fingerprint once with `unifi-unas status` against a console you trust, or from the console's own UI, then set it.
 
 ```bash
 pip install "aiounas[cli]"        # CLI

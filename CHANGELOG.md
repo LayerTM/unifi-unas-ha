@@ -28,6 +28,13 @@ adheres to [Semantic Versioning](https://semver.org/).
   the same way — previously it would have surfaced as "invalid credentials",
   because the underlying error is a subclass of the one that carries those.
 
+  This is trust on first use, and the limit is worth stating plainly: it assumes
+  the first contact is not already intercepted, so it is not equivalent to a
+  certificate signed by a real authority. Showing the fingerprint for comparison
+  is what closes that gap. The change covers the Home Assistant integration; the
+  CLI and MCP server still default to an unverified connection and now take
+  `UNAS_CERT_FINGERPRINT` or `UNAS_VERIFY_SSL` to do better.
+
   Existing entries keep the behaviour they had; nothing changes under them on
   upgrade. One that verifies nothing raises a repair offering the one-time switch
   to pinning. They are not migrated silently, because pinning whatever the console
