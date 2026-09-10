@@ -15,6 +15,7 @@ from .aiounas.exceptions import (
     UnasConnectionError,
     UnasError,
 )
+from .aiounas.tls import UnasCertificateMismatch
 from .const import DOMAIN
 
 
@@ -24,6 +25,16 @@ def action_error(err: UnasError) -> HomeAssistantError:
         return HomeAssistantError(translation_domain=DOMAIN, translation_key="not_permitted")
     if isinstance(err, UnasAuthError):
         return HomeAssistantError(translation_domain=DOMAIN, translation_key="auth_failed")
+    if isinstance(err, UnasCertificateMismatch):
+        # Must precede UnasConnectionError, its base class. The console is
+        # reachable; it is presenting a different certificate. Reporting that as
+        # "could not reach" sends the user to check cables and firewalls, and
+        # hides the one thing they need to look at.
+        return HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="cert_mismatch",
+            translation_placeholders={"expected": err.expected, "got": err.got},
+        )
     if isinstance(err, UnasConnectionError):
         return HomeAssistantError(
             translation_domain=DOMAIN,

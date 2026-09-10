@@ -523,3 +523,81 @@ async def test_the_mismatch_repair_gives_up_when_the_console_is_unreachable(
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "cannot_connect"
     assert config_entry.data.get(CONF_CERT_FINGERPRINT) is None
+
+
+# --- how the two failures are reported ----------------------------------------
+
+
+def test_a_swapped_certificate_is_not_reported_as_unreachable() -> None:
+    """A control action refused over TLS must say what actually happened.
+
+    ``UnasCertificateMismatch`` is a ``UnasConnectionError``, so it fell into the
+    "could not reach the UNAS" branch — which sends the user to check cables and
+    firewalls and hides the one thing they need to look at. The console is
+    reachable; it is presenting a different certificate.
+    """
+    from custom_components.unifi_unas_rest.errors import action_error
+
+    err = action_error(UnasCertificateMismatch(_FP, _OTHER_FP))
+    assert err.translation_key == "cert_mismatch"
+    assert err.translation_placeholders == {"expected": _FP, "got": _OTHER_FP}
+
+
+def test_an_ordinary_connection_failure_still_reads_as_one() -> None:
+    """The other direction: the new branch must not swallow real outages."""
+    from custom_components.unifi_unas_rest.errors import action_error
+
+    assert action_error(UnasConnectionError("down")).translation_key == "cannot_connect"
+
+
+async def test_an_unreachable_console_returns_to_the_step_the_user_is_on(
+    hass: HomeAssistant, mock_aiounas: AsyncMock
+) -> None:
+    """Reconfigure must not drop the user into the first-time setup form.
+
+    Both steps collect the same fields, so the only signal that something went
+    wrong is the step id — and landing on `user` makes it look as though the
+    existing entry was lost.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="AABBCC000001",
+        data={
+            **_HOST,
+            CONF_TLS_MODE: TlsMode.FINGERPRINT,
+            CONF_CERT_FINGERPRINT: _FP,
+            CONF_API_KEY: "k123456789",
+            CONF_AUTH_METHOD: AUTH_API_KEY,
+        },
+    )
+    entry.add_to_hass(hass)
+    result = await entry.start_reconfigure_flow(hass)
+    assert result["step_id"] == "reconfigure"
+
+    with patch(
+        "custom_components.unifi_unas_rest.config_flow.async_probe_fingerprint",
+        AsyncMock(side_effect=UnasConnectionError("down")),
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {**_HOST, CONF_TLS_MODE: TlsMode.FINGERPRINT, CONF_AUTH_METHOD: AUTH_API_KEY},
+        )
+    assert result["step_id"] == "reconfigure"
+    assert result["errors"] == {"base": "cannot_connect"}
+
+
+async def test_first_time_setup_still_returns_to_the_user_step(
+    hass: HomeAssistant, mock_aiounas: AsyncMock
+) -> None:
+    """And a fresh install must keep landing on `user`, not on `reconfigure`."""
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    with patch(
+        "custom_components.unifi_unas_rest.config_flow.async_probe_fingerprint",
+        AsyncMock(side_effect=UnasConnectionError("down")),
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {**_HOST, CONF_TLS_MODE: TlsMode.FINGERPRINT, CONF_AUTH_METHOD: AUTH_API_KEY},
+        )
+    assert result["step_id"] == "user"
+    assert result["errors"] == {"base": "cannot_connect"}

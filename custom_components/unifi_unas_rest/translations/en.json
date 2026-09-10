@@ -288,6 +288,9 @@
     "cannot_connect": {
       "message": "Could not reach the UNAS: {error}"
     },
+    "cert_mismatch": {
+      "message": "The UNAS presented a different TLS certificate than the one saved for it, so the request was refused. Saved: {expected}. Now served: {got}. This is expected if the certificate was reissued or the console was reset; if you changed neither, something may be impersonating it."
+    },
     "action_failed": {
       "message": "The UNAS could not complete the action{detail}."
     },
