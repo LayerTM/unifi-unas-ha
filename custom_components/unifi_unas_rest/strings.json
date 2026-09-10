@@ -7,12 +7,12 @@
         "data": {
           "host": "Host",
           "port": "Port",
-          "verify_ssl": "Verify TLS certificate",
+          "tls_mode": "Certificate trust",
           "auth_method": "Authentication method"
         },
         "data_description": {
           "host": "IP address or hostname of the UNAS console.",
-          "verify_ssl": "UniFi OS uses a self-signed certificate; leave off unless you pin a CA."
+          "tls_mode": "UniFi consoles serve a self-signed certificate. Pinning records the one it serves now and refuses any other. Choose CA verification only if you installed a certificate from a real authority."
         }
       },
       "reconfigure": {
@@ -21,23 +21,32 @@
         "data": {
           "host": "Host",
           "port": "Port",
-          "verify_ssl": "Verify TLS certificate",
+          "tls_mode": "Certificate trust",
           "auth_method": "Authentication method"
         },
         "data_description": {
           "host": "IP address or hostname of the UNAS console.",
-          "verify_ssl": "UniFi OS uses a self-signed certificate; leave off unless you pin a CA."
+          "tls_mode": "UniFi consoles serve a self-signed certificate. Pinning records the one it serves now and refuses any other. Choose CA verification only if you installed a certificate from a real authority."
         }
+      },
+      "tls_fingerprint": {
+        "title": "Trust this certificate",
+        "description": "The console at this address is serving a certificate with the SHA-256 fingerprint below. Compare it with the one shown by the console itself if you can, then continue to accept it. From then on this integration refuses any other certificate.\n\n`{fingerprint}`"
       },
       "api_key": {
         "title": "API key",
         "description": "Create an API key in the UniFi OS UI. It grants read-only access to storage, disks and system telemetry (it cannot read users or shares).",
-        "data": { "api_key": "API key" }
+        "data": {
+          "api_key": "API key"
+        }
       },
       "password": {
         "title": "Local account",
         "description": "Use a least-privilege local account. This also exposes shares and snapshots.",
-        "data": { "username": "Username", "password": "Password" }
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        }
       },
       "reauth_confirm": {
         "title": "Re-authenticate UniFi UNAS",
@@ -53,7 +62,8 @@
       "invalid_auth": "Invalid authentication.",
       "cannot_connect": "Failed to connect.",
       "insufficient_permissions": "This credential lacks permission to read the required data.",
-      "unknown": "Unexpected error."
+      "unknown": "Unexpected error.",
+      "cert_mismatch": "The console presented a different certificate than the one saved. Either it was reissued, or something is impersonating the console."
     },
     "abort": {
       "already_configured": "This UNAS is already configured.",
@@ -82,67 +92,176 @@
         "api_key": "API key (recommended, read-only)",
         "password": "Username & password"
       }
+    },
+    "tls_mode": {
+      "options": {
+        "fingerprint": "Trust this console's certificate (recommended)",
+        "ca": "Verify against a certificate authority",
+        "insecure": "Accept any certificate (not verified)"
+      }
     }
   },
   "entity": {
     "sensor": {
-      "storage_used": { "name": "Storage used" },
-      "storage_total": { "name": "Storage total" },
-      "storage_free": { "name": "Storage free" },
-      "storage_usage": { "name": "Storage usage" },
-      "storage_status": { "name": "Storage status" },
-      "raid_level": { "name": "RAID level" },
-      "pool_count": { "name": "Pools" },
-      "disks_at_risk": { "name": "Disks at risk" },
-      "average_disk_temperature": { "name": "Average disk temperature" },
-      "cpu_usage": { "name": "CPU usage" },
-      "cpu_temperature": { "name": "CPU temperature" },
-      "memory_usage": { "name": "Memory usage" },
-      "network_rx": { "name": "Network receive" },
-      "network_tx": { "name": "Network transmit" },
-      "unifi_os_version": { "name": "UniFi OS version" },
-      "drive_version": { "name": "Drive app version" },
-      "last_boot": { "name": "Last boot" },
-      "link_speed": { "name": "Link speed" },
-      "user_count": { "name": "Accounts" },
-      "applications": { "name": "Applications" },
-      "recent_events": { "name": "Recent events" },
-      "last_event": { "name": "Last event" },
-      "log_entries": { "name": "Log entries" },
-      "disk_temperature": { "name": "Temperature" },
-      "disk_power_on_hours": { "name": "Power-on hours" },
-      "disk_state": { "name": "State" },
-      "disk_health_score": { "name": "Health score" },
-      "disk_bad_sectors": { "name": "Bad sectors" },
-      "disk_read_rate": { "name": "Read rate" },
-      "disk_write_rate": { "name": "Write rate" },
-      "pool_raid_level": { "name": "RAID level" },
-      "pool_status": { "name": "Status" },
-      "pool_usage": { "name": "Usage" },
-      "pool_capacity": { "name": "Capacity" },
-      "pool_used": { "name": "Used" },
-      "pool_scrubbing": { "name": "Data scrubbing" },
-      "share_usage": { "name": "Usage" },
-      "share_quota": { "name": "Quota" },
-      "share_members": { "name": "Members" },
-      "share_encryption": { "name": "Encryption" }
+      "storage_used": {
+        "name": "Storage used"
+      },
+      "storage_total": {
+        "name": "Storage total"
+      },
+      "storage_free": {
+        "name": "Storage free"
+      },
+      "storage_usage": {
+        "name": "Storage usage"
+      },
+      "storage_status": {
+        "name": "Storage status"
+      },
+      "raid_level": {
+        "name": "RAID level"
+      },
+      "pool_count": {
+        "name": "Pools"
+      },
+      "disks_at_risk": {
+        "name": "Disks at risk"
+      },
+      "average_disk_temperature": {
+        "name": "Average disk temperature"
+      },
+      "cpu_usage": {
+        "name": "CPU usage"
+      },
+      "cpu_temperature": {
+        "name": "CPU temperature"
+      },
+      "memory_usage": {
+        "name": "Memory usage"
+      },
+      "network_rx": {
+        "name": "Network receive"
+      },
+      "network_tx": {
+        "name": "Network transmit"
+      },
+      "unifi_os_version": {
+        "name": "UniFi OS version"
+      },
+      "drive_version": {
+        "name": "Drive app version"
+      },
+      "last_boot": {
+        "name": "Last boot"
+      },
+      "link_speed": {
+        "name": "Link speed"
+      },
+      "user_count": {
+        "name": "Accounts"
+      },
+      "applications": {
+        "name": "Applications"
+      },
+      "recent_events": {
+        "name": "Recent events"
+      },
+      "last_event": {
+        "name": "Last event"
+      },
+      "log_entries": {
+        "name": "Log entries"
+      },
+      "disk_temperature": {
+        "name": "Temperature"
+      },
+      "disk_power_on_hours": {
+        "name": "Power-on hours"
+      },
+      "disk_state": {
+        "name": "State"
+      },
+      "disk_health_score": {
+        "name": "Health score"
+      },
+      "disk_bad_sectors": {
+        "name": "Bad sectors"
+      },
+      "disk_read_rate": {
+        "name": "Read rate"
+      },
+      "disk_write_rate": {
+        "name": "Write rate"
+      },
+      "pool_raid_level": {
+        "name": "RAID level"
+      },
+      "pool_status": {
+        "name": "Status"
+      },
+      "pool_usage": {
+        "name": "Usage"
+      },
+      "pool_capacity": {
+        "name": "Capacity"
+      },
+      "pool_used": {
+        "name": "Used"
+      },
+      "pool_scrubbing": {
+        "name": "Data scrubbing"
+      },
+      "share_usage": {
+        "name": "Usage"
+      },
+      "share_quota": {
+        "name": "Quota"
+      },
+      "share_members": {
+        "name": "Members"
+      },
+      "share_encryption": {
+        "name": "Encryption"
+      }
     },
     "binary_sensor": {
-      "device_online": { "name": "Online" },
-      "storage_problem": { "name": "Storage problem" },
-      "disk_problem": { "name": "Problem" },
-      "share_snapshot": { "name": "Snapshots" },
-      "share_backup": { "name": "Remote backup" }
+      "device_online": {
+        "name": "Online"
+      },
+      "storage_problem": {
+        "name": "Storage problem"
+      },
+      "disk_problem": {
+        "name": "Problem"
+      },
+      "share_snapshot": {
+        "name": "Snapshots"
+      },
+      "share_backup": {
+        "name": "Remote backup"
+      }
     },
     "button": {
-      "reboot": { "name": "Reboot" },
-      "shutdown": { "name": "Shut down" },
-      "update_firmware": { "name": "Install UniFi OS update" },
-      "update_drive_app": { "name": "Install Drive app update" }
+      "reboot": {
+        "name": "Reboot"
+      },
+      "shutdown": {
+        "name": "Shut down"
+      },
+      "update_firmware": {
+        "name": "Install UniFi OS update"
+      },
+      "update_drive_app": {
+        "name": "Install Drive app update"
+      }
     },
     "update": {
-      "unifi_os_update": { "name": "UniFi OS" },
-      "drive_update": { "name": "Drive app" }
+      "unifi_os_update": {
+        "name": "UniFi OS"
+      },
+      "drive_update": {
+        "name": "Drive app"
+      }
     },
     "select": {
       "fan_profile": {
@@ -162,11 +281,49 @@
     "auth_failed": {
       "message": "Authentication with the UNAS failed; re-authenticate the integration."
     },
-    "cannot_connect": { "message": "Could not reach the UNAS: {error}" },
-    "action_failed": { "message": "The UNAS could not complete the action{detail}." },
-    "share_gone": { "message": "That share is no longer present on the UNAS." },
+    "cannot_connect": {
+      "message": "Could not reach the UNAS: {error}"
+    },
+    "action_failed": {
+      "message": "The UNAS could not complete the action{detail}."
+    },
+    "share_gone": {
+      "message": "That share is no longer present on the UNAS."
+    },
     "install_needs_controls": {
       "message": "Enable control actions (with an owner account) to install updates."
+    }
+  },
+  "issues": {
+    "cert_mismatch": {
+      "title": "UniFi UNAS certificate changed",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Accept the new certificate?",
+            "description": "The console is presenting a certificate that does not match the one saved for it. This is expected if you reissued it or reset the console; if you did neither, do not accept it.\n\nSaved:\n`{expected}`\n\nNow served:\n`{got}`"
+          }
+        },
+        "abort": {
+          "entry_not_found": "This UniFi UNAS entry no longer exists.",
+          "cannot_connect": "Could not reach the console to read its certificate. Try again when it is back online."
+        }
+      }
+    },
+    "tls_insecure": {
+      "title": "UniFi UNAS connection is not verified",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Start trusting one certificate?",
+            "description": "This connection to {host} accepts any certificate, so nothing confirms the host answering is your console. Continue to record the certificate it serves now and refuse any other.\n\n`{fingerprint}`"
+          }
+        },
+        "abort": {
+          "entry_not_found": "This UniFi UNAS entry no longer exists.",
+          "cannot_connect": "Could not reach the console to read its certificate. Try again when it is back online."
+        }
+      }
     }
   }
 }

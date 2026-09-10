@@ -28,6 +28,14 @@ from .models import (
     SystemIdentity,
     UpdateInfo,
 )
+from .tls import (
+    TlsMode,
+    UnasCertificateMismatch,
+    async_probe_fingerprint,
+    format_fingerprint,
+    parse_fingerprint,
+    ssl_param,
+)
 from .transport import UnasTransport
 
 __all__ = [
@@ -47,14 +55,20 @@ __all__ = [
     "Share",
     "Storage",
     "SystemIdentity",
+    "TlsMode",
     "UnasActionClient",
     "UnasApiError",
     "UnasAuthError",
     "UnasCapabilityError",
+    "UnasCertificateMismatch",
     "UnasClient",
     "UnasConnectionError",
     "UnasError",
     "UnasTransport",
     "UpdateInfo",
+    "async_probe_fingerprint",
+    "format_fingerprint",
+    "parse_fingerprint",
     "probe",
+    "ssl_param",
 ]

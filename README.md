@@ -68,7 +68,15 @@ This integration is in the HACS default list, so no custom repository is needed:
 1. **HACS → Integrations**, search for **UniFi UNAS (non-invasive)** and download it.
 2. Restart Home Assistant.
 3. **Settings → Devices & Services → Add Integration → UniFi UNAS**, then complete the flow:
-   - **Host / Port** of the UNAS console, and whether to verify TLS (off by default — UniFi OS ships a self-signed certificate).
+   - **Host / Port** of the UNAS console, and how to trust its certificate:
+     - **Trust this console's certificate** (default) — the certificate the
+       console is serving is shown to you once, and from then on the integration
+       accepts only that one. Compare it with the fingerprint the console shows
+       before accepting it.
+     - **Verify against a certificate authority** — for a console on which you
+       installed a certificate from a real authority.
+     - **Accept any certificate** — no assurance the host answering is your
+       console. Only for a setup where the other two cannot work.
    - **Authentication** — an API key (recommended, read-only) or a local account.
 
 Use a least-privilege credential — an API key or a dedicated limited local admin — rather than your owner account.
@@ -132,7 +140,13 @@ The integration **polls** the console's local REST API (`local_polling`) on a fi
 
 ## Troubleshooting
 
-- **"Failed to connect"** — check the host/port and that the console is reachable over HTTPS on your LAN. TLS verification is off by default because UniFi OS ships a self-signed certificate; leave it off unless you pin a CA.
+- **"Failed to connect"** — check the host/port and that the console is reachable
+  over HTTPS on your LAN.
+- **"The console presented a different certificate"** — the integration accepts
+  only the certificate recorded when it was set up. A UniFi OS reinstall, a factory
+  reset or a reissued certificate all change it legitimately, and a repair
+  notification shows you both fingerprints so you can accept the new one. If you
+  changed nothing, do not accept it: something else is answering at that address.
 - **Shares / account count / activity sensors missing** — you are using API-key auth; reconfigure with a local account (**Configure → Reconfigure**) to expose them.
 - **It keeps asking to re-authenticate, but the credential still works** — fixed in **v1.7.3**. Earlier versions read a console that was busy restarting (typically during a firmware update) as an expired session, and Home Assistant treats that as final: polling stops until you click through re-authentication. Update, then reload the entry — reloading also clears the stale *"Authentication expired"* repair.
 - **Controls don't appear after enabling them** — controls require **username/password** auth; with an API key the option is rejected. Power and firmware actions additionally need an **owner/admin** account.

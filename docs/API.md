@@ -15,7 +15,7 @@ device-wide endpoints live under `https://<host>/api/...`.
 | Property | Value |
 |---|---|
 | Transport | HTTPS, port `443` |
-| TLS | Self-signed console certificate — skip verification or pin the console CA |
+| TLS | Self-signed console certificate — pinned by SHA-256 on first use (`TlsMode.FINGERPRINT`), verified against a CA, or unverified |
 | Methods used | `GET` only (this reference covers read access) |
 
 ## Authentication

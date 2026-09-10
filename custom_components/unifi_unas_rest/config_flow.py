@@ -19,7 +19,6 @@ from homeassistant.const import (
     CONF_PASSWORD,
     CONF_PORT,
     CONF_USERNAME,
-    CONF_VERIFY_SSL,
 )
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -33,22 +32,28 @@ from .aiounas import (
     ApiKeyAuth,
     SessionAuth,
     SystemIdentity,
+    TlsMode,
     UnasAuthError,
     UnasCapabilityError,
+    UnasCertificateMismatch,
     UnasClient,
     UnasConnectionError,
+    async_probe_fingerprint,
 )
 from .aiounas.auth import AbstractAuth
 from .const import (
     AUTH_API_KEY,
     AUTH_PASSWORD,
     CONF_AUTH_METHOD,
+    CONF_CERT_FINGERPRINT,
     CONF_ENABLE_CONTROLS,
+    CONF_TLS_MODE,
     DEFAULT_ENABLE_CONTROLS,
     DEFAULT_PORT,
-    DEFAULT_VERIFY_SSL,
+    DEFAULT_TLS_MODE,
     DOMAIN,
 )
+from .tls import ssl_for_entry, tls_mode_of
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -62,6 +67,11 @@ def _auth_from_input(method: str, user_input: dict[str, Any]) -> AbstractAuth:
     return SessionAuth(user_input[CONF_USERNAME], user_input[CONF_PASSWORD])
 
 
+def _tls_default(defaults: dict[str, Any]) -> str:
+    """Preselect the entry's current mode, or the pinning default for a new one."""
+    return str(tls_mode_of(defaults)) if defaults else str(DEFAULT_TLS_MODE)
+
+
 def _connection_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     """Host / port / TLS / auth-method form, optionally prefilled (reconfigure)."""
     d = defaults or {}
@@ -72,7 +82,13 @@ def _connection_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
         {
             host: str,
             vol.Required(CONF_PORT, default=d.get(CONF_PORT, DEFAULT_PORT)): int,
-            vol.Required(CONF_VERIFY_SSL, default=d.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL)): bool,
+            vol.Required(CONF_TLS_MODE, default=_tls_default(d)): SelectSelector(
+                SelectSelectorConfig(
+                    options=[TlsMode.FINGERPRINT, TlsMode.CA, TlsMode.INSECURE],
+                    translation_key="tls_mode",
+                    mode=SelectSelectorMode.LIST,
+                )
+            ),
             vol.Required(CONF_AUTH_METHOD, default=d.get(CONF_AUTH_METHOD, AUTH_API_KEY)): (
                 SelectSelector(
                     SelectSelectorConfig(
@@ -103,9 +119,7 @@ class UnifiUnasConfigFlow(ConfigFlow, domain=DOMAIN):
         """Collect host / port / TLS and the chosen auth method."""
         if user_input is not None:
             self._data.update(user_input)
-            if user_input[CONF_AUTH_METHOD] == AUTH_API_KEY:
-                return await self.async_step_api_key()
-            return await self.async_step_password()
+            return await self._after_connection()
         return self.async_show_form(step_id="user", data_schema=_connection_schema())
 
     async def async_step_reconfigure(
@@ -114,12 +128,50 @@ class UnifiUnasConfigFlow(ConfigFlow, domain=DOMAIN):
         """Change host / port / TLS / credentials for an existing entry."""
         if user_input is not None:
             self._data.update(user_input)
-            if user_input[CONF_AUTH_METHOD] == AUTH_API_KEY:
-                return await self.async_step_api_key()
-            return await self.async_step_password()
+            return await self._after_connection()
         entry = self._get_reconfigure_entry()
         return self.async_show_form(
             step_id="reconfigure", data_schema=_connection_schema(dict(entry.data))
+        )
+
+    async def _after_connection(self) -> ConfigFlowResult:
+        """Pin the certificate first when asked to, then collect credentials."""
+        if self._data[CONF_TLS_MODE] == TlsMode.FINGERPRINT:
+            return await self.async_step_tls_fingerprint()
+        self._data.pop(CONF_CERT_FINGERPRINT, None)
+        return await self._credentials_step()
+
+    async def _credentials_step(self) -> ConfigFlowResult:
+        if self._data[CONF_AUTH_METHOD] == AUTH_API_KEY:
+            return await self.async_step_api_key()
+        return await self.async_step_password()
+
+    async def async_step_tls_fingerprint(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Show the certificate the console is serving and have the user accept it.
+
+        Nothing is trusted by reading it: the fingerprint is displayed so the
+        person setting this up can compare it with the console's own UI. Only
+        after they submit does it become the one certificate this entry accepts.
+        """
+        if user_input is not None:
+            return await self._credentials_step()
+        try:
+            fingerprint = await async_probe_fingerprint(
+                self._data[CONF_HOST], self._data[CONF_PORT]
+            )
+        except UnasConnectionError:
+            return self.async_show_form(
+                step_id="user",
+                data_schema=_connection_schema(self._data),
+                errors={"base": "cannot_connect"},
+            )
+        self._data[CONF_CERT_FINGERPRINT] = fingerprint
+        return self.async_show_form(
+            step_id="tls_fingerprint",
+            data_schema=vol.Schema({}),
+            description_placeholders={"fingerprint": fingerprint},
         )
 
     async def async_step_api_key(
@@ -146,6 +198,8 @@ class UnifiUnasConfigFlow(ConfigFlow, domain=DOMAIN):
             data = {**self._data, CONF_AUTH_METHOD: method, **user_input}
             try:
                 identity = await self._probe(data, _auth_from_input(method, user_input))
+            except UnasCertificateMismatch:
+                errors["base"] = "cert_mismatch"
             except UnasAuthError:
                 errors["base"] = "invalid_auth"
             except UnasConnectionError:
@@ -181,6 +235,8 @@ class UnifiUnasConfigFlow(ConfigFlow, domain=DOMAIN):
             data = {**self._data, **user_input}
             try:
                 identity = await self._probe(data, _auth_from_input(method, user_input))
+            except UnasCertificateMismatch:
+                errors["base"] = "cert_mismatch"
             except UnasAuthError:
                 errors["base"] = "invalid_auth"
             except UnasConnectionError:
@@ -196,14 +252,17 @@ class UnifiUnasConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def _probe(self, data: dict[str, Any], auth: AbstractAuth) -> SystemIdentity:
         """Validate connectivity + auth; return the device identity (for unique_id)."""
-        session = async_get_clientsession(self.hass, verify_ssl=data[CONF_VERIFY_SSL])
+        # The per-request ssl argument decides the trust, so the shared session
+        # is the ordinary verifying one; passing a Fingerprint makes aiohttp use
+        # its unverified context for that request alone.
+        session = async_get_clientsession(self.hass)
         client = UnasClient(
             session,
             data[CONF_HOST],
             auth,
             port=data[CONF_PORT],
             use_ssl=True,
-            verify_ssl=data[CONF_VERIFY_SSL],
+            ssl=ssl_for_entry(data),
         )
         await client.async_prepare()
         identity = await client.get_identity()

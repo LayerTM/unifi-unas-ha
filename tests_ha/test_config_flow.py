@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock
 
 from custom_components.unifi_unas_rest.aiounas import (
+    TlsMode,
     UnasAuthError,
     UnasCapabilityError,
     UnasConnectionError,
@@ -13,6 +14,7 @@ from custom_components.unifi_unas_rest.const import (
     AUTH_API_KEY,
     AUTH_PASSWORD,
     CONF_AUTH_METHOD,
+    CONF_TLS_MODE,
     DOMAIN,
 )
 from homeassistant.config_entries import SOURCE_REAUTH, SOURCE_USER
@@ -22,13 +24,12 @@ from homeassistant.const import (
     CONF_PASSWORD,
     CONF_PORT,
     CONF_USERNAME,
-    CONF_VERIFY_SSL,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-_HOST = {CONF_HOST: "192.0.2.10", CONF_PORT: 443, CONF_VERIFY_SSL: False}
+_HOST = {CONF_HOST: "192.0.2.10", CONF_PORT: 443, CONF_TLS_MODE: TlsMode.INSECURE}
 
 
 async def test_user_flow_api_key(hass: HomeAssistant, mock_aiounas: AsyncMock) -> None:
@@ -183,7 +184,7 @@ async def test_reconfigure_updates_host(
         {
             CONF_HOST: "192.0.2.55",
             CONF_PORT: 443,
-            CONF_VERIFY_SSL: False,
+            CONF_TLS_MODE: TlsMode.INSECURE,
             CONF_AUTH_METHOD: AUTH_API_KEY,
         },
     )
@@ -215,7 +216,7 @@ async def test_reconfigure_wrong_device_aborts(
         {
             CONF_HOST: "192.0.2.55",
             CONF_PORT: 443,
-            CONF_VERIFY_SSL: False,
+            CONF_TLS_MODE: TlsMode.INSECURE,
             CONF_AUTH_METHOD: AUTH_API_KEY,
         },
     )

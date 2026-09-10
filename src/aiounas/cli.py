@@ -26,6 +26,7 @@ from .actions import UnasActionClient
 from .auth import AbstractAuth, ApiKeyAuth, SessionAuth
 from .client import UnasClient
 from .exceptions import UnasError
+from .tls import TlsMode, ssl_param
 
 app = typer.Typer(
     help="Query and control a UniFi UNAS over its local REST API.",
@@ -55,10 +56,26 @@ def _host() -> str:
     return host
 
 
+def _ssl() -> bool | aiohttp.Fingerprint:
+    """TLS trust for the CLI/MCP, from the environment.
+
+    ``UNAS_CERT_FINGERPRINT`` pins that SHA-256; ``UNAS_VERIFY_SSL=1`` verifies
+    against the CA store; with neither set the connection is unverified, which
+    is the historical behaviour of these developer tools against local hardware.
+    Home Assistant does not take this path — it stores a pinned fingerprint.
+    """
+    fingerprint = os.environ.get("UNAS_CERT_FINGERPRINT")
+    if fingerprint:
+        return ssl_param(TlsMode.FINGERPRINT, fingerprint)
+    if os.environ.get("UNAS_VERIFY_SSL", "").lower() in ("1", "true", "yes"):
+        return ssl_param(TlsMode.CA)
+    return ssl_param(TlsMode.INSECURE)
+
+
 def _run[T](func: Callable[[UnasClient], Awaitable[T]]) -> T:
     async def runner() -> T:
         async with aiohttp.ClientSession() as session:
-            return await func(UnasClient(session, _host(), _auth(), verify_ssl=False))
+            return await func(UnasClient(session, _host(), _auth(), ssl=_ssl()))
 
     try:
         return asyncio.run(runner())
@@ -70,7 +87,7 @@ def _run[T](func: Callable[[UnasClient], Awaitable[T]]) -> T:
 def _run_action(func: Callable[[UnasActionClient], Awaitable[None]]) -> None:
     async def runner() -> None:
         async with aiohttp.ClientSession() as session:
-            await func(UnasActionClient(session, _host(), _auth(), verify_ssl=False))
+            await func(UnasActionClient(session, _host(), _auth(), ssl=_ssl()))
 
     try:
         asyncio.run(runner())
