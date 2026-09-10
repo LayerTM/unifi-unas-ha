@@ -68,7 +68,15 @@ This integration is in the HACS default list, so no custom repository is needed:
 1. **HACS → Integrations**, search for **UniFi UNAS (non-invasive)** and download it.
 2. Restart Home Assistant.
 3. **Settings → Devices & Services → Add Integration → UniFi UNAS**, then complete the flow:
-   - **Host / Port** of the UNAS console, and whether to verify TLS (off by default — UniFi OS ships a self-signed certificate).
+   - **Host / Port** of the UNAS console, and how to trust its certificate:
+     - **Trust this console's certificate** (default) — the certificate the
+       console is serving is shown to you once, and from then on the integration
+       accepts only that one. Compare it with the fingerprint the console shows
+       before accepting it.
+     - **Verify against a certificate authority** — for a console on which you
+       installed a certificate from a real authority.
+     - **Accept any certificate** — no assurance the host answering is your
+       console. Only for a setup where the other two cannot work.
    - **Authentication** — an API key (recommended, read-only) or a local account.
 
 Use a least-privilege credential — an API key or a dedicated limited local admin — rather than your owner account.
@@ -85,6 +93,7 @@ Nothing is written to or left on the NAS, so no cleanup is needed on the device 
 ## Security & privacy
 
 - Read-only by default; control actions are opt-in and off by default, and need username/password auth (an owner account for power/firmware) — never an API key.
+- The console's certificate is **pinned**: the one it serves at setup is recorded, and any other is refused. Because UniFi OS ships a self-signed certificate, this is *trust on first use* — it assumes the first contact is not already intercepted, and it is not equivalent to a certificate signed by a real authority. That is exactly why the fingerprint is shown during setup: compare it with the one the console displays, and the assumption stops being one.
 - User accounts are never exposed as entities (they are personal data).
 - Credentials live only in the Home Assistant config entry; nothing is sent to third parties.
 - A secret/PII scanner (`scripts/secret_scan.py`) runs in pre-commit and CI, and diagnostics are redacted.
@@ -129,10 +138,18 @@ The integration **polls** the console's local REST API (`local_polling`) on a fi
 - **Power/firmware actions require an owner/admin account.** The firmware-install endpoint, auth gating, and its "nothing to update" refusal are verified against live hardware; the actual install-and-reboot path only runs when an update is genuinely available.
 - **No cloud**: only local access is supported; the UniFi Site Manager cloud API exposes none of this data.
 - **High-churn sensors** (network and per-disk throughput) are **disabled by default** — enable them per entity if you want them.
+- **Certificate pinning is trust on first use.** It detects a certificate that changes later, and it stops credentials reaching a host presenting a different one. It cannot detect interception that was already in place the first time the console was contacted — only comparing the fingerprint against the console's own display closes that.
+- **The CLI and MCP server do not verify anything unless told to** (see below). They are developer tools; the Home Assistant integration pins per entry and is unaffected.
 
 ## Troubleshooting
 
-- **"Failed to connect"** — check the host/port and that the console is reachable over HTTPS on your LAN. TLS verification is off by default because UniFi OS ships a self-signed certificate; leave it off unless you pin a CA.
+- **"Failed to connect"** — check the host/port and that the console is reachable
+  over HTTPS on your LAN.
+- **"The console presented a different certificate"** — the integration accepts
+  only the certificate recorded when it was set up. A UniFi OS reinstall, a factory
+  reset or a reissued certificate all change it legitimately, and a repair
+  notification shows you both fingerprints so you can accept the new one. If you
+  changed nothing, do not accept it: something else is answering at that address.
 - **Shares / account count / activity sensors missing** — you are using API-key auth; reconfigure with a local account (**Configure → Reconfigure**) to expose them.
 - **It keeps asking to re-authenticate, but the credential still works** — fixed in **v1.7.3**. Earlier versions read a console that was busy restarting (typically during a firmware update) as an expired session, and Home Assistant treats that as final: polling stops until you click through re-authentication. Update, then reload the entry — reloading also clears the stale *"Authentication expired"* repair.
 - **Controls don't appear after enabling them** — controls require **username/password** auth; with an API key the option is rejected. Power and firmware actions additionally need an **owner/admin** account.
@@ -177,10 +194,21 @@ automation:
 
 The same client also powers a command-line tool and an MCP server for scripts, agents and LLMs. Credentials come from the environment (`UNAS_HOST` + `UNAS_APIKEY`, or `UNAS_USER`/`UNAS_PASS`).
 
+TLS trust comes from the environment too, and **defaults to unverified** — unlike the integration, these tools have nowhere to record a certificate you accepted:
+
+| variable | effect |
+|---|---|
+| `UNAS_CERT_FINGERPRINT=aa:bb:…` | accept only the certificate with that SHA-256 |
+| `UNAS_VERIFY_SSL=1` | verify against the system CA store |
+| *(neither set)* | accept any certificate |
+
+Read the fingerprint with `unifi-unas fingerprint`, compare it with the one the console's own UI shows, then set it.
+
 ```bash
 pip install "aiounas[cli]"        # CLI
 unifi-unas status                 # storage, disks, system summary
 unifi-unas status --json          # machine-readable output
+unifi-unas fingerprint            # SHA-256 of the console's TLS certificate
 unifi-unas fan                    # show the fan profile
 unifi-unas fan quiet              # set it (write — asks for confirmation, or --yes)
 unifi-unas reboot                 # write — asks for confirmation (or --yes)

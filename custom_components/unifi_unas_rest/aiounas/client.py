@@ -8,7 +8,6 @@ from .auth import AbstractAuth
 from .const import (
     DEFAULT_PORT,
     DEFAULT_TIMEOUT,
-    DEFAULT_VERIFY_SSL,
     PATH_DEVICE_INFO,
     PATH_FAN_CONTROL,
     PATH_LOGS,
@@ -52,7 +51,7 @@ class UnasClient:
         *,
         port: int = DEFAULT_PORT,
         use_ssl: bool = True,
-        verify_ssl: bool = DEFAULT_VERIFY_SSL,
+        ssl: bool | aiohttp.Fingerprint = True,
         timeout: int = DEFAULT_TIMEOUT,
     ) -> None:
         self._transport = UnasTransport(
@@ -61,7 +60,7 @@ class UnasClient:
             auth,
             port=port,
             use_ssl=use_ssl,
-            verify_ssl=verify_ssl,
+            ssl=ssl,
             timeout=timeout,
         )
 

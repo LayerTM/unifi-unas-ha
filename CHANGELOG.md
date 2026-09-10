@@ -6,6 +6,40 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-09-10
+
+### Security
+
+- **The console's certificate is now trusted on first use instead of ignored.**
+  A UniFi OS console serves a self-signed certificate, so CA verification cannot
+  succeed against one, and the previous answer was to switch verification off
+  entirely — which also removed any assurance that the host answering was the
+  console. Setup now reads the certificate once, shows its SHA-256 fingerprint so
+  it can be compared against the console's own, and afterwards accepts only that
+  certificate. A console with a real certificate can be verified against the CA
+  store instead, and accepting any certificate remains available for setups where
+  neither works.
+
+  When the certificate changes, a repair notification shows the saved and the
+  offered fingerprint side by side and lets you accept the new one. It is
+  deliberately not a re-authentication prompt: the credentials are still valid,
+  and asking for a password at the moment something may be impersonating the
+  console teaches exactly the wrong reflex. A mismatch during login is classified
+  the same way — previously it would have surfaced as "invalid credentials",
+  because the underlying error is a subclass of the one that carries those.
+
+  This is trust on first use, and the limit is worth stating plainly: it assumes
+  the first contact is not already intercepted, so it is not equivalent to a
+  certificate signed by a real authority. Showing the fingerprint for comparison
+  is what closes that gap. The change covers the Home Assistant integration; the
+  CLI and MCP server still default to an unverified connection and now take
+  `UNAS_CERT_FINGERPRINT` or `UNAS_VERIFY_SSL` to do better.
+
+  Existing entries keep the behaviour they had; nothing changes under them on
+  upgrade. One that verifies nothing raises a repair offering the one-time switch
+  to pinning. They are not migrated silently, because pinning whatever the console
+  happened to serve during an upgrade would record a certificate nobody looked at.
+
 ### Fixed
 
 - **One version number.** Three files stated it and they had drifted apart —

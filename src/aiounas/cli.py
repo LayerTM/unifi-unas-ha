@@ -25,7 +25,9 @@ from rich.table import Table
 from .actions import UnasActionClient
 from .auth import AbstractAuth, ApiKeyAuth, SessionAuth
 from .client import UnasClient
+from .const import DEFAULT_PORT
 from .exceptions import UnasError
+from .tls import async_probe_fingerprint, ssl_from_env
 
 app = typer.Typer(
     help="Query and control a UniFi UNAS over its local REST API.",
@@ -55,10 +57,16 @@ def _host() -> str:
     return host
 
 
+def _port() -> int:
+    """Console port, from UNAS_PORT when the console is not on the default."""
+    raw = os.environ.get("UNAS_PORT")
+    return int(raw) if raw else DEFAULT_PORT
+
+
 def _run[T](func: Callable[[UnasClient], Awaitable[T]]) -> T:
     async def runner() -> T:
         async with aiohttp.ClientSession() as session:
-            return await func(UnasClient(session, _host(), _auth(), verify_ssl=False))
+            return await func(UnasClient(session, _host(), _auth(), ssl=ssl_from_env()))
 
     try:
         return asyncio.run(runner())
@@ -70,7 +78,7 @@ def _run[T](func: Callable[[UnasClient], Awaitable[T]]) -> T:
 def _run_action(func: Callable[[UnasActionClient], Awaitable[None]]) -> None:
     async def runner() -> None:
         async with aiohttp.ClientSession() as session:
-            await func(UnasActionClient(session, _host(), _auth(), verify_ssl=False))
+            await func(UnasActionClient(session, _host(), _auth(), ssl=ssl_from_env()))
 
     try:
         asyncio.run(runner())
@@ -144,6 +152,25 @@ def status(
         console.print(table)
 
     _run(_fetch)
+
+
+@app.command()
+def fingerprint() -> None:
+    """Print the SHA-256 fingerprint of the console's TLS certificate.
+
+    Read it here, compare it with the one the console shows, then pin it — via
+    UNAS_CERT_FINGERPRINT for these tools, or by accepting it in the Home
+    Assistant setup flow. Nothing is trusted by running this.
+    """
+    host = _host()
+    try:
+        value = asyncio.run(async_probe_fingerprint(host, _port()))
+    except UnasError as err:
+        err_console.print(f"[red]{err}[/]")
+        raise typer.Exit(1) from err
+    # Plain, unwrapped: this is a value to copy or capture in `$(...)`, and a
+    # 95-character fingerprint is wider than many terminals.
+    typer.echo(value)
 
 
 @app.command()

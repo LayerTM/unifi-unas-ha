@@ -415,7 +415,7 @@ async def test_console_serving_ui_does_not_trigger_reauth(
         _UiSession(),  # type: ignore[arg-type]
         "192.0.2.10",
         ApiKeyAuth("still-valid-key"),
-        verify_ssl=False,
+        ssl=False,
     )
     await coordinator.async_refresh()
     await hass.async_block_till_done()
@@ -440,7 +440,7 @@ async def test_real_401_still_triggers_reauth(
         _UiSession(status=401),  # type: ignore[arg-type]
         "192.0.2.10",
         ApiKeyAuth("revoked-key"),
-        verify_ssl=False,
+        ssl=False,
     )
     await coordinator.async_refresh()
     await hass.async_block_till_done()

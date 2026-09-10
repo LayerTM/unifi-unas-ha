@@ -15,19 +15,21 @@ from homeassistant.const import (
     CONF_PORT,
     CONF_SCAN_INTERVAL,
     CONF_USERNAME,
-    CONF_VERIFY_SSL,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceEntry
 
 from .aiounas import (
     ApiKeyAuth,
     SessionAuth,
+    TlsMode,
     UnasActionClient,
     UnasAuthError,
+    UnasCertificateMismatch,
     UnasClient,
     UnasConnectionError,
     probe,
@@ -38,12 +40,14 @@ from .const import (
     DEFAULT_ENABLE_CONTROLS,
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL,
-    DEFAULT_VERIFY_SSL,
     DOMAIN,
+    ISSUE_TLS_INSECURE,
     PLATFORMS,
 )
 from .coordinator import UnasDataUpdateCoordinator
 from .entity import hub_device_info
+from .issues import clear_cert_mismatch, raise_cert_mismatch
+from .tls import ssl_for_entry, tls_mode_of
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -69,20 +73,31 @@ def build_auth(data: Mapping[str, Any]) -> AbstractAuth:
 async def async_setup_entry(hass: HomeAssistant, entry: UnasConfigEntry) -> bool:
     """Set up UniFi UNAS from a config entry."""
     data = entry.data
-    verify_ssl = data.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL)
     port = data.get(CONF_PORT, DEFAULT_PORT)
-    session = async_get_clientsession(hass, verify_ssl=verify_ssl)
+    ssl = ssl_for_entry(data)
+    # The trust is decided per request, so the shared verifying session is the
+    # right one to take even when a self-signed certificate is being pinned.
+    session = async_get_clientsession(hass)
     client = UnasClient(
-        session, data[CONF_HOST], build_auth(data), port=port, use_ssl=True, verify_ssl=verify_ssl
+        session, data[CONF_HOST], build_auth(data), port=port, use_ssl=True, ssl=ssl
     )
 
     try:
         await client.async_prepare()
         capabilities = await probe(client)
+    except UnasCertificateMismatch as err:
+        # NOT ConfigEntryAuthFailed: the credentials are fine and asking for them
+        # again would teach the user to retype a password at exactly the moment
+        # something may be impersonating their console. Raise a repair instead,
+        # which shows both fingerprints and lets them accept the new one.
+        raise_cert_mismatch(hass, entry, err)
+        raise ConfigEntryNotReady(str(err)) from err
     except UnasAuthError as err:
         raise ConfigEntryAuthFailed(str(err)) from err
     except UnasConnectionError as err:
         raise ConfigEntryNotReady(str(err)) from err
+
+    _async_review_tls(hass, entry)
 
     scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
     coordinator = UnasDataUpdateCoordinator(hass, entry, client, capabilities, scan_interval)
@@ -105,7 +120,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: UnasConfigEntry) -> bool
                 build_auth(data),
                 port=port,
                 use_ssl=True,
-                verify_ssl=verify_ssl,
+                ssl=ssl,
             )
 
     entry.runtime_data = UnasRuntimeData(coordinator, action_client)
@@ -145,3 +160,28 @@ async def async_remove_config_entry_device(
 async def _async_reload(hass: HomeAssistant, entry: UnasConfigEntry) -> None:
     """Reload the entry when its options change."""
     await hass.config_entries.async_reload(entry.entry_id)
+
+
+def _async_review_tls(hass: HomeAssistant, entry: UnasConfigEntry) -> None:
+    """Clear a resolved mismatch, and flag an entry that verifies nothing.
+
+    The insecure issue exists because entries created before pinning kept working
+    unchanged on upgrade, which is deliberate — silently pinning whatever the
+    console served during an upgrade would record a certificate nobody looked at.
+    The user is asked once, here, and can dismiss it.
+    """
+    clear_cert_mismatch(hass, entry)
+    issue_id = f"{ISSUE_TLS_INSECURE}_{entry.entry_id}"
+    if tls_mode_of(entry.data) is not TlsMode.INSECURE:
+        ir.async_delete_issue(hass, DOMAIN, issue_id)
+        return
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        issue_id,
+        is_fixable=True,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key=ISSUE_TLS_INSECURE,
+        translation_placeholders={"host": entry.data[CONF_HOST]},
+        data={"entry_id": entry.entry_id},
+    )

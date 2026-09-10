@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock
 
 import pytest
+from custom_components.unifi_unas_rest.aiounas import TlsMode
 from custom_components.unifi_unas_rest.aiounas.exceptions import (
     UnasApiError,
     UnasAuthError,
@@ -16,6 +17,7 @@ from custom_components.unifi_unas_rest.const import (
     AUTH_PASSWORD,
     CONF_AUTH_METHOD,
     CONF_ENABLE_CONTROLS,
+    CONF_TLS_MODE,
     DOMAIN,
 )
 from homeassistant.const import (
@@ -25,7 +27,6 @@ from homeassistant.const import (
     CONF_PASSWORD,
     CONF_PORT,
     CONF_USERNAME,
-    CONF_VERIFY_SSL,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
@@ -33,7 +34,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-_BASE = {CONF_HOST: "192.0.2.10", CONF_PORT: 443, CONF_VERIFY_SSL: False}
+_BASE = {CONF_HOST: "192.0.2.10", CONF_PORT: 443, CONF_TLS_MODE: TlsMode.INSECURE}
 _ERRORS = [
     UnasCapabilityError("forbidden"),
     UnasAuthError("bad"),

@@ -25,14 +25,19 @@ from custom_components.unifi_unas_rest.aiounas import (
     Share,
     Storage,
     SystemIdentity,
+    TlsMode,
     UpdateInfo,
 )
-from custom_components.unifi_unas_rest.const import AUTH_API_KEY, CONF_AUTH_METHOD, DOMAIN
+from custom_components.unifi_unas_rest.const import (
+    AUTH_API_KEY,
+    CONF_AUTH_METHOD,
+    CONF_TLS_MODE,
+    DOMAIN,
+)
 from homeassistant.const import (
     CONF_API_KEY,
     CONF_HOST,
     CONF_PORT,
-    CONF_VERIFY_SSL,
 )
 from homeassistant.helpers import frame
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -178,7 +183,7 @@ def config_entry() -> MockConfigEntry:
         data={
             CONF_HOST: "192.0.2.10",
             CONF_PORT: 443,
-            CONF_VERIFY_SSL: False,
+            CONF_TLS_MODE: TlsMode.INSECURE,
             CONF_API_KEY: "test-api-key-0123456789",
             CONF_AUTH_METHOD: AUTH_API_KEY,
         },

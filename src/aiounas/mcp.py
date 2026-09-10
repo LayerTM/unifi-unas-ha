@@ -22,6 +22,7 @@ from mcp.server.mcpserver import MCPServer
 from .actions import UnasActionClient
 from .auth import AbstractAuth, ApiKeyAuth, SessionAuth
 from .client import UnasClient
+from .tls import ssl_from_env
 
 
 def _auth() -> AbstractAuth:
@@ -41,12 +42,12 @@ def _host() -> str:
 
 async def _with_read[T](func: Callable[[UnasClient], Awaitable[T]]) -> T:
     async with aiohttp.ClientSession() as session:
-        return await func(UnasClient(session, _host(), _auth(), verify_ssl=False))
+        return await func(UnasClient(session, _host(), _auth(), ssl=ssl_from_env()))
 
 
 async def _with_action(func: Callable[[UnasActionClient], Awaitable[None]]) -> None:
     async with aiohttp.ClientSession() as session:
-        await func(UnasActionClient(session, _host(), _auth(), verify_ssl=False))
+        await func(UnasActionClient(session, _host(), _auth(), ssl=ssl_from_env()))
 
 
 def build_server(*, allow_writes: bool) -> MCPServer:
