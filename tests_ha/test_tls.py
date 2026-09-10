@@ -210,11 +210,15 @@ async def test_accepting_a_new_certificate_repins_the_entry(
     )
     flow.hass = hass
 
-    result = await flow.async_step_init()
-    assert result["step_id"] == "confirm"
-    assert result["description_placeholders"] == {"expected": _FP, "got": _OTHER_FP}
+    with patch(
+        "custom_components.unifi_unas_rest.repairs.async_probe_fingerprint",
+        AsyncMock(return_value=_OTHER_FP),
+    ):
+        result = await flow.async_step_init()
+        assert result["step_id"] == "confirm"
+        assert result["description_placeholders"] == {"expected": _FP, "got": _OTHER_FP}
 
-    result = await flow.async_step_confirm({})
+        result = await flow.async_step_confirm({})
     await hass.async_block_till_done()
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.data[CONF_CERT_FINGERPRINT] == _OTHER_FP
@@ -228,19 +232,18 @@ async def test_the_insecure_repair_pins_what_the_console_serves(
         hass, f"{ISSUE_TLS_INSECURE}_{config_entry.entry_id}", {"entry_id": config_entry.entry_id}
     )
     flow.hass = hass
-    # Two different answers on purpose. The certificate the user compared against
-    # the console is the one shown; if the flow probes again on confirmation, it
-    # would store something nobody looked at — which is the whole property this
-    # feature exists to provide. A single return_value cannot catch that.
-    probe = AsyncMock(side_effect=[_FP, _OTHER_FP])
-    with patch("custom_components.unifi_unas_rest.repairs.async_probe_fingerprint", probe):
+    # The console is serving the same certificate at both moments, which is the
+    # ordinary case: the value shown is the value pinned.
+    with patch(
+        "custom_components.unifi_unas_rest.repairs.async_probe_fingerprint",
+        AsyncMock(return_value=_FP),
+    ):
         result = await flow.async_step_init()
         assert result["description_placeholders"]["fingerprint"] == _FP
         result = await flow.async_step_confirm({})
     await hass.async_block_till_done()
     assert config_entry.data[CONF_TLS_MODE] == TlsMode.FINGERPRINT
     assert config_entry.data[CONF_CERT_FINGERPRINT] == _FP
-    assert probe.await_count == 1, "the certificate must be read once, and pinned as shown"
 
 
 async def test_the_insecure_repair_gives_up_when_the_console_is_unreachable(
@@ -376,6 +379,15 @@ async def test_reconfigure_says_when_the_certificate_is_not_the_stored_one(
     assert result["description_placeholders"]["previous"] == _FP
     assert result["description_placeholders"]["fingerprint"] == _OTHER_FP
 
+    # And accepting it stores the new certificate rather than the old one.
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["step_id"] == "api_key"
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_API_KEY: "k123456789"}
+    )
+    await hass.async_block_till_done()
+    assert entry.data[CONF_CERT_FINGERPRINT] == _OTHER_FP
+
 
 async def test_reconfigure_is_quiet_when_the_certificate_is_unchanged(
     hass: HomeAssistant, mock_aiounas: AsyncMock
@@ -403,3 +415,111 @@ async def test_reconfigure_is_quiet_when_the_certificate_is_unchanged(
             {**_HOST, CONF_TLS_MODE: TlsMode.FINGERPRINT, CONF_AUTH_METHOD: AUTH_API_KEY},
         )
     assert result["step_id"] == "tls_fingerprint"
+
+
+async def test_the_insecure_repair_will_not_pin_a_certificate_that_moved(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    """Both rules at once, and they pull in opposite directions.
+
+    Pin only what was shown — so confirmation cannot store a second reading. And
+    never pin what is no longer served — so it cannot store the first one either
+    once the console has moved on. A repair can sit unread for days; the answer
+    is to show the new value and wait for the user again.
+    """
+    config_entry.add_to_hass(hass)
+    flow = await async_create_fix_flow(
+        hass, f"{ISSUE_TLS_INSECURE}_{config_entry.entry_id}", {"entry_id": config_entry.entry_id}
+    )
+    flow.hass = hass
+    with patch(
+        "custom_components.unifi_unas_rest.repairs.async_probe_fingerprint",
+        AsyncMock(side_effect=[_FP, _OTHER_FP]),
+    ):
+        result = await flow.async_step_init()
+        assert result["description_placeholders"]["fingerprint"] == _FP
+        result = await flow.async_step_confirm({})
+
+    assert result["type"] is FlowResultType.FORM, "a moved certificate must be shown, not pinned"
+    assert result["description_placeholders"]["fingerprint"] == _OTHER_FP
+    assert config_entry.data[CONF_TLS_MODE] == TlsMode.INSECURE
+    assert CONF_CERT_FINGERPRINT not in config_entry.data
+
+
+async def test_the_mismatch_repair_will_not_pin_a_certificate_that_moved(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    """Same rule for the notification raised by a mismatch.
+
+    Its fingerprint was recorded when the mismatch happened, which may be days
+    before anyone presses the button.
+    """
+    config_entry.add_to_hass(hass)
+    flow = await async_create_fix_flow(
+        hass,
+        f"{ISSUE_CERT_MISMATCH}_{config_entry.entry_id}",
+        {"entry_id": config_entry.entry_id, "expected": _FP, "fingerprint": _OTHER_FP},
+    )
+    flow.hass = hass
+    third = "ef:" * 31 + "ef"
+    with patch(
+        "custom_components.unifi_unas_rest.repairs.async_probe_fingerprint",
+        AsyncMock(return_value=third),
+    ):
+        result = await flow.async_step_init()
+        assert result["description_placeholders"]["got"] == _OTHER_FP
+        result = await flow.async_step_confirm({})
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["description_placeholders"]["got"] == third
+    assert config_entry.data.get(CONF_CERT_FINGERPRINT) is None
+
+
+async def test_a_recovered_console_withdraws_the_certificate_repair(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    """The repair must not outlive the condition it reports.
+
+    Otherwise a healthy system carries an alarming notification, and pressing its
+    button would pin a certificate the console no longer serves.
+    """
+    config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    coordinator = config_entry.runtime_data.coordinator
+    registry = ir.async_get(hass)
+    issue_id = f"{ISSUE_CERT_MISMATCH}_{config_entry.entry_id}"
+
+    storage = mock_aiounas.get_storage
+    mock_aiounas.get_storage = AsyncMock(side_effect=UnasCertificateMismatch(_FP, _OTHER_FP))
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert registry.async_get_issue(DOMAIN, issue_id) is not None
+
+    mock_aiounas.get_storage = storage
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert coordinator.last_update_success is True
+    assert registry.async_get_issue(DOMAIN, issue_id) is None
+
+
+async def test_the_mismatch_repair_gives_up_when_the_console_is_unreachable(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    """It cannot confirm what is being served, so it must not pin anything."""
+    config_entry.add_to_hass(hass)
+    flow = await async_create_fix_flow(
+        hass,
+        f"{ISSUE_CERT_MISMATCH}_{config_entry.entry_id}",
+        {"entry_id": config_entry.entry_id, "expected": _FP, "fingerprint": _OTHER_FP},
+    )
+    flow.hass = hass
+    with patch(
+        "custom_components.unifi_unas_rest.repairs.async_probe_fingerprint",
+        AsyncMock(side_effect=UnasConnectionError("down")),
+    ):
+        await flow.async_step_init()
+        result = await flow.async_step_confirm({})
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "cannot_connect"
+    assert config_entry.data.get(CONF_CERT_FINGERPRINT) is None

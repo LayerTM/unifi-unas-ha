@@ -351,3 +351,40 @@ def test_a_pinned_fingerprint_wins_over_ca_verification(
     monkeypatch.setenv("UNAS_CERT_FINGERPRINT", _OTHER)
     monkeypatch.setenv("UNAS_VERIFY_SSL", "1")
     assert isinstance(ssl_from_env(), aiohttp.Fingerprint)
+
+
+async def test_the_cli_prints_the_fingerprint_it_tells_people_to_compare(
+    tls_server: _Server, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The README sends people to this command, so it has to print the value.
+
+    Against the generated certificate, what it prints must equal what the pinning
+    path would accept — otherwise the instruction sends them to compare the wrong
+    number.
+    """
+    from typer.testing import CliRunner
+
+    from aiounas.cli import app
+
+    monkeypatch.setenv("UNAS_HOST", "127.0.0.1")
+    monkeypatch.setenv("UNAS_PORT", str(tls_server.port))
+    # The command calls asyncio.run(), which cannot run inside this test's loop —
+    # and a RuntimeError from that would look exactly like a failed connection.
+    result = await asyncio.to_thread(CliRunner().invoke, app, ["fingerprint"])
+    assert result.exit_code == 0, result.output
+    assert result.stdout.strip() == tls_server.fingerprint
+
+
+async def test_the_cli_fingerprint_reports_an_unreachable_console(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from typer.testing import CliRunner
+
+    from aiounas.cli import app
+
+    monkeypatch.setenv("UNAS_HOST", "127.0.0.1")
+    monkeypatch.setenv("UNAS_PORT", "9")
+    result = await asyncio.to_thread(CliRunner().invoke, app, ["fingerprint"])
+    assert result.exit_code == 1
+    # Exit 1 must come from the unreachable console, not from a broken harness.
+    assert "could not read the certificate" in result.output

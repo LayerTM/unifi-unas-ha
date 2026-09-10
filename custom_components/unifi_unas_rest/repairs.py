@@ -8,6 +8,18 @@ authentication problem, so neither belongs in the reauth flow:
   are shown and accepting the new one is an explicit act.
 * the entry predates pinning and still verifies nothing. It keeps working; this
   offers the one-time step that starts pinning.
+
+Both flows obey the same two rules, which pull in opposite directions and are
+easy to satisfy one at a time and get wrong together:
+
+1. **Pin only what was shown.** Reading the certificate again on confirmation and
+   storing that would record something the user never compared.
+2. **Never pin what is no longer served.** A repair can sit in the notification
+   list for days; the certificate behind it may be long gone.
+
+So confirmation re-reads the certificate and compares it against the one on
+screen: equal, it is pinned; different, the form comes back showing the new one,
+and nothing is stored until the user has seen the value being accepted.
 """
 
 from __future__ import annotations
@@ -16,6 +28,7 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant.components.repairs import RepairsFlow
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
@@ -31,16 +44,27 @@ from .const import (
 
 
 class _PinCertificateFlow(RepairsFlow):
-    """Shared tail: store a fingerprint on the entry and reload it."""
+    """Shared behaviour: show a certificate, confirm it, pin it, reload."""
 
     def __init__(self, entry_id: str) -> None:
         self._entry_id = entry_id
+        self._shown: str | None = None
 
-    async def _async_pin(self, hass: HomeAssistant, fingerprint: str) -> FlowResult:
-        entry = hass.config_entries.async_get_entry(self._entry_id)
-        if entry is None:
-            return self.async_abort(reason="entry_not_found")
-        hass.config_entries.async_update_entry(
+    @property
+    def _entry(self) -> ConfigEntry | None:
+        return self.hass.config_entries.async_get_entry(self._entry_id)
+
+    async def _async_current_fingerprint(self, entry: ConfigEntry) -> str | None:
+        """What the console is serving right now, or None if it cannot be read."""
+        try:
+            return await async_probe_fingerprint(
+                entry.data[CONF_HOST], entry.data.get(CONF_PORT, DEFAULT_PORT)
+            )
+        except UnasConnectionError:
+            return None
+
+    async def _async_pin(self, entry: ConfigEntry, fingerprint: str) -> FlowResult:
+        self.hass.config_entries.async_update_entry(
             entry,
             data={
                 **entry.data,
@@ -48,8 +72,19 @@ class _PinCertificateFlow(RepairsFlow):
                 CONF_CERT_FINGERPRINT: fingerprint,
             },
         )
-        await hass.config_entries.async_reload(entry.entry_id)
+        await self.hass.config_entries.async_reload(entry.entry_id)
         return self.async_create_entry(data={})
+
+    def _async_show(self, step_id: str, placeholders: dict[str, str]) -> FlowResult:
+        return self.async_show_form(
+            step_id=step_id, data_schema=vol.Schema({}), description_placeholders=placeholders
+        )
+
+    async def async_step_confirm(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        raise NotImplementedError  # pragma: no cover - both subclasses implement it
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        return await self.async_step_confirm()
 
 
 class CertMismatchRepairFlow(_PinCertificateFlow):
@@ -58,54 +93,41 @@ class CertMismatchRepairFlow(_PinCertificateFlow):
     def __init__(self, entry_id: str, expected: str, got: str) -> None:
         super().__init__(entry_id)
         self._expected = expected
-        self._got = got
-
-    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
-        return await self.async_step_confirm()
+        self._shown = got
 
     async def async_step_confirm(self, user_input: dict[str, Any] | None = None) -> FlowResult:
-        if user_input is not None:
-            return await self._async_pin(self.hass, self._got)
-        return self.async_show_form(
-            step_id="confirm",
-            data_schema=vol.Schema({}),
-            description_placeholders={"expected": self._expected, "got": self._got},
-        )
+        entry = self._entry
+        if entry is None:
+            return self.async_abort(reason="entry_not_found")
+        if user_input is None:
+            return self._async_show(
+                "confirm", {"expected": self._expected, "got": self._shown or ""}
+            )
+        current = await self._async_current_fingerprint(entry)
+        if current is None:
+            return self.async_abort(reason="cannot_connect")
+        if current != self._shown:
+            # Moved again between the notification and the click. Show the value
+            # actually on offer rather than storing one nobody looked at.
+            self._shown = current
+            return self._async_show("confirm", {"expected": self._expected, "got": current})
+        return await self._async_pin(entry, current)
 
 
 class TlsInsecureRepairFlow(_PinCertificateFlow):
     """Start pinning on an entry that currently verifies nothing."""
 
-    def __init__(self, entry_id: str) -> None:
-        super().__init__(entry_id)
-        self._fingerprint: str | None = None
-
-    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
-        return await self.async_step_confirm()
-
     async def async_step_confirm(self, user_input: dict[str, Any] | None = None) -> FlowResult:
-        # Read the certificate ONCE, when building the form, and pin exactly what
-        # was shown. Probing again on confirmation would store a certificate the
-        # user never compared against the console — which is the property this
-        # whole feature exists to provide.
-        if user_input is not None:
-            if self._fingerprint is None:  # pragma: no cover - form precedes confirm
-                return self.async_abort(reason="cannot_connect")
-            return await self._async_pin(self.hass, self._fingerprint)
-        entry = self.hass.config_entries.async_get_entry(self._entry_id)
+        entry = self._entry
         if entry is None:
             return self.async_abort(reason="entry_not_found")
-        try:
-            self._fingerprint = await async_probe_fingerprint(
-                entry.data[CONF_HOST], entry.data.get(CONF_PORT, DEFAULT_PORT)
-            )
-        except UnasConnectionError:
+        current = await self._async_current_fingerprint(entry)
+        if current is None:
             return self.async_abort(reason="cannot_connect")
-        return self.async_show_form(
-            step_id="confirm",
-            data_schema=vol.Schema({}),
-            description_placeholders={"fingerprint": self._fingerprint},
-        )
+        if user_input is not None and current == self._shown:
+            return await self._async_pin(entry, current)
+        self._shown = current
+        return self._async_show("confirm", {"fingerprint": current})
 
 
 async def async_create_fix_flow(

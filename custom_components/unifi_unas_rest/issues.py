@@ -37,3 +37,8 @@ def raise_cert_mismatch(
             "fingerprint": err.got,
         },
     )
+
+
+def clear_cert_mismatch(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Withdraw the certificate repair; a no-op when none is raised."""
+    ir.async_delete_issue(hass, DOMAIN, f"{ISSUE_CERT_MISMATCH}_{entry.entry_id}")

@@ -19,6 +19,9 @@ jobs:
       - name: Install
         run: pip install -e ".[dev,cli,mcp]"
       - name: Type check (strict)
-        run: mypy --strict src/aiounas
+        # No path argument: an explicit one OVERRIDES `files =` in pyproject.toml,
+        # so the config could widen its scope while CI kept checking the old set.
+        # That is how a public-API change broke scripts/smoke.py unnoticed.
+        run: mypy --strict
       - name: Tests + coverage gate
         run: pytest --cov=aiounas --cov-report=term-missing --cov-fail-under=90

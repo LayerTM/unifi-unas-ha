@@ -202,12 +202,13 @@ TLS trust comes from the environment too, and **defaults to unverified** — unl
 | `UNAS_VERIFY_SSL=1` | verify against the system CA store |
 | *(neither set)* | accept any certificate |
 
-Read the fingerprint once with `unifi-unas status` against a console you trust, or from the console's own UI, then set it.
+Read the fingerprint with `unifi-unas fingerprint`, compare it with the one the console's own UI shows, then set it.
 
 ```bash
 pip install "aiounas[cli]"        # CLI
 unifi-unas status                 # storage, disks, system summary
 unifi-unas status --json          # machine-readable output
+unifi-unas fingerprint            # SHA-256 of the console's TLS certificate
 unifi-unas fan                    # show the fan profile
 unifi-unas fan quiet              # set it (write — asks for confirmation, or --yes)
 unifi-unas reboot                 # write — asks for confirmation (or --yes)

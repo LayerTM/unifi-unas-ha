@@ -41,13 +41,12 @@ from .const import (
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
-    ISSUE_CERT_MISMATCH,
     ISSUE_TLS_INSECURE,
     PLATFORMS,
 )
 from .coordinator import UnasDataUpdateCoordinator
 from .entity import hub_device_info
-from .issues import raise_cert_mismatch
+from .issues import clear_cert_mismatch, raise_cert_mismatch
 from .tls import ssl_for_entry, tls_mode_of
 
 _LOGGER = logging.getLogger(__name__)
@@ -171,7 +170,7 @@ def _async_review_tls(hass: HomeAssistant, entry: UnasConfigEntry) -> None:
     console served during an upgrade would record a certificate nobody looked at.
     The user is asked once, here, and can dismiss it.
     """
-    ir.async_delete_issue(hass, DOMAIN, f"{ISSUE_CERT_MISMATCH}_{entry.entry_id}")
+    clear_cert_mismatch(hass, entry)
     issue_id = f"{ISSUE_TLS_INSECURE}_{entry.entry_id}"
     if tls_mode_of(entry.data) is not TlsMode.INSECURE:
         ir.async_delete_issue(hass, DOMAIN, issue_id)

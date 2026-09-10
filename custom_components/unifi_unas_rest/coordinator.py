@@ -31,7 +31,7 @@ from .aiounas import (
     UpdateInfo,
 )
 from .const import DOMAIN
-from .issues import raise_cert_mismatch
+from .issues import clear_cert_mismatch, raise_cert_mismatch
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -133,6 +133,12 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
             raise UpdateFailed(str(err)) from err
         except (UnasConnectionError, UnasApiError) as err:
             raise UpdateFailed(str(err)) from err
+        # Symmetric with raising it above. Without this the repair outlives the
+        # condition: the console recovers, the entities come back, and a scary
+        # notification stays on a healthy system — offering to pin a certificate
+        # that is no longer served.
+        if self.config_entry is not None:
+            clear_cert_mismatch(self.hass, self.config_entry)
         return UnasData(
             storage=storage,
             device_info=device_info,
