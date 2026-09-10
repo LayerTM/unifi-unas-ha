@@ -168,8 +168,11 @@ class UnifiUnasConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._data[CONF_HOST], self._data[CONF_PORT]
             )
         except UnasConnectionError:
+            # Back to the step the user is on, not always the first-time one:
+            # someone reconfiguring an existing entry would otherwise be dropped
+            # into the setup form, which looks like the entry was lost.
             return self.async_show_form(
-                step_id="user",
+                step_id="reconfigure" if self.source == SOURCE_RECONFIGURE else "user",
                 data_schema=_connection_schema(self._data),
                 errors={"base": "cannot_connect"},
             )

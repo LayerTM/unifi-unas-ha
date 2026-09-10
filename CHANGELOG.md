@@ -8,6 +8,18 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A control action refused because the certificate changed now says so.** It was
+  reported as "could not reach the UNAS" — the mismatch is a connection error by
+  inheritance — which sends the user to check cables and firewalls while hiding
+  the one thing to look at. The console is reachable; it is presenting a
+  different certificate, and the message now names both fingerprints.
+- **A console that cannot be reached during reconfigure returns to the
+  reconfigure form**, not to the first-time setup form. Both collect the same
+  fields, so the step was the only signal, and landing on the setup form made it
+  look as though the existing entry had been lost.
+
+### Fixed
+
 - **Turning control actions off now removes their entities instead of leaving them
   unavailable.** The control platforms create nothing when writes are not
   available, but whatever they created on an earlier run stayed in the entity
