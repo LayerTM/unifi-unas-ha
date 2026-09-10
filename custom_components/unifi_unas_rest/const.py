@@ -10,6 +10,11 @@ from .aiounas import TlsMode
 
 DOMAIN: Final = "unifi_unas_rest"
 
+# The platforms that exist only to perform writes. Named once: setup uses this to
+# clear their entities from the registry when writes are unavailable, so the
+# registry cannot disagree with what those platforms create.
+CONTROL_PLATFORMS: Final = (Platform.BUTTON, Platform.SELECT)
+
 PLATFORMS: Final = [
     Platform.BINARY_SENSOR,
     Platform.BUTTON,

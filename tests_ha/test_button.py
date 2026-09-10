@@ -222,3 +222,69 @@ async def test_options_flow_toggles_controls(hass: HomeAssistant, mock_aiounas: 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options[CONF_ENABLE_CONTROLS] is True
     await hass.async_block_till_done()  # options change triggers a reload
+
+
+async def test_control_entities_are_removed_when_controls_are_turned_off(
+    hass: HomeAssistant, mock_aiounas: AsyncMock
+) -> None:
+    """Opting out must clear the rows, not leave them `unavailable` forever.
+
+    The platforms create nothing without a write client, so anything registered
+    on an earlier run would otherwise sit in the UI permanently, reading as a
+    fault rather than as a setting the user chose.
+    """
+    entry = _entry(True, session=True)
+    await _setup(hass, entry)
+    registry = er.async_get(hass)
+
+    def control_entities() -> list[str]:
+        return sorted(
+            e.entity_id
+            for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+            if e.domain in ("button", "select")
+        )
+
+    assert control_entities(), "the fixture must actually create control entities"
+
+    hass.config_entries.async_update_entry(entry, options={CONF_ENABLE_CONTROLS: False})
+    await hass.async_block_till_done()
+
+    assert control_entities() == []
+
+
+async def test_control_entities_survive_while_controls_are_on(
+    hass: HomeAssistant, mock_aiounas: AsyncMock
+) -> None:
+    """The other direction: a reload with controls on must not clear them."""
+    entry = _entry(True, session=True)
+    await _setup(hass, entry)
+    registry = er.async_get(hass)
+    before = sorted(
+        e.entity_id
+        for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+        if e.domain in ("button", "select")
+    )
+
+    await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+
+    after = sorted(
+        e.entity_id
+        for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+        if e.domain in ("button", "select")
+    )
+    assert after == before
+
+
+async def test_an_api_key_entry_keeps_no_control_rows(
+    hass: HomeAssistant, mock_aiounas: AsyncMock
+) -> None:
+    """An API key cannot write, so controls-on must still leave no rows behind."""
+    entry = _entry(True)  # API-key auth
+    await _setup(hass, entry)
+    registry = er.async_get(hass)
+    assert [
+        e.entity_id
+        for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+        if e.domain in ("button", "select")
+    ] == []

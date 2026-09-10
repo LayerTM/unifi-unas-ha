@@ -19,6 +19,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceEntry
@@ -37,6 +38,7 @@ from .aiounas import (
 from .aiounas.auth import AbstractAuth
 from .const import (
     CONF_ENABLE_CONTROLS,
+    CONTROL_PLATFORMS,
     DEFAULT_ENABLE_CONTROLS,
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL,
@@ -123,6 +125,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: UnasConfigEntry) -> bool
                 ssl=ssl,
             )
 
+    if action_client is None:
+        _async_remove_control_entities(hass, entry)
+
     entry.runtime_data = UnasRuntimeData(coordinator, action_client)
     # Register the hub before the platforms load: a sub-device can only be linked
     # to it by device-registry id, which does not exist until the hub does.
@@ -185,3 +190,21 @@ def _async_review_tls(hass: HomeAssistant, entry: UnasConfigEntry) -> None:
         translation_placeholders={"host": entry.data[CONF_HOST]},
         data={"entry_id": entry.entry_id},
     )
+
+
+def _async_remove_control_entities(hass: HomeAssistant, entry: UnasConfigEntry) -> None:
+    """Drop control entities from the registry when there is no client to drive them.
+
+    The control platforms simply create nothing when writes are not available —
+    controls turned off, or an API key, which cannot write. What they created on
+    an earlier run stays in the entity registry, and Home Assistant shows every
+    one of those as `unavailable` indefinitely: a row for a button the user
+    switched off, which reads like a fault rather than a setting.
+
+    Keyed on the same condition the platforms use, so the registry cannot
+    disagree with what they do.
+    """
+    registry = er.async_get(hass)
+    for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if entity.domain in CONTROL_PLATFORMS:
+            registry.async_remove(entity.entity_id)

@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Turning control actions off now removes their entities instead of leaving them
+  unavailable.** The control platforms create nothing when writes are not
+  available, but whatever they created on an earlier run stayed in the entity
+  registry, so Home Assistant showed a permanently `unavailable` row for every
+  button and for the fan selector — which reads as a fault rather than as a
+  setting that was switched off. The same applies to an entry using API-key auth,
+  which cannot write at all.
+
 ## [1.8.0] - 2026-09-10
 
 ### Security
