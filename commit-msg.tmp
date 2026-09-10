@@ -1,0 +1,15 @@
+fix: remove control entities when writes are unavailable
+
+The control platforms create nothing when there is no client to drive them
+-- control actions switched off, or an API key, which cannot write at all.
+Whatever they created on an earlier run stayed in the entity registry, so
+Home Assistant kept showing a permanently unavailable row for each button
+and for the fan selector. That reads as a fault rather than as a setting
+the user chose.
+
+Setup now clears those rows, keyed on the same condition the platforms
+use, so the registry cannot disagree with what they create. Which
+platforms are control-only is stated once, in const.
+
+Measured before the change: turning controls off left all five entities
+in the registry, every one of them unavailable.
