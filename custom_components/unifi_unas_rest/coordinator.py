@@ -78,18 +78,31 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
     async def _optional[T](self, call: Callable[[], Awaitable[T]]) -> T | None:
         """Run a supplementary (capability-scoped) fetch.
 
-        A scope denial (UnasCapabilityError) or API error degrades that field to
-        None instead of failing the whole update — so a transient 403 on shares/
-        users/updates/fan does not take the core sensors unavailable. Auth (401)
-        and connection errors still propagate so re-auth / retry fire.
+        A refusal degrades that field to None instead of failing the whole
+        update — so a 403 on shares/users/updates/fan does not take the core
+        sensors unavailable. A 401 counts as a refusal here too: the three core
+        reads of this same cycle have already answered, so the credential is
+        good and the 401 is the console refusing this auth method on a
+        session-only read. Which status it picks is firmware-dependent (403 and
+        500 on UniFi OS 5.1.19 / Drive 4.3.6, 401 on 5.1.33 / Drive 4.4.9), so
+        the kind of refusal cannot be read off the status. Raising
+        ConfigEntryAuthFailed for it would tear down a working entry and send
+        the user into a re-auth loop over a credential that is not the problem.
+
+        Connection errors still propagate, so a retry fires.
+
+        Only safe after the core reads have succeeded in this cycle; see
+        :meth:`_async_update_data`, which awaits them first.
         """
         try:
             return await call()
-        except (UnasCapabilityError, UnasApiError):
+        except (UnasCapabilityError, UnasApiError, UnasAuthError):
             return None
 
     async def _async_update_data(self) -> UnasData:
         try:
+            # These three run first and on their own: a 401 here IS a credential
+            # failure, and it is what licenses _optional to absorb a 401 below.
             storage, device_info, network_io = await asyncio.gather(
                 self.client.get_storage(),
                 self.client.get_device_info(),

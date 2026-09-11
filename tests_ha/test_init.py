@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import replace
 from unittest.mock import AsyncMock, patch
 
 import aiohttp
+import pytest
 import yarl
 from custom_components.unifi_unas_rest import async_remove_config_entry_device
 from custom_components.unifi_unas_rest.aiounas import (
@@ -20,6 +22,7 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import issue_registry as ir
 from multidict import CIMultiDict
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -470,3 +473,80 @@ async def test_subdevices_link_to_hub_without_deprecated_api(
     children = [device for device in devices if device.id != hub.id]
     assert children, "expected disk / pool / share sub-devices"
     assert all(device.via_device_id == hub.id for device in children)
+
+
+async def test_supplementary_auth_error_does_not_detach_the_entry(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    """A 401 on one session-only read must not send a good key into re-auth.
+
+    Reported against UniFi OS 5.1.33 / Drive 4.4.9, which answers an API key on
+    /api/notifications with 401 where earlier firmware answered 403. Treating it
+    as a credential failure made setup fail, Home Assistant ask for the key
+    again, the flow validate it successfully against a read the key can reach,
+    and setup fail again on the same endpoint — a loop with no exit.
+    """
+    mock_aiounas.get_notification_summary = AsyncMock(
+        side_effect=UnasAuthError("unauthorized for /api/notifications")
+    )
+    await _setup(hass, config_entry)
+
+    assert config_entry.state is ConfigEntryState.LOADED
+    registry = er.async_get(hass)
+    # Core telemetry is untouched; the refused read simply carries no value.
+    assert hass.states.get(
+        registry.async_get_entity_id("sensor", DOMAIN, "AABBCC000001_storage_usage")
+    ).state not in ("unknown", "unavailable")
+    assert hass.states.get(
+        registry.async_get_entity_id("sensor", DOMAIN, "AABBCC000001_recent_events")
+    ).state in ("unknown", "unavailable")
+
+
+async def test_api_key_out_of_scope_reads_are_named_in_the_log(
+    hass: HomeAssistant,
+    mock_aiounas: AsyncMock,
+    config_entry: MockConfigEntry,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Otherwise the only symptom is entities that silently never appear."""
+    caps = Capabilities(
+        storage=True,
+        device_info=True,
+        network_io=True,
+        shares=False,
+        users=False,
+        updates=False,
+        notifications=False,
+        logs=False,
+    )
+    with (
+        caplog.at_level(logging.INFO, logger="custom_components.unifi_unas_rest"),
+        patch("custom_components.unifi_unas_rest.probe", AsyncMock(return_value=caps)),
+    ):
+        await _setup(hass, config_entry)
+
+    assert "not authorized for" in caplog.text
+    assert "notifications" in caplog.text
+    issue = ir.async_get(hass).async_get_issue(DOMAIN, f"api_key_scope_{config_entry.entry_id}")
+    assert issue is not None
+    assert issue.translation_placeholders is not None
+    assert "notifications" in issue.translation_placeholders["denied"]
+    # Informational, not something the user is asked to repair.
+    assert issue.is_fixable is False
+
+
+async def test_nothing_logged_when_every_read_is_in_scope(
+    hass: HomeAssistant,
+    mock_aiounas: AsyncMock,
+    config_entry: MockConfigEntry,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The other branch — a line that fires on a healthy entry gets ignored."""
+    with caplog.at_level(logging.INFO, logger="custom_components.unifi_unas_rest"):
+        await _setup(hass, config_entry)
+
+    assert "not authorized for" not in caplog.text
+    # A repair that fires on a healthy entry gets ignored, so it must not fire.
+    assert (
+        ir.async_get(hass).async_get_issue(DOMAIN, f"api_key_scope_{config_entry.entry_id}") is None
+    )

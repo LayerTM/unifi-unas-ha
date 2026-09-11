@@ -8,10 +8,10 @@ depending on version-fragile response mocking.
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 import aiohttp
 import pytest
@@ -112,7 +112,16 @@ def _system() -> Callable[[web.Request], Any]:
     return handler
 
 
-def make_app(*, api_key: str = FAKE_API_KEY) -> web.Application:
+# What a console answers an API key with on its session-only reads. The statuses
+# are firmware-dependent — these are UniFi OS 5.1.19 / Drive 4.3.6, captured live
+# — so a test can override one to reproduce another build's choice.
+APIKEY_DENIALS: Final[Mapping[str, int]] = {"drives": 500, "notifications": 403, "logs": 500}
+
+
+def make_app(
+    *, api_key: str = FAKE_API_KEY, apikey_denials: Mapping[str, int] | None = None
+) -> web.Application:
+    denials = {**APIKEY_DENIALS, **(apikey_denials or {})}
     app = web.Application()
     app[_API_KEY] = api_key
     app[_WRITES] = []
@@ -123,11 +132,17 @@ def make_app(*, api_key: str = FAKE_API_KEY) -> web.Application:
     app.router.add_get("/proxy/drive/api/v2/systems/device-info", _data("device_info"))
     app.router.add_get("/proxy/drive/api/v2/systems/network-io", _data("network_io"))
     app.router.add_get("/proxy/drive/api/v2/systems/fan-control", _data("fan_control"))
-    app.router.add_get("/proxy/drive/api/v2/drives", _data("drives", apikey_status=500))
+    app.router.add_get(
+        "/proxy/drive/api/v2/drives", _data("drives", apikey_status=denials["drives"])
+    )
     app.router.add_get("/proxy/drive/api/v1/users", _users)
     # session-only supplementary reads (an API key is denied on real hardware)
-    app.router.add_get("/api/notifications", _data("notifications", apikey_status=403))
-    app.router.add_get("/proxy/drive/api/v2/systems/logs", _data("logs", apikey_status=500))
+    app.router.add_get(
+        "/api/notifications", _data("notifications", apikey_status=denials["notifications"])
+    )
+    app.router.add_get(
+        "/proxy/drive/api/v2/systems/logs", _data("logs", apikey_status=denials["logs"])
+    )
     # write / action endpoints
     app.router.add_post("/api/system/reboot", _write())
     app.router.add_post("/api/system/poweroff", _write())
@@ -152,6 +167,22 @@ class RunningServer:
 @pytest.fixture
 async def unas_server() -> AsyncIterator[RunningServer]:
     app = make_app()
+    server = TestServer(app)
+    await server.start_server()
+    try:
+        yield RunningServer(str(server.host), int(server.port), FAKE_API_KEY, app[_WRITES])
+    finally:
+        await server.close()
+
+
+@pytest.fixture
+async def unas_server_401_notifications() -> AsyncIterator[RunningServer]:
+    """A console that refuses an API key on /api/notifications with 401, not 403.
+
+    Reported on UniFi OS 5.1.33 with Drive 4.4.9. Everything else answers exactly
+    as on the firmware the default server models, so the 401 is the only variable.
+    """
+    app = make_app(apikey_denials={"notifications": 401})
     server = TestServer(app)
     await server.start_server()
     try:
