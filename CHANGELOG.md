@@ -12,6 +12,18 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 - **Requires Home Assistant 2025.8 or later** (previously 2025.3). The options
   flow now uses `OptionsFlowWithReload`, which Home Assistant introduced in 2025.8.
+- **Disk, pool and share devices now carry the console's name**, as the console's
+  own device always has: *UNAS 2 Disk 1*, *UNAS 2 Pool 1*, *UNAS 2 Backups*
+  instead of *Disk 1*, *Pool 1*, *Backups*. Entities take their names from their
+  device, so they could not be found, filtered or grouped by console, and two
+  consoles produced identically named disks.
+  - **Existing entity IDs do not change**, so automations and dashboards keep
+    working. What changes on an existing installation is the display name, which
+    gains the console's name.
+  - **A name you gave a device yourself still takes precedence.**
+  - **New installations** get the console's name in the entity ID as well — for
+    example `sensor.unas_2_disk_1_temperature` — so a second console no longer
+    needs a `_2` suffix.
 
 ### Fixed
 

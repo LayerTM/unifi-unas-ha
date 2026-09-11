@@ -44,6 +44,22 @@ def add_new_entities(
     return _sync
 
 
+def console_name(coordinator: UnasDataUpdateCoordinator) -> str:
+    """The console's own name — the hub device's name and every sub-device's prefix.
+
+    Entities name themselves after their device, so a sub-device named only
+    "Disk 1" gave its entities no trace of which console they belong to: nothing
+    to search or group by, and a second console's disks came out with the very
+    same names. Each sub-device's name therefore starts with this, and this is
+    defined once so the hub and its sub-devices cannot drift apart.
+
+    Only the name the integration supplies changes. Home Assistant keeps an
+    existing entity ID when a device is renamed, and a name the user gave a
+    device still takes precedence.
+    """
+    return coordinator.data.device_info.name or "UNAS"
+
+
 def hub_device_info(coordinator: UnasDataUpdateCoordinator) -> DeviceInfo:
     """Describe the UNAS hub device.
 
@@ -64,7 +80,7 @@ def hub_device_info(coordinator: UnasDataUpdateCoordinator) -> DeviceInfo:
         identifiers={(DOMAIN, entry.entry_id)},
         connections=connections,
         manufacturer=MANUFACTURER,
-        name=info.name or "UNAS",
+        name=console_name(coordinator),
         model=info.model or None,
         sw_version=info.firmware_version or None,
         configuration_url=config_url,
@@ -123,7 +139,7 @@ class UnasDiskEntity(CoordinatorEntity[UnasDataUpdateCoordinator]):
                 manufacturer=vendor,
                 model=disk.model if disk else None,
                 serial_number=disk.serial if disk else None,
-                name=f"Disk {slot}",
+                name=f"{console_name(coordinator)} Disk {slot}",
             ),
             coordinator,
         )
@@ -159,7 +175,7 @@ class UnasPoolEntity(CoordinatorEntity[UnasDataUpdateCoordinator]):
                 identifiers={(DOMAIN, f"{entry.entry_id}_pool{self._pool_key}")},
                 manufacturer=MANUFACTURER,
                 model="Storage pool",
-                name=f"Pool {pool.number}",
+                name=f"{console_name(coordinator)} Pool {pool.number}",
             ),
             coordinator,
         )
@@ -197,7 +213,7 @@ class UnasShareEntity(CoordinatorEntity[UnasDataUpdateCoordinator]):
                 identifiers={(DOMAIN, f"{entry.entry_id}_share{share.id}")},
                 manufacturer=MANUFACTURER,
                 model="Shared drive",
-                name=share.name or f"Share {share.id}",
+                name=f"{console_name(coordinator)} {share.name or f'Share {share.id}'}",
             ),
             coordinator,
         )

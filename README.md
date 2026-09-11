@@ -46,7 +46,7 @@ Two authentication methods are supported; pick one during setup:
 
 ## Entities
 
-Everything is grouped under one hub device (the UNAS), with a sub-device per disk, per pool and (with local-account auth) per share.
+Everything is grouped under one hub device (the UNAS), with a sub-device per disk, per pool and (with local-account auth) per share. Each sub-device is named after the console — *UNAS 2 Disk 1*, *UNAS 2 Pool 1* — so its entities can be told apart when there is more than one UNAS.
 
 - **Storage** — used / total / free, usage %, RAID level, storage status, pool count.
 - **System** — CPU usage %, CPU temperature, memory usage %, network throughput, link speed, last boot, UniFi OS and Drive app versions.
