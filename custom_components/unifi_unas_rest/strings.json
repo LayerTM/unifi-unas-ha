@@ -192,10 +192,10 @@
         "name": "Bad sectors"
       },
       "disk_read_rate": {
-        "name": "Read rate"
+        "name": "Transfer read rate"
       },
       "disk_write_rate": {
-        "name": "Write rate"
+        "name": "Transfer write rate"
       },
       "pool_raid_level": {
         "name": "RAID level"
@@ -204,22 +204,22 @@
         "name": "Status"
       },
       "pool_usage": {
-        "name": "Usage"
+        "name": "Storage usage"
       },
       "pool_capacity": {
-        "name": "Capacity"
+        "name": "Storage total"
       },
       "pool_used": {
-        "name": "Used"
+        "name": "Storage used"
       },
       "pool_scrubbing": {
         "name": "Data scrubbing"
       },
       "share_usage": {
-        "name": "Usage"
+        "name": "Storage used"
       },
       "share_quota": {
-        "name": "Quota"
+        "name": "Storage quota"
       },
       "share_members": {
         "name": "Members"
