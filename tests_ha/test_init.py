@@ -547,3 +547,140 @@ async def test_nothing_logged_when_every_read_is_in_scope(
         await _setup(hass, config_entry)
 
     assert "not authorized for" not in caplog.text
+
+
+async def _all_caps(**overrides: bool) -> Capabilities:
+    """Every reading in scope, minus the ones a test names."""
+    base = dict(
+        storage=True,
+        device_info=True,
+        network_io=True,
+        shares=True,
+        users=True,
+        updates=True,
+        notifications=True,
+        logs=True,
+    )
+    return Capabilities(**{**base, **overrides})
+
+
+async def test_narrowing_the_auth_removes_the_readings_it_lost(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    """Entities of a reading that left scope must go, not linger unavailable.
+
+    This is what a reconfigure from a local account to an API key does: the
+    console stops serving shares, accounts, updates, notifications and logs, so
+    the platforms create nothing for them — while everything created under the
+    wider authentication stayed in the registry, permanently `unavailable`. On
+    a real entry that was 61 of 103 rows, every one of them reading as a fault.
+    """
+    # First run: a local account, everything in scope.
+    await _setup(hass, config_entry)
+    registry = er.async_get(hass)
+    wide = {e.unique_id for e in er.async_entries_for_config_entry(registry, config_entry.entry_id)}
+    assert f"{config_entry.unique_id}_user_count" in wide
+    assert any(uid.startswith(f"{config_entry.unique_id}_share") for uid in wide)
+    assert f"{config_entry.unique_id}_recent_events" in wide
+    assert f"{config_entry.unique_id}_log_entries" in wide
+
+    # Second run: the same entry, now reaching only the core readings.
+    narrow_caps = await _all_caps(
+        shares=False, users=False, updates=False, notifications=False, logs=False
+    )
+    await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()
+    with patch("custom_components.unifi_unas_rest.probe", AsyncMock(return_value=narrow_caps)):
+        assert await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    narrow = {
+        e.unique_id for e in er.async_entries_for_config_entry(registry, config_entry.entry_id)
+    }
+    assert f"{config_entry.unique_id}_user_count" not in narrow
+    assert not any(uid.startswith(f"{config_entry.unique_id}_share") for uid in narrow)
+    assert f"{config_entry.unique_id}_recent_events" not in narrow
+    assert f"{config_entry.unique_id}_last_event" not in narrow
+    assert f"{config_entry.unique_id}_log_entries" not in narrow
+    assert f"{config_entry.unique_id}_applications" not in narrow
+    # Nothing is left behind as unavailable.
+    assert all(
+        hass.states.get(e.entity_id) is None or hass.states.get(e.entity_id).state != "unavailable"
+        for e in er.async_entries_for_config_entry(registry, config_entry.entry_id)
+    )
+    # The core readings are untouched — this prunes scope, not everything.
+    assert f"{config_entry.unique_id}_storage_usage" in narrow
+    assert any(uid.startswith(f"{config_entry.unique_id}_disk") for uid in narrow)
+
+
+async def test_a_reading_in_scope_is_never_pruned(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    """The other branch: an entry that loses nothing must lose nothing."""
+    await _setup(hass, config_entry)
+    registry = er.async_get(hass)
+    before = {
+        e.unique_id for e in er.async_entries_for_config_entry(registry, config_entry.entry_id)
+    }
+
+    await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    after = {
+        e.unique_id for e in er.async_entries_for_config_entry(registry, config_entry.entry_id)
+    }
+    assert after == before
+
+
+async def test_diagnostics_name_the_readings_out_of_scope(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    """Diagnostics carry the list, so it is readable without raising log levels.
+
+    Measured on a live instance: the whole log held zero INFO lines, so the
+    startup line alone reaches nobody who has not already changed a setting.
+    """
+    from custom_components.unifi_unas_rest.diagnostics import (
+        async_get_config_entry_diagnostics,
+    )
+
+    caps = await _all_caps(
+        shares=False, users=False, updates=False, notifications=False, logs=False
+    )
+    with patch("custom_components.unifi_unas_rest.probe", AsyncMock(return_value=caps)):
+        await _setup(hass, config_entry)
+
+    diag = await async_get_config_entry_diagnostics(hass, config_entry)
+    assert diag["readings_out_of_scope"] == [
+        "shares",
+        "accounts",
+        "firmware updates",
+        "notifications",
+        "logs",
+    ]
+    # Every capability is reported, not a hand-picked subset.
+    assert set(diag["capabilities"]) == {
+        "storage",
+        "device_info",
+        "network_io",
+        "shares",
+        "users",
+        "updates",
+        "notifications",
+        "logs",
+    }
+
+
+async def test_diagnostics_list_is_empty_when_everything_is_in_scope(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    """A report that always names something cannot mean anything."""
+    from custom_components.unifi_unas_rest.diagnostics import (
+        async_get_config_entry_diagnostics,
+    )
+
+    await _setup(hass, config_entry)
+    diag = await async_get_config_entry_diagnostics(hass, config_entry)
+    assert diag["readings_out_of_scope"] == []
