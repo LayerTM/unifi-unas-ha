@@ -331,10 +331,6 @@
           "cannot_connect": "Could not reach the console to read its certificate. Try again when it is back online."
         }
       }
-    },
-    "api_key_scope": {
-      "title": "Some UniFi UNAS readings need a local account",
-      "description": "The API key used for {host} is not authorized for: {denied}. UniFi OS scopes an API key to device-level readings, so this is the console's rule rather than a fault, and everything else works normally.\n\nTo add those entities, open the integration and choose **Reconfigure**, then sign in with a local account. Otherwise you can safely ignore this."
     }
   }
 }

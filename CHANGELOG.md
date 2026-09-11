@@ -21,9 +21,9 @@ adheres to [Semantic Versioning](https://semver.org/).
   A refusal of one supplementary reading is now treated as what it is: that
   reading is unavailable, and the rest of the integration sets up normally. A
   credential that reaches nothing at all still fails, as it must.
-- **The readings an API key cannot reach are now named**, in the log and in a
-  repair notification, instead of showing only as entities that never appear.
-  Reconfiguring with a local account withdraws it.
+- **The readings an API key cannot reach are now named in the log**, instead of
+  showing only as entities that never appear. README carries the same list as a
+  table.
 
 ## [1.8.1] - 2026-09-10
 

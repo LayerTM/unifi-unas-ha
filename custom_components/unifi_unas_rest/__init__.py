@@ -49,7 +49,7 @@ from .const import (
 )
 from .coordinator import UnasDataUpdateCoordinator
 from .entity import hub_device_info
-from .issues import clear_cert_mismatch, raise_cert_mismatch, review_api_key_scope
+from .issues import clear_cert_mismatch, raise_cert_mismatch
 from .tls import ssl_for_entry, tls_mode_of
 
 _LOGGER = logging.getLogger(__name__)
@@ -101,7 +101,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: UnasConfigEntry) -> bool
         raise ConfigEntryNotReady(str(err)) from err
 
     _async_review_tls(hass, entry)
-    _async_review_api_key_scope(hass, entry, capabilities)
+    _log_readings_out_of_scope(entry, capabilities)
 
     scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
     coordinator = UnasDataUpdateCoordinator(hass, entry, client, capabilities, scan_interval)
@@ -169,42 +169,41 @@ async def _async_reload(hass: HomeAssistant, entry: UnasConfigEntry) -> None:
     await hass.config_entries.async_reload(entry.entry_id)
 
 
-def _async_review_api_key_scope(
-    hass: HomeAssistant, entry: UnasConfigEntry, capabilities: Capabilities
-) -> None:
-    """Name the reads this API key is not authorized for, in log and repair.
+def _log_readings_out_of_scope(entry: UnasConfigEntry, capabilities: Capabilities) -> None:
+    """Name the readings this API key is not authorized for, once, in the log.
 
-    UniFi OS scopes an API key to device-level reads; shares, accounts, firmware
-    detail, notifications and logs need a local account. The integration already
-    degrades to what the key can read, but it did so silently — so the only
-    symptom was entities that never appeared, and a console that refuses those
-    reads with 401 instead of 403 read as a broken credential. Both statements
-    come from the same list, so the log and the repair cannot disagree.
+    UniFi OS scopes an API key to device-level readings; shares, accounts,
+    firmware detail, notifications and logs need a local account. The
+    integration creates no entities for what it cannot read, which is right —
+    but it did so silently, so the only symptom was entities that never
+    appeared, and that is what let a console refusing them with 401 instead of
+    403 look like a broken credential.
+
+    A log line and not a repair: this is the documented, correct state of every
+    API-key entry, and a notification that fires on a correct configuration is
+    one people learn to dismiss. README carries the same list.
     """
-    denied = (
-        [
-            name
-            for name, in_scope in (
-                ("shares", capabilities.shares),
-                ("accounts", capabilities.users),
-                ("firmware updates", capabilities.updates),
-                ("notifications", capabilities.notifications),
-                ("logs", capabilities.logs),
-            )
-            if not in_scope
-        ]
-        if entry.data.get(CONF_API_KEY)
-        else []
-    )
+    if not entry.data.get(CONF_API_KEY):
+        return
+    denied = [
+        name
+        for name, in_scope in (
+            ("shares", capabilities.shares),
+            ("accounts", capabilities.users),
+            ("firmware updates", capabilities.updates),
+            ("notifications", capabilities.notifications),
+            ("logs", capabilities.logs),
+        )
+        if not in_scope
+    ]
     if denied:
         _LOGGER.info(
-            "UniFi UNAS at %s: this API key is not authorized for %s, so those "
-            "entities are not created. UniFi OS scopes an API key to "
-            "device-level reads; reconfigure with a local account to add them.",
+            "UniFi UNAS at %s: this API key is not authorized for %s, so no "
+            "entities are created for them. UniFi OS scopes an API key to "
+            "device-level readings; reconfigure with a local account to add them.",
             entry.data[CONF_HOST],
             ", ".join(denied),
         )
-    review_api_key_scope(hass, entry, denied)
 
 
 def _async_review_tls(hass: HomeAssistant, entry: UnasConfigEntry) -> None:

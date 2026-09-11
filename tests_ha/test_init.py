@@ -22,7 +22,6 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers import issue_registry as ir
 from multidict import CIMultiDict
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -527,12 +526,14 @@ async def test_api_key_out_of_scope_reads_are_named_in_the_log(
 
     assert "not authorized for" in caplog.text
     assert "notifications" in caplog.text
-    issue = ir.async_get(hass).async_get_issue(DOMAIN, f"api_key_scope_{config_entry.entry_id}")
-    assert issue is not None
-    assert issue.translation_placeholders is not None
-    assert "notifications" in issue.translation_placeholders["denied"]
-    # Informational, not something the user is asked to repair.
-    assert issue.is_fixable is False
+
+    # And the readings themselves create nothing — not a permanently
+    # unavailable row, which reads as a fault rather than as a scope.
+    registry = er.async_get(hass)
+    assert registry.async_get_entity_id("sensor", DOMAIN, "AABBCC000001_recent_events") is None
+    assert registry.async_get_entity_id("sensor", DOMAIN, "AABBCC000001_user_count") is None
+    # Core telemetry is unaffected.
+    assert registry.async_get_entity_id("sensor", DOMAIN, "AABBCC000001_storage_usage")
 
 
 async def test_nothing_logged_when_every_read_is_in_scope(
@@ -546,7 +547,3 @@ async def test_nothing_logged_when_every_read_is_in_scope(
         await _setup(hass, config_entry)
 
     assert "not authorized for" not in caplog.text
-    # A repair that fires on a healthy entry gets ignored, so it must not fire.
-    assert (
-        ir.async_get(hass).async_get_issue(DOMAIN, f"api_key_scope_{config_entry.entry_id}") is None
-    )
