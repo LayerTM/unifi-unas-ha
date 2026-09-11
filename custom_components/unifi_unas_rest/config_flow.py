@@ -12,6 +12,7 @@ from homeassistant.config_entries import (
     ConfigFlow,
     ConfigFlowResult,
     OptionsFlow,
+    OptionsFlowWithReload,
 )
 from homeassistant.const import (
     CONF_API_KEY,
@@ -299,8 +300,17 @@ def _title(identity: SystemIdentity, data: dict[str, Any]) -> str:
     return f"{name} ({data[CONF_HOST]})"
 
 
-class UnasOptionsFlow(OptionsFlow):
-    """Options: opt in/out of control (write) entities."""
+class UnasOptionsFlow(OptionsFlowWithReload):
+    """Options: opt in/out of control (write) entities.
+
+    Home Assistant reloads the entry itself when the options change, so the
+    integration keeps no update listener. Having one as well is what made every
+    reconfigure and re-authentication set the entry up twice: the listener
+    reloaded it from inside the entry update, and the flow then scheduled a second
+    reload — a pattern the core reports as breaking in 2026.12, and whose report
+    the first reload happened to suppress by removing the listener before the
+    check ran.
+    """
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}

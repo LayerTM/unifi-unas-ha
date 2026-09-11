@@ -173,15 +173,19 @@ async def test_an_unverified_entry_is_flagged_and_clears_once_pinned(
     issue_id = f"{ISSUE_TLS_INSECURE}_{config_entry.entry_id}"
     assert registry.async_get_issue(DOMAIN, issue_id) is not None
 
-    hass.config_entries.async_update_entry(
-        config_entry,
-        data={
-            **config_entry.data,
-            CONF_TLS_MODE: TlsMode.FINGERPRINT,
-            CONF_CERT_FINGERPRINT: _FP,
-        },
-    )
+    # Pin through the repair itself, the only path that pins in practice. A bare
+    # data update would not do: the entry keeps no update listener, so nothing
+    # reloads it unless the path that changed it asks for a reload.
+    flow = await async_create_fix_flow(hass, issue_id, {"entry_id": config_entry.entry_id})
+    flow.hass = hass
+    with patch(
+        "custom_components.unifi_unas_rest.repairs.async_probe_fingerprint",
+        AsyncMock(return_value=_FP),
+    ):
+        await flow.async_step_init()
+        await flow.async_step_confirm({})
     await hass.async_block_till_done()
+    assert config_entry.data[CONF_TLS_MODE] == TlsMode.FINGERPRINT
     assert registry.async_get_issue(DOMAIN, issue_id) is None
 
 

@@ -15,7 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # 2025.3 needs Python 3.13; the harness pinning it declares `>=3.13`.
+          # 2025.8 needs Python 3.13.2+; the harness pinning it declares `>=3.13`.
           - ha: minimum
             python-version: "3.13"
           - ha: latest
@@ -43,11 +43,29 @@ jobs:
         # and letting the resolver work backwards picks the matching harness on its
         # own. A table would be a second place to be wrong; this asks the packages.
         # It costs the resolver a couple of minutes of backtracking.
+        #
+        # The resolution is made as of the day the floor was released. Home
+        # Assistant pins its direct dependencies but not all of theirs, so a
+        # fresh install of an old release can pull a transitive package published
+        # months later that the release never ran with — 2025.8 pins aiodns 3.5.0,
+        # and pycares 5 (December 2025) breaks that aiodns at import. Real
+        # installations are unaffected; they run the images the release shipped.
+        # The cut-off is read from PyPI's own upload time for that release, so
+        # there is no list of packages to keep current here either.
         run: |
           MIN=$(python -c 'import json; print(json.load(open("hacs.json"))["homeassistant"])')
           echo "Floor declared in hacs.json: $MIN"
+          CUTOFF=$(curl -fsS "https://pypi.org/pypi/homeassistant/$MIN/json" | python -c '
+          import datetime, json, sys
+          uploaded = json.load(sys.stdin)["urls"][0]["upload_time_iso_8601"]
+          at = datetime.datetime.fromisoformat(uploaded.replace("Z", "+00:00"))
+          print((at + datetime.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ"))
+          ')
+          echo "Resolving as of: $CUTOFF"
+          pip install uv
           pip install -e ".[dev]"
-          pip install "pytest-homeassistant-custom-component" "homeassistant==$MIN"
+          uv pip install --system --exclude-newer "$CUTOFF" \
+            "pytest-homeassistant-custom-component" "homeassistant==$MIN"
           python - "$MIN" <<'EOF'
           import sys
           from homeassistant.const import __version__ as running

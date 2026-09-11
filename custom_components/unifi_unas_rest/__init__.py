@@ -144,7 +144,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: UnasConfigEntry) -> bool
     )
     coordinator.hub_device_id = hub.id
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    entry.async_on_unload(entry.add_update_listener(_async_reload))
     return True
 
 
@@ -168,11 +167,6 @@ async def async_remove_config_entry_device(
     known |= {f"{prefix}pool{pool.id or pool.number}" for pool in data.storage.pools}
     known |= {f"{prefix}share{share.id}" for share in (data.shares or [])}
     return not any(ident in known for domain, ident in device.identifiers if domain == DOMAIN)
-
-
-async def _async_reload(hass: HomeAssistant, entry: UnasConfigEntry) -> None:
-    """Reload the entry when its options change."""
-    await hass.config_entries.async_reload(entry.entry_id)
 
 
 def _log_readings_out_of_scope(entry: UnasConfigEntry, capabilities: Capabilities) -> None:

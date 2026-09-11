@@ -6,6 +6,26 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.8.6] - 2026-09-11
+
+### Changed
+
+- **Requires Home Assistant 2025.8 or later** (previously 2025.3). The options
+  flow now uses `OptionsFlowWithReload`, which Home Assistant introduced in 2025.8.
+
+### Fixed
+
+- **Reconfiguring, re-authenticating or accepting a certificate sets the entry
+  up once, not twice.**
+  The integration kept an update listener that reloaded the entry, while
+  reconfigure and re-authentication already ask Home Assistant to reload it.
+  Both fired, so every such change ran setup twice — visible as each startup
+  log line appearing twice. Home Assistant reports this combination as breaking
+  in 2026.12, but the first reload removed the listener before that check ran,
+  so the warning never appeared. The listener is gone; Home Assistant now
+  performs the single reload for options changes too, and only when the options
+  actually changed.
+
 ## [1.8.5] - 2026-09-11
 
 ### Fixed

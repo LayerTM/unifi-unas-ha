@@ -75,7 +75,7 @@ def hub_device_info(coordinator: UnasDataUpdateCoordinator) -> DeviceInfo:
 # `via_device_id` (the hub's device-registry id) and removes the old spelling in
 # 2027.8, warning about it in the log until then. Both state the same fact, so
 # which one to send is asked of `DeviceInfo` itself rather than of a version
-# number: that keeps the 2025.3 floor this integration supports, with nothing to
+# number: that keeps the 2025.8 floor this integration supports, with nothing to
 # revisit when the old key finally goes.
 _ACCEPTS_VIA_DEVICE_ID = "via_device_id" in DeviceInfo.__optional_keys__
 
