@@ -5,8 +5,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+import pytest
+
 from aiounas.models import (
     DeviceInfo,
+    Disk,
     LogSummary,
     NetworkIO,
     NotificationSummary,
@@ -159,3 +162,39 @@ def test_summaries_fail_closed_on_malformed_payloads() -> None:
         assert ns.total == 0 and ns.latest is None
         ls = LogSummary.from_api(bad)
         assert ls.total == 0 and ls.latest is None
+
+
+def test_an_empty_bay_is_not_a_disk_at_risk(fixture: Fx) -> None:
+    """A NAS that is not fully populated reports its empty bays in `disks`.
+
+    An empty bay holds no drive, so it cannot be at risk: counting it made a
+    4-bay console with 3 drives report one disk at risk, and switched the hub's
+    storage-problem sensor on.
+    """
+    s = Storage.from_api(fixture("storage_partial"))
+    assert len(s.disks) == 3
+    empty = s.disks[2]
+    assert empty.slot == "3"
+    assert empty.is_present is False
+    assert empty.is_at_risk is False
+    assert s.at_risk_disk_count == 0
+    # The bay's temperature of 0 is not a reading; the average is over drives.
+    assert s.average_disk_temperature == 48.0
+
+
+@pytest.mark.parametrize("state", ["empty", "EMPTY", "Empty"])
+def test_empty_is_recognised_whatever_its_case(state: str) -> None:
+    assert Disk.from_api({"slotId": "4", "state": state}).is_present is False
+
+
+@pytest.mark.parametrize(
+    ("state", "reasons"),
+    [("degraded", []), ("failed", []), ("optimal", ["badSector"])],
+)
+def test_a_present_drive_that_is_not_healthy_is_still_at_risk(
+    state: str, reasons: list[str]
+) -> None:
+    """The other branch: excluding empty bays must not hide a real problem."""
+    d = Disk.from_api({"slotId": "1", "state": state, "riskReasons": reasons})
+    assert d.is_present is True
+    assert d.is_at_risk is True

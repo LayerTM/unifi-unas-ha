@@ -106,6 +106,22 @@ class Disk:
         return self.state.lower() == "optimal" and not self.risk_reasons
 
     @property
+    def is_present(self) -> bool:
+        """False for a bay the console lists with no drive in it.
+
+        A NAS that is not fully populated reports its empty bays in `disks`
+        alongside the drives, with state ``empty``. Such a bay has no health to
+        speak of, and every figure it carries (a zero temperature, a zero size)
+        describes the absence of a drive rather than a drive.
+        """
+        return self.state.lower() != "empty"
+
+    @property
+    def is_at_risk(self) -> bool:
+        """A drive that is present and not healthy. An empty bay is never at risk."""
+        return self.is_present and not self.is_healthy
+
+    @property
     def size_tb(self) -> float:
         return round(self.size / _TB, 2)
 
@@ -238,11 +254,11 @@ class Storage:
 
     @property
     def at_risk_disk_count(self) -> int:
-        return sum(1 for d in self.disks if not d.is_healthy)
+        return sum(1 for d in self.disks if d.is_at_risk)
 
     @property
     def average_disk_temperature(self) -> float | None:
-        temps = [d.temperature for d in self.disks if d.temperature is not None]
+        temps = [d.temperature for d in self.disks if d.is_present and d.temperature is not None]
         return round(sum(temps) / len(temps), 1) if temps else None
 
     def disks_for_pool(self, pool_id: str) -> tuple[Disk, ...]:

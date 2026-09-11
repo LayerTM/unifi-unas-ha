@@ -6,6 +6,18 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.8.5] - 2026-09-11
+
+### Fixed
+
+- **An empty drive bay is no longer reported as a disk at risk.** A NAS that is
+  not fully populated lists its empty bays alongside its drives, with the state
+  `empty`. Such a bay was counted as unhealthy, so a 4-bay console with 3 drives
+  showed one disk at risk, turned the hub's *Storage problem* sensor on, and
+  marked the empty bay's own *Problem* sensor on. An empty bay is now never at
+  risk; a present drive that is not healthy still is. The empty bay also no
+  longer counts towards the average disk temperature.
+
 ## [1.8.4] - 2026-09-11
 
 ### Fixed
