@@ -246,7 +246,10 @@ async def test_control_entities_are_removed_when_controls_are_turned_off(
 
     assert control_entities(), "the fixture must actually create control entities"
 
-    hass.config_entries.async_update_entry(entry, options={CONF_ENABLE_CONTROLS: False})
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    await hass.config_entries.options.async_configure(
+        result["flow_id"], {CONF_ENABLE_CONTROLS: False}
+    )
     await hass.async_block_till_done()
 
     assert control_entities() == []
