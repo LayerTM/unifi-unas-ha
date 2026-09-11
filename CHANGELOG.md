@@ -6,6 +6,27 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.8.3] - 2026-09-11
+
+### Fixed
+
+- **Changing an entry's authentication no longer leaves the readings it lost
+  behind as `unavailable` rows.** Reconfiguring from a local account to an API
+  key narrows what the console will serve, so the platforms stop creating
+  entities for shares, accounts, firmware detail, notifications and logs — but
+  everything the wider authentication had created stayed in the entity
+  registry, showing as `unavailable` for good. On a real entry that was 61 of
+  103 rows, each of them reading as a fault rather than as a setting. The
+  registry is now pruned at setup to what the current authentication can
+  actually produce, by the same rule and in the same place as the control
+  entities, which had this fixed for them in 1.8.1.
+
+### Changed
+
+- **Diagnostics report every reading and name the ones out of scope**, so
+  "why is this entity missing" can be answered from a downloaded report rather
+  than from a log line that a default installation does not record.
+
 ## [1.8.2] - 2026-09-11
 
 ### Fixed

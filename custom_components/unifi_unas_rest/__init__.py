@@ -19,7 +19,6 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceEntry
@@ -39,7 +38,6 @@ from .aiounas import (
 from .aiounas.auth import AbstractAuth
 from .const import (
     CONF_ENABLE_CONTROLS,
-    CONTROL_PLATFORMS,
     DEFAULT_ENABLE_CONTROLS,
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL,
@@ -50,6 +48,7 @@ from .const import (
 from .coordinator import UnasDataUpdateCoordinator
 from .entity import hub_device_info
 from .issues import clear_cert_mismatch, raise_cert_mismatch
+from .scope import prune_registry, readings_out_of_scope
 from .tls import ssl_for_entry, tls_mode_of
 
 _LOGGER = logging.getLogger(__name__)
@@ -127,8 +126,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: UnasConfigEntry) -> bool
                 ssl=ssl,
             )
 
-    if action_client is None:
-        _async_remove_control_entities(hass, entry)
+    removed = prune_registry(hass, entry, capabilities, writes_available=action_client is not None)
+    if removed:
+        _LOGGER.info(
+            "UniFi UNAS at %s: removed %d entities this entry's authentication "
+            "can no longer produce: %s",
+            data[CONF_HOST],
+            len(removed),
+            ", ".join(sorted(removed)),
+        )
 
     entry.runtime_data = UnasRuntimeData(coordinator, action_client)
     # Register the hub before the platforms load: a sub-device can only be linked
@@ -173,29 +179,20 @@ def _log_readings_out_of_scope(entry: UnasConfigEntry, capabilities: Capabilitie
     """Name the readings this API key is not authorized for, once, in the log.
 
     UniFi OS scopes an API key to device-level readings; shares, accounts,
-    firmware detail, notifications and logs need a local account. The
-    integration creates no entities for what it cannot read, which is right —
-    but it did so silently, so the only symptom was entities that never
-    appeared, and that is what let a console refusing them with 401 instead of
-    403 look like a broken credential.
+    firmware detail, notifications and logs need a local account. No entities
+    are created for them, which is right — but silently, so the only symptom
+    was entities that never appeared, and that is what let a console refusing
+    them with 401 instead of 403 look like a broken credential.
 
     A log line and not a repair: this is the documented, correct state of every
     API-key entry, and a notification that fires on a correct configuration is
-    one people learn to dismiss. README carries the same list.
+    one people learn to dismiss. The same list reaches diagnostics, which is
+    readable without raising anyone's log level, and README carries it as a
+    table.
     """
     if not entry.data.get(CONF_API_KEY):
         return
-    denied = [
-        name
-        for name, in_scope in (
-            ("shares", capabilities.shares),
-            ("accounts", capabilities.users),
-            ("firmware updates", capabilities.updates),
-            ("notifications", capabilities.notifications),
-            ("logs", capabilities.logs),
-        )
-        if not in_scope
-    ]
+    denied = readings_out_of_scope(capabilities)
     if denied:
         _LOGGER.info(
             "UniFi UNAS at %s: this API key is not authorized for %s, so no "
@@ -229,21 +226,3 @@ def _async_review_tls(hass: HomeAssistant, entry: UnasConfigEntry) -> None:
         translation_placeholders={"host": entry.data[CONF_HOST]},
         data={"entry_id": entry.entry_id},
     )
-
-
-def _async_remove_control_entities(hass: HomeAssistant, entry: UnasConfigEntry) -> None:
-    """Drop control entities from the registry when there is no client to drive them.
-
-    The control platforms simply create nothing when writes are not available —
-    controls turned off, or an API key, which cannot write. What they created on
-    an earlier run stays in the entity registry, and Home Assistant shows every
-    one of those as `unavailable` indefinitely: a row for a button the user
-    switched off, which reads like a fault rather than a setting.
-
-    Keyed on the same condition the platforms use, so the registry cannot
-    disagree with what they do.
-    """
-    registry = er.async_get(hass)
-    for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
-        if entity.domain in CONTROL_PLATFORMS:
-            registry.async_remove(entity.entity_id)
