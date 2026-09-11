@@ -51,9 +51,9 @@ Everything is grouped under one hub device (the UNAS), with a sub-device per dis
 - **Storage** — used / total / free, usage %, RAID level, storage status, pool count.
 - **System** — CPU usage %, CPU temperature, memory usage %, network throughput, link speed, last boot, UniFi OS and Drive app versions.
 - **Health** — disks-at-risk count, average disk temperature, a `storage problem` binary sensor, and a connectivity (`online`) binary sensor.
-- **Per disk** — temperature, read/write rate, power-on hours, health score, bad sectors, state, and a per-disk `problem` binary sensor.
-- **Per pool** — RAID level, status, usage %, capacity, used space, data-scrubbing status.
-- **Per share** *(local-account auth)* — usage, quota, member count, encryption, and snapshot / remote-backup binary sensors. A privacy-safe **account count** is also exposed (only the number of accounts — never the accounts themselves).
+- **Per disk** — temperature, transfer read/write rate, power-on hours, health score, bad sectors, state, and a per-disk `problem` binary sensor.
+- **Per pool** — RAID level, status, storage total / used / usage %, data-scrubbing status.
+- **Per share** *(local-account auth)* — storage used / quota, member count, encryption, and snapshot / remote-backup binary sensors. A privacy-safe **account count** is also exposed (only the number of accounts — never the accounts themselves).
 - **Updates** *(local-account auth)* — UniFi OS and Drive-app update entities (install requires opt-in controls with an owner account). An **Applications** sensor lists installed apps/integrations and their versions.
 - **Activity** *(local-account auth)* — recent-event count (with a per-category breakdown), latest-event time, and recent-log-entry count. Only counts, categories and timestamps are read — notification and log **bodies are personal data and are never retained**.
 

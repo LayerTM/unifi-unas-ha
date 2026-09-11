@@ -6,6 +6,29 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.8.7] - 2026-09-11
+
+### Changed
+
+- **Related disk, pool and share readings now share a leading word**, so they
+  sort next to each other in entity lists, as the console's own readings
+  (*Storage used*, *Network receive*) always have:
+
+  | device | before | now |
+  |---|---|---|
+  | disk | Read rate, Write rate | Transfer read rate, Transfer write rate |
+  | pool | Capacity, Used, Usage | Storage total, Storage used, Storage usage |
+  | share | Usage, Quota | Storage used, Storage quota |
+
+  Pools and shares now use the console's words for the same quantities, so a
+  given word means the same thing on every device — before, *Usage* was a
+  percentage on a pool and an amount of data on a share.
+  - **Existing entity IDs do not change**, so automations and dashboards keep
+    working. Only the displayed names change.
+  - **A name you gave an entity yourself still takes precedence.**
+  - **New installations** get the new words in the entity ID as well — for
+    example `sensor.unas_2_disk_1_transfer_read_rate`.
+
 ## [1.8.6] - 2026-09-11
 
 ### Changed
