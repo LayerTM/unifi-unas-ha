@@ -54,7 +54,7 @@ DISK_BINARY_SENSORS: tuple[UnasDiskBinaryDescription, ...] = (
         key="problem",
         translation_key="disk_problem",
         device_class=BinarySensorDeviceClass.PROBLEM,
-        value_fn=lambda disk: not disk.is_healthy,
+        value_fn=lambda disk: disk.is_at_risk,
     ),
 )
 
