@@ -6,6 +6,20 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.8.4] - 2026-09-11
+
+### Fixed
+
+- **An entity you customised is no longer removed when your authentication
+  narrows.** Since 1.8.3 an entity whose reading an entry's authentication can
+  no longer reach is removed from the registry instead of left `unavailable` —
+  and removing the registry row removes whatever you set on it. Such an entity
+  is now kept if you renamed it, gave it an icon, labels, categories or its own
+  area, hid or disabled it yourself, added a voice alias, or (on Home Assistant
+  2026.2 or later) edited its entity ID. It shows as `unavailable` until you
+  delete it or widen the authentication again; untouched entities are still
+  removed as before.
+
 ## [1.8.3] - 2026-09-11
 
 ### Fixed

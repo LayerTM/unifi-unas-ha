@@ -133,7 +133,7 @@ The integration **polls** the console's local REST API (`local_polling`) on a fi
 
 ## Known limitations
 
-- **API-key auth is device-scoped.** UniFi OS authorizes an API key for device-level readings only, and refuses the rest — with `403`, `500` or `401` depending on the firmware, all meaning the same thing. The integration sets up with what the key does reach and creates no entities for the rest. Downloaded diagnostics name the readings that are out of scope:
+- **API-key auth is device-scoped.** UniFi OS authorizes an API key for device-level readings only, and refuses the rest — with `403`, `500` or `401` depending on the firmware, all meaning the same thing. The integration sets up with what the key does reach and creates no entities for the rest. Switching an existing entry to an API key removes the entities it can no longer read — except any you customised (renamed, icon, labels, area, hidden, disabled, voice alias, edited entity ID), which stay as `unavailable` so nothing you set is lost. Downloaded diagnostics name the readings that are out of scope:
 
   | Reading | API key | Local account |
   |---|---|---|

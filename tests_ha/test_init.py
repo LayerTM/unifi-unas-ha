@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import replace
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import aiohttp
@@ -684,3 +685,119 @@ async def test_diagnostics_list_is_empty_when_everything_is_in_scope(
     await _setup(hass, config_entry)
     diag = await async_get_config_entry_diagnostics(hass, config_entry)
     assert diag["readings_out_of_scope"] == []
+
+
+_REGENERATE_AVAILABLE = hasattr(er.EntityRegistry, "async_regenerate_entity_id")
+
+
+@pytest.mark.parametrize(
+    ("customization", "changes"),
+    [
+        ("name", {"name": "My accounts"}),
+        ("icon", {"icon": "mdi:account-group"}),
+        ("labels", {"labels": {"nas"}}),
+        ("categories", {"categories": {"helpers": "storage"}}),
+        ("area", {"area_id": "office"}),
+        ("hidden by the user", {"hidden_by": er.RegistryEntryHider.USER}),
+        ("disabled by the user", {"disabled_by": er.RegistryEntryDisabler.USER}),
+        ("voice alias", {"aliases": {"nas accounts"}}),
+        pytest.param(
+            "hand-edited entity ID",
+            {"new_entity_id": "sensor.my_nas_accounts"},
+            marks=pytest.mark.skipif(
+                not _REGENERATE_AVAILABLE,
+                reason="Home Assistant cannot say what the generated ID would be before 2026.2",
+            ),
+        ),
+    ],
+)
+async def test_narrowing_keeps_a_row_the_user_customised(
+    hass: HomeAssistant,
+    mock_aiounas: AsyncMock,
+    config_entry: MockConfigEntry,
+    customization: str,
+    changes: dict[str, Any],
+) -> None:
+    """Whatever the user set on a row must survive the reading leaving scope.
+
+    Removing the row would remove the customisation with it; keeping it costs an
+    `unavailable` row, which the user can delete once they no longer want it.
+    """
+    await _setup(hass, config_entry)
+    registry = er.async_get(hass)
+    prefix = config_entry.unique_id
+    accounts = registry.async_get_entity_id("sensor", DOMAIN, f"{prefix}_user_count")
+    logs = registry.async_get_entity_id("sensor", DOMAIN, f"{prefix}_log_entries")
+    assert accounts and logs
+    registry.async_update_entity(accounts, **changes)
+
+    await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()
+    narrow = await _all_caps(users=False, logs=False)
+    with patch("custom_components.unifi_unas_rest.probe", AsyncMock(return_value=narrow)):
+        assert await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    kept = registry.async_get_entity_id("sensor", DOMAIN, f"{prefix}_user_count")
+    assert kept is not None, f"a row customised by its {customization} was removed"
+    # The other branch, in the same run: an untouched row of a reading that left
+    # scope is still removed, so keeping customised rows did not disable pruning.
+    assert registry.async_get_entity_id("sensor", DOMAIN, f"{prefix}_log_entries") is None
+
+
+async def test_narrowing_still_removes_a_row_only_the_integration_touched(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    """Home Assistant's own bookkeeping must not read as the user's work.
+
+    Two things look like customisation and are not: the computed-name alias
+    every row carries, and the unit and precision the core writes into
+    `options` at setup. A share usage sensor carries both.
+    """
+    await _setup(hass, config_entry)
+    registry = er.async_get(hass)
+    share_rows = [
+        e
+        for e in er.async_entries_for_config_entry(registry, config_entry.entry_id)
+        if e.unique_id.startswith(f"{config_entry.unique_id}_share")
+    ]
+    assert share_rows
+    # The case this test exists for: at least one of them carries core-written options.
+    assert any(e.options for e in share_rows)
+
+    await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()
+    narrow = await _all_caps(shares=False)
+    with patch("custom_components.unifi_unas_rest.probe", AsyncMock(return_value=narrow)):
+        assert await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    left = [
+        e
+        for e in er.async_entries_for_config_entry(registry, config_entry.entry_id)
+        if e.unique_id.startswith(f"{config_entry.unique_id}_share")
+    ]
+    assert left == []
+
+
+async def test_narrowing_removes_a_row_the_integration_disabled(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    """Disabled by the integration is a default, not a choice the user made."""
+    await _setup(hass, config_entry)
+    registry = er.async_get(hass)
+    logs = registry.async_get_entity_id("sensor", DOMAIN, f"{config_entry.unique_id}_log_entries")
+    assert logs
+    registry.async_update_entity(logs, disabled_by=er.RegistryEntryDisabler.INTEGRATION)
+
+    await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()
+    narrow = await _all_caps(logs=False)
+    with patch("custom_components.unifi_unas_rest.probe", AsyncMock(return_value=narrow)):
+        assert await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    assert (
+        registry.async_get_entity_id("sensor", DOMAIN, f"{config_entry.unique_id}_log_entries")
+        is None
+    )

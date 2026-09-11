@@ -67,6 +67,41 @@ def readings_out_of_scope(capabilities: Capabilities) -> list[str]:
     ]
 
 
+def _is_customized(registry: er.EntityRegistry, entity: er.RegistryEntry) -> bool:
+    """Whether the user has put their own work into this registry row.
+
+    Removing a row removes everything the user set on it, so a row carrying any
+    of it is kept — it goes `unavailable` instead, which loses nothing and is the
+    user's own choice to clean up. Only fields a person sets count:
+
+    - a name, an icon, labels, categories, or an area chosen for the entity
+      itself (a device's area lives on the device and survives regardless);
+    - hidden or disabled by the user — not by the integration, which is how
+      this one ships its high-churn sensors;
+    - a voice alias: aliases hold the computed-name placeholder by default, so
+      only an actual string counts, never "the list is not empty";
+    - a hand-edited entity ID, when Home Assistant can say what the generated
+      one would have been. That question has an answer only from 2026.2 on;
+      on older releases an edited ID alone is not recognised.
+
+    `options` is deliberately not read. Home Assistant writes into it on its
+    own at setup — suggested display precision and unit conversion, 17 of this
+    integration's 61 entities on a plain run — so a non-empty `options` cannot
+    separate a user's choice from the core's bookkeeping, and counting it would
+    keep exactly the rows this pruning exists to remove.
+    """
+    if entity.name or entity.icon or entity.labels or entity.categories or entity.area_id:
+        return True
+    if entity.hidden_by is er.RegistryEntryHider.USER:
+        return True
+    if entity.disabled_by is er.RegistryEntryDisabler.USER:
+        return True
+    if any(isinstance(alias, str) for alias in entity.aliases):
+        return True
+    regenerate = getattr(registry, "async_regenerate_entity_id", None)
+    return regenerate is not None and entity.entity_id != regenerate(entity)
+
+
 def _orphaned(unique_id: str, prefix: str, readings: Iterable[Reading]) -> bool:
     """Whether *unique_id* belongs to a reading that is out of scope."""
     for reading in readings:
@@ -92,6 +127,9 @@ def prune_registry(
     conditions the platforms themselves use — so the registry cannot end up
     claiming something the platforms decline to create. An entry that never
     narrows its authentication removes nothing, which is the common case.
+
+    A row the user customised is never removed, whatever its scope; see
+    :func:`_is_customized`.
     """
     registry = er.async_get(hass)
     prefix = f"{entry.unique_id}_"
@@ -101,7 +139,8 @@ def prune_registry(
     removed: list[str] = []
     for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
         stale_control = not writes_available and entity.domain in CONTROL_PLATFORMS
-        if stale_control or _orphaned(entity.unique_id, prefix, out_of_scope):
+        out_of_reach = stale_control or _orphaned(entity.unique_id, prefix, out_of_scope)
+        if out_of_reach and not _is_customized(registry, entity):
             registry.async_remove(entity.entity_id)
             removed.append(entity.entity_id)
     return removed
