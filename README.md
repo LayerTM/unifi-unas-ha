@@ -133,7 +133,18 @@ The integration **polls** the console's local REST API (`local_polling`) on a fi
 
 ## Known limitations
 
-- **API-key auth is device-scoped**: an API key cannot read shares, the account count, or activity aggregates (those need a local account). It also cannot perform control actions.
+- **API-key auth is device-scoped.** UniFi OS authorizes an API key for device-level readings only, and refuses the rest — with `403`, `500` or `401` depending on the firmware, all meaning the same thing. The integration sets up with what the key does reach and creates no entities for the rest, naming them once in the log:
+
+  | Reading | API key | Local account |
+  |---|---|---|
+  | Storage, pools, disks and SMART | yes | yes |
+  | CPU, memory, network, fan, uptime | yes | yes |
+  | Shares (usage, quota, members, snapshots) | no | yes |
+  | Account count | no | yes |
+  | Firmware and Drive-app updates | no | yes |
+  | Notifications and log activity | no | yes |
+  | Control actions (reboot, shut down, install, fan) | no | yes, owner account for power and firmware |
+
 - **Snapshots are read-only**: the API exposes only a per-share scheduled-snapshot **flag** (shown as the *Snapshots* binary sensor). There is no snapshot list/create/delete endpoint, and the only candidate write is silently ignored by the device (confirmed by a live test), so no snapshot control is offered.
 - **Power/firmware actions require an owner/admin account.** The firmware-install endpoint, auth gating, and its "nothing to update" refusal are verified against live hardware; the actual install-and-reboot path only runs when an update is genuinely available.
 - **No cloud**: only local access is supported; the UniFi Site Manager cloud API exposes none of this data.
@@ -150,7 +161,8 @@ The integration **polls** the console's local REST API (`local_polling`) on a fi
   reset or a reissued certificate all change it legitimately, and a repair
   notification shows you both fingerprints so you can accept the new one. If you
   changed nothing, do not accept it: something else is answering at that address.
-- **Shares / account count / activity sensors missing** — you are using API-key auth; reconfigure with a local account (**Configure → Reconfigure**) to expose them.
+- **Shares / account count / activity sensors missing** — you are using API-key auth; see the table under *Known limitations* for what that covers, and reconfigure with a local account (**Configure → Reconfigure**) to expose them. The log names the exact list at startup.
+- **"Failed to set up: unauthorized for /api/notifications" with an API key** — fixed in **v1.8.2**. UniFi OS 5.1.33 with Drive 4.4.9 refuses an API key on the session-only readings with `401` where earlier firmware used `403`, and earlier versions read that as an invalid credential: setup failed, re-authentication reported success, and setup failed again on the same endpoint. Update to v1.8.2; the key needs no changes.
 - **It keeps asking to re-authenticate, but the credential still works** — fixed in **v1.7.3**. Earlier versions read a console that was busy restarting (typically during a firmware update) as an expired session, and Home Assistant treats that as final: polling stops until you click through re-authentication. Update, then reload the entry — reloading also clears the stale *"Authentication expired"* repair.
 - **Controls don't appear after enabling them** — controls require **username/password** auth; with an API key the option is rejected. Power and firmware actions additionally need an **owner/admin** account.
 - **A control returns an error** — the message states the cause (insufficient permissions, auth failed, or the device rejected it). Owner rights are required for reboot/shutdown/firmware.

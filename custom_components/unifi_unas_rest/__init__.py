@@ -26,6 +26,7 @@ from homeassistant.helpers.device_registry import DeviceEntry
 
 from .aiounas import (
     ApiKeyAuth,
+    Capabilities,
     SessionAuth,
     TlsMode,
     UnasActionClient,
@@ -100,6 +101,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: UnasConfigEntry) -> bool
         raise ConfigEntryNotReady(str(err)) from err
 
     _async_review_tls(hass, entry)
+    _log_readings_out_of_scope(entry, capabilities)
 
     scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
     coordinator = UnasDataUpdateCoordinator(hass, entry, client, capabilities, scan_interval)
@@ -165,6 +167,43 @@ async def async_remove_config_entry_device(
 async def _async_reload(hass: HomeAssistant, entry: UnasConfigEntry) -> None:
     """Reload the entry when its options change."""
     await hass.config_entries.async_reload(entry.entry_id)
+
+
+def _log_readings_out_of_scope(entry: UnasConfigEntry, capabilities: Capabilities) -> None:
+    """Name the readings this API key is not authorized for, once, in the log.
+
+    UniFi OS scopes an API key to device-level readings; shares, accounts,
+    firmware detail, notifications and logs need a local account. The
+    integration creates no entities for what it cannot read, which is right —
+    but it did so silently, so the only symptom was entities that never
+    appeared, and that is what let a console refusing them with 401 instead of
+    403 look like a broken credential.
+
+    A log line and not a repair: this is the documented, correct state of every
+    API-key entry, and a notification that fires on a correct configuration is
+    one people learn to dismiss. README carries the same list.
+    """
+    if not entry.data.get(CONF_API_KEY):
+        return
+    denied = [
+        name
+        for name, in_scope in (
+            ("shares", capabilities.shares),
+            ("accounts", capabilities.users),
+            ("firmware updates", capabilities.updates),
+            ("notifications", capabilities.notifications),
+            ("logs", capabilities.logs),
+        )
+        if not in_scope
+    ]
+    if denied:
+        _LOGGER.info(
+            "UniFi UNAS at %s: this API key is not authorized for %s, so no "
+            "entities are created for them. UniFi OS scopes an API key to "
+            "device-level readings; reconfigure with a local account to add them.",
+            entry.data[CONF_HOST],
+            ", ".join(denied),
+        )
 
 
 def _async_review_tls(hass: HomeAssistant, entry: UnasConfigEntry) -> None:

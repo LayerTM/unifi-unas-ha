@@ -6,6 +6,25 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.8.2] - 2026-09-11
+
+### Fixed
+
+- **Setting up with an API key no longer fails on a console that refuses one
+  read with 401.** UniFi OS scopes an API key to device-level readings and
+  refuses the rest, but the status it picks for that refusal depends on the
+  firmware: 403 and 500 on UniFi OS 5.1.19 with Drive 4.3.6, 401 on 5.1.33 with
+  Drive 4.4.9. A 401 was read as a bad credential, so setup failed with
+  `unauthorized for /api/notifications`, Home Assistant asked for the key again,
+  the form validated it against a reading the key *can* reach and reported
+  success, and setup failed again on the same endpoint — a loop with no exit.
+  A refusal of one supplementary reading is now treated as what it is: that
+  reading is unavailable, and the rest of the integration sets up normally. A
+  credential that reaches nothing at all still fails, as it must.
+- **The readings an API key cannot reach are now named in the log**, instead of
+  showing only as entities that never appear. README carries the same list as a
+  table.
+
 ## [1.8.1] - 2026-09-10
 
 ### Fixed
