@@ -6,6 +6,10 @@ contributor's device, not just one. Runs in pre-commit and CI. Exit code 1 on
 any finding. Placeholder/example values (e.g. ``<redacted>``, ``AA:BB:CC:...``,
 ``EXAMPLE``) are allowed so sanitized fixtures and docs pass.
 
+Machine-specific paths (a home directory, a temporary directory, a symlink
+leaving the clone) are not secrets and are not scanned here: ``hygiene_scan.py``
+owns them, and no line is reported by both.
+
 Usage:
     python scripts/secret_scan.py [path]   # default: current directory
 """
@@ -56,7 +60,6 @@ PATTERNS: dict[str, re.Pattern[str]] = {
     "AWS access key id": re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
     "Google API key": re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b"),
     "private key block": re.compile(r"BEGIN (RSA |OPENSSH |EC |DSA |PGP )?PRIVATE KEY"),
-    "personal macOS path": re.compile(r"/Users/[a-z]"),
     "personal email (gmail)": re.compile(r"[A-Za-z0-9._%+-]+@gmail\.com"),
     "private LAN IP": re.compile(r"\b(?:192\.168|10\.0\.0)\.\d{1,3}\b"),
 }
