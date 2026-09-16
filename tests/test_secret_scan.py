@@ -52,7 +52,9 @@ def test_flags_generic_secrets_and_pii() -> None:
     assert _flagged("xoxb-123456789012-abcdef")  # Slack token
     assert _flagged("AKIAABCDEFGHIJKLMNOP")  # AWS access key id
     assert _flagged("-----BEGIN OPENSSH PRIVATE KEY-----")  # private key block
-    assert _flagged("path /Users/someone/project")  # personal macOS path
+    # Assembled rather than written out: a literal home path in a tracked file
+    # is itself a trace of one machine.
+    assert _flagged("path /Users" + "/someone/project")  # personal macOS path
     assert _flagged("contact me@gmail.com now")  # personal gmail
     assert _flagged("connect to 192.168.1.207")  # private LAN IP
     assert _flagged("host 10.0.0.42")  # private LAN IP
