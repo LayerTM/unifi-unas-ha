@@ -6,6 +6,12 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Ready for Home Assistant 2026.10**, which moved setup and repair form
+  validation from voluptuous to probatio; earlier releases back to 2025.8 keep
+  working unchanged.
+
 ## [1.8.7] - 2026-09-11
 
 ### Changed
