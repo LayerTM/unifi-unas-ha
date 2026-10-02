@@ -8,9 +8,9 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- **Ready for Home Assistant 2026.10**, which validates setup and repair forms
-  with probatio instead of voluptuous: the forms are built with probatio there
-  and with voluptuous on earlier releases, back to 2025.8.
+- **Ready for Home Assistant 2026.10**, which moved setup and repair form
+  validation from voluptuous to probatio; earlier releases back to 2025.8 keep
+  working unchanged.
 
 ## [1.8.7] - 2026-09-11
 
