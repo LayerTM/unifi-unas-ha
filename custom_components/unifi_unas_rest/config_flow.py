@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import voluptuous as vol
 from homeassistant.config_entries import (
     SOURCE_RECONFIGURE,
     ConfigEntry,
@@ -55,6 +54,7 @@ from .const import (
     DOMAIN,
 )
 from .tls import ssl_for_entry, tls_mode_of
+from .validation import vol
 
 _LOGGER = logging.getLogger(__name__)
 

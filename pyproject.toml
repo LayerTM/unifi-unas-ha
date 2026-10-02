@@ -93,6 +93,14 @@ disallow_any_generics = true
 # broke it without any gate noticing.
 files = ["src/aiounas", "scripts"]
 
+# An entity platform's package root is the import path Home Assistant's own
+# integrations use for its types (`from homeassistant.components.binary_sensor
+# import BinarySensorDeviceClass`), whether or not that root re-exports them
+# explicitly; 2026.10 dropped the explicit form for some of them.
+[[tool.mypy.overrides]]
+module = "homeassistant.components.*"
+implicit_reexport = true
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 addopts = "-q --strict-markers"

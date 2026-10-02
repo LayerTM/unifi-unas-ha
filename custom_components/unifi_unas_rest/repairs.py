@@ -24,14 +24,12 @@ and nothing is stored until the user has seen the value being accepted.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import voluptuous as vol
 from homeassistant.components.repairs import RepairsFlow
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResult
 
 from .aiounas import TlsMode, UnasConnectionError, async_probe_fingerprint
 from .const import (
@@ -41,6 +39,10 @@ from .const import (
     DOMAIN,
     ISSUE_CERT_MISMATCH,
 )
+from .validation import vol
+
+if TYPE_CHECKING:
+    from homeassistant.components.repairs import RepairsFlowResult
 
 
 class _PinCertificateFlow(RepairsFlow):
@@ -63,7 +65,7 @@ class _PinCertificateFlow(RepairsFlow):
         except UnasConnectionError:
             return None
 
-    async def _async_pin(self, entry: ConfigEntry, fingerprint: str) -> FlowResult:
+    async def _async_pin(self, entry: ConfigEntry, fingerprint: str) -> RepairsFlowResult:
         self.hass.config_entries.async_update_entry(
             entry,
             data={
@@ -75,15 +77,17 @@ class _PinCertificateFlow(RepairsFlow):
         await self.hass.config_entries.async_reload(entry.entry_id)
         return self.async_create_entry(data={})
 
-    def _async_show(self, step_id: str, placeholders: dict[str, str]) -> FlowResult:
+    def _async_show(self, step_id: str, placeholders: dict[str, str]) -> RepairsFlowResult:
         return self.async_show_form(
             step_id=step_id, data_schema=vol.Schema({}), description_placeholders=placeholders
         )
 
-    async def async_step_confirm(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+    async def async_step_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> RepairsFlowResult:
         raise NotImplementedError  # pragma: no cover - both subclasses implement it
 
-    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> RepairsFlowResult:
         return await self.async_step_confirm()
 
 
@@ -95,7 +99,9 @@ class CertMismatchRepairFlow(_PinCertificateFlow):
         self._expected = expected
         self._shown = got
 
-    async def async_step_confirm(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+    async def async_step_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> RepairsFlowResult:
         entry = self._entry
         if entry is None:
             return self.async_abort(reason="entry_not_found")
@@ -117,7 +123,9 @@ class CertMismatchRepairFlow(_PinCertificateFlow):
 class TlsInsecureRepairFlow(_PinCertificateFlow):
     """Start pinning on an entry that currently verifies nothing."""
 
-    async def async_step_confirm(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+    async def async_step_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> RepairsFlowResult:
         entry = self._entry
         if entry is None:
             return self.async_abort(reason="entry_not_found")
