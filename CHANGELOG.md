@@ -28,8 +28,9 @@ adheres to [Semantic Versioning](https://semver.org/).
   the console's certificate and to signing in.
 - **An unreachable console no longer asks for the password again.** With
   username/password auth, a network failure while signing in — or a console
-  that answered the sign-in with a server error, a redirect to its web UI or a
-  rate limit while booting or updating — was treated as rejected credentials,
+  that answered the sign-in with a server error, a redirect to its web UI, a
+  request timeout or a rate limit while booting or updating — was treated as
+  rejected credentials,
   so Home Assistant opened a re-authentication flow for a console that was only
   unavailable. It now marks the entities unavailable and
   retries. Signing in is also bounded by the same timeout as every other
