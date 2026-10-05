@@ -21,7 +21,7 @@ from .const import (
     HEADER_CSRF_UPDATED,
     PATH_LOGIN,
 )
-from .exceptions import UnasAuthError, describe
+from .exceptions import UnasAuthError, UnasConnectionError, describe
 from .tls import mismatch_from
 
 
@@ -65,6 +65,28 @@ class ApiKeyAuth(AbstractAuth):
 
     def headers(self) -> dict[str, str]:
         return {HEADER_API_KEY: self._api_key}
+
+
+def _raise_for_login_status(status: int) -> None:
+    """Classify the console's answer to the login request.
+
+    Only a refusal of the credential is an auth error: a 4xx, or a 2xx without a
+    token (checked by the caller). Home Assistant answers an auth error by asking
+    the user to retype the password, so everything that means "the console could
+    not answer yet" — a redirect to its UI, a 5xx while it boots, a 429 while it
+    rate-limits logins — is a connection error, which is retried instead.
+    """
+    if 300 <= status < 400 or status >= 500:
+        raise UnasConnectionError(
+            f"console answered the login with status {status}; "
+            "it is most likely booting, updating or restarting"
+        )
+    if status == 429:
+        raise UnasConnectionError("console is rate-limiting logins (status 429)")
+    if status in (401, 403):
+        raise UnasAuthError("invalid credentials")
+    if status >= 400:
+        raise UnasAuthError(f"login refused with status {status}")
 
 
 class SessionAuth(AbstractAuth):
@@ -114,8 +136,13 @@ class SessionAuth(AbstractAuth):
                 self._capture(resp)
         except aiohttp.ServerFingerprintMismatch as err:
             raise mismatch_from(err) from err
-        except aiohttp.ClientError as err:
-            raise UnasAuthError(f"could not reach console: {describe(err)}") from err
+        except (aiohttp.ClientError, TimeoutError) as err:
+            # Not a refusal: the credentials were never checked. Filed as an auth
+            # error, Home Assistant would ask the user to retype a password that
+            # is fine, for a console that was merely unreachable. A session-level
+            # ``aiohttp.ClientTimeout`` raises a bare ``TimeoutError``, which is
+            # not a ``ClientError``.
+            raise UnasConnectionError(f"could not reach console: {describe(err)}") from err
 
         # 2) log in
         payload = {
@@ -127,20 +154,24 @@ class SessionAuth(AbstractAuth):
         request_headers = {HEADER_CSRF: self._csrf} if self._csrf else {}
         try:
             async with session.post(
-                f"{base_url}{PATH_LOGIN}", json=payload, headers=request_headers, ssl=ssl
+                f"{base_url}{PATH_LOGIN}",
+                json=payload,
+                headers=request_headers,
+                ssl=ssl,
+                # A console that is not serving its API yet redirects to its web
+                # UI; followed, that ends as a 200 page without a token and reads
+                # exactly like a refused login. Keep it visible.
+                allow_redirects=False,
             ) as resp:
-                if resp.status in (401, 403):
-                    raise UnasAuthError("invalid credentials")
-                if resp.status >= 400:
-                    raise UnasAuthError(f"login failed with status {resp.status}")
+                _raise_for_login_status(resp.status)
                 self._capture(resp)
         except aiohttp.ServerFingerprintMismatch as err:
             # A swapped certificate is not a bad password. Misfiling it as one
             # makes Home Assistant tear the entry down and demand credentials
             # that were always correct.
             raise mismatch_from(err) from err
-        except aiohttp.ClientError as err:
-            raise UnasAuthError(f"login request failed: {describe(err)}") from err
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise UnasConnectionError(f"login request failed: {describe(err)}") from err
 
         if not self._token:
             raise UnasAuthError("login did not return a session token")
