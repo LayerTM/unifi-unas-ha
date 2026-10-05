@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import aiohttp
 import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestServer
 
 from aiounas.auth import ApiKeyAuth, SessionAuth
-from aiounas.exceptions import UnasAuthError
+from aiounas.exceptions import UnasAuthError, UnasConnectionError
 
 
 def test_apikey_headers() -> None:
@@ -49,6 +51,27 @@ async def test_session_login_no_token_raises() -> None:
         base = f"http://{server.host}:{server.port}"
         async with aiohttp.ClientSession() as session:
             with pytest.raises(UnasAuthError, match="token"):
+                await SessionAuth("user", "pass").async_prepare(session, base, ssl=False)
+    finally:
+        await server.close()
+
+
+async def test_session_timeout_during_login_is_a_connection_error() -> None:
+    """A session-level ``ClientTimeout`` raises a bare ``TimeoutError``, not a
+    ``ClientError``; it must still arrive typed, and not as bad credentials."""
+
+    async def hang(_: web.Request) -> web.Response:
+        await asyncio.sleep(10)
+        return web.Response(text="")
+
+    app = web.Application()
+    app.router.add_get("/", hang)
+    server = TestServer(app)
+    await server.start_server()
+    try:
+        base = f"http://{server.host}:{server.port}"
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=0.3)) as session:
+            with pytest.raises(UnasConnectionError, match="could not reach console: TimeoutError"):
                 await SessionAuth("user", "pass").async_prepare(session, base, ssl=False)
     finally:
         await server.close()

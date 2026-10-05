@@ -21,7 +21,7 @@ from .const import (
     HEADER_CSRF_UPDATED,
     PATH_LOGIN,
 )
-from .exceptions import UnasAuthError, describe
+from .exceptions import UnasAuthError, UnasConnectionError, describe
 from .tls import mismatch_from
 
 
@@ -114,8 +114,13 @@ class SessionAuth(AbstractAuth):
                 self._capture(resp)
         except aiohttp.ServerFingerprintMismatch as err:
             raise mismatch_from(err) from err
-        except aiohttp.ClientError as err:
-            raise UnasAuthError(f"could not reach console: {describe(err)}") from err
+        except (aiohttp.ClientError, TimeoutError) as err:
+            # Not a refusal: the credentials were never checked. Filed as an auth
+            # error, Home Assistant would ask the user to retype a password that
+            # is fine, for a console that was merely unreachable. A session-level
+            # ``aiohttp.ClientTimeout`` raises a bare ``TimeoutError``, which is
+            # not a ``ClientError``.
+            raise UnasConnectionError(f"could not reach console: {describe(err)}") from err
 
         # 2) log in
         payload = {
@@ -139,8 +144,8 @@ class SessionAuth(AbstractAuth):
             # makes Home Assistant tear the entry down and demand credentials
             # that were always correct.
             raise mismatch_from(err) from err
-        except aiohttp.ClientError as err:
-            raise UnasAuthError(f"login request failed: {describe(err)}") from err
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise UnasConnectionError(f"login request failed: {describe(err)}") from err
 
         if not self._token:
             raise UnasAuthError("login did not return a session token")

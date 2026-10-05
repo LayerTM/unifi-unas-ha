@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 
 import aiohttp
 import pytest
@@ -231,3 +232,52 @@ async def test_redirect_to_ui_is_api_error_not_auth() -> None:
             assert "/manage" in str(excinfo.value)
     finally:
         await server.close()
+
+
+# --- a network failure during login is not a refused credential ---------------
+
+
+async def test_unreachable_console_during_login_is_a_connection_error() -> None:
+    """Filed as an auth error, Home Assistant would ask for a password that is fine."""
+    async with aiohttp.ClientSession() as session:
+        t = UnasTransport(
+            session, "127.0.0.1", SessionAuth("u", "p"), port=1, use_ssl=False, timeout=2
+        )
+        with pytest.raises(UnasConnectionError, match="could not reach console"):
+            await t.get_json("/proxy/drive/api/v2/storage")
+
+
+async def test_login_that_never_answers_times_out_as_a_connection_error() -> None:
+    async def hang(_: web.Request) -> web.Response:
+        await asyncio.sleep(10)
+        return web.Response(text="")
+
+    app = web.Application()
+    app.router.add_get("/", hang)
+    server = TestServer(app)
+    await server.start_server()
+    try:
+        async with aiohttp.ClientSession() as session:
+            t = UnasTransport(
+                session,
+                server.host,
+                SessionAuth("u", "p"),
+                port=server.port,
+                use_ssl=False,
+                timeout=1,
+            )
+            started = time.monotonic()
+            with pytest.raises(UnasConnectionError) as exc_info:
+                await t.get_json("/proxy/drive/api/v2/storage")
+            elapsed = time.monotonic() - started
+        assert str(exc_info.value) == "login did not finish within 1s: TimeoutError"
+        assert elapsed < 3
+    finally:
+        await server.close()
+
+
+async def test_refused_login_is_still_an_auth_error(unas_server) -> None:
+    async with aiohttp.ClientSession() as session:
+        t = _transport(session, unas_server, SessionAuth("user", "bad"))
+        with pytest.raises(UnasAuthError, match="invalid credentials"):
+            await t.get_json("/proxy/drive/api/v2/storage")

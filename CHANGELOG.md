@@ -26,6 +26,12 @@ adheres to [Semantic Versioning](https://semver.org/).
   it now reads, for example,
   `GET /proxy/drive/api/v2/storage: TimeoutError`. The same applies to reading
   the console's certificate and to signing in.
+- **An unreachable console no longer asks for the password again.** With
+  username/password auth, a network failure while signing in was treated as
+  rejected credentials, so Home Assistant opened a re-authentication flow for a
+  console that was only offline. It now marks the entities unavailable and
+  retries. Signing in is also bounded by the same timeout as every other
+  request, instead of waiting as long as the connection allows.
 
 ## [1.8.7] - 2026-09-11
 

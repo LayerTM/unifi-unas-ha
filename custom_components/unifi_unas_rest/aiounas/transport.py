@@ -17,7 +17,8 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any
+from collections.abc import Awaitable, Callable
+from typing import Any, TypeVar
 
 import aiohttp
 
@@ -40,6 +41,8 @@ class _NonJsonBody:
 
 
 _NON_JSON = _NonJsonBody()
+
+_T = TypeVar("_T")
 
 
 class UnasTransport:
@@ -73,8 +76,23 @@ class UnasTransport:
     async def async_prepare(self) -> None:
         """Run the auth handshake once (idempotent)."""
         if not self._prepared:
-            await self._auth.async_prepare(self._session, self._base_url, ssl=self._ssl)
+            await self._handshake(self._auth.async_prepare)
             self._prepared = True
+
+    async def _handshake(self, step: Callable[..., Awaitable[_T]]) -> _T:
+        """Run an auth handshake *step* under the same budget as every request.
+
+        Without it a console that accepts the connection and never answers the
+        login holds the caller for as long as the session allows, and then fails
+        with a bare ``TimeoutError`` that no typed handler expects.
+        """
+        try:
+            async with asyncio.timeout(self._timeout):
+                return await step(self._session, self._base_url, ssl=self._ssl)
+        except TimeoutError as err:
+            raise UnasConnectionError(
+                f"login did not finish within {self._timeout}s: {describe(err)}"
+            ) from err
 
     async def get_json(self, path: str, *, allow_reauth: bool = True) -> Any:
         """GET *path* and return parsed JSON, or raise a typed error."""
@@ -113,7 +131,7 @@ class UnasTransport:
             (status == 401 or data is _NON_JSON)
             and allow_reauth
             and self._auth.can_reauth
-            and await self._auth.async_reauth(self._session, self._base_url, ssl=self._ssl)
+            and await self._handshake(self._auth.async_reauth)
         ):
             status, data = await self._request(
                 method, path, json_body=json_body, expect_json=expect_json
