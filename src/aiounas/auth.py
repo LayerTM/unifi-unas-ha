@@ -11,6 +11,7 @@ Two interchangeable strategies:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from http import HTTPStatus
 
 import aiohttp
 
@@ -67,22 +68,28 @@ class ApiKeyAuth(AbstractAuth):
         return {HEADER_API_KEY: self._api_key}
 
 
+# 4xx answers that defer the login instead of refusing the credential.
+_LOGIN_NOT_NOW = frozenset({HTTPStatus.REQUEST_TIMEOUT, HTTPStatus.TOO_MANY_REQUESTS})
+
+
 def _raise_for_login_status(status: int) -> None:
     """Classify the console's answer to the login request.
 
     Only a refusal of the credential is an auth error: a 4xx, or a 2xx without a
     token (checked by the caller). Home Assistant answers an auth error by asking
     the user to retype the password, so everything that means "the console could
-    not answer yet" — a redirect to its UI, a 5xx while it boots, a 429 while it
-    rate-limits logins — is a connection error, which is retried instead.
+    not answer yet" — a redirect to its UI, a 5xx while it boots, a 4xx that says
+    "not now" rather than "no" — is a connection error, which is retried instead.
     """
     if 300 <= status < 400 or status >= 500:
         raise UnasConnectionError(
             f"console answered the login with status {status}; "
             "it is most likely booting, updating or restarting"
         )
-    if status == 429:
-        raise UnasConnectionError("console is rate-limiting logins (status 429)")
+    if status in _LOGIN_NOT_NOW:
+        raise UnasConnectionError(
+            f"console could not take the login now (status {status} {HTTPStatus(status).phrase})"
+        )
     if status in (401, 403):
         raise UnasAuthError("invalid credentials")
     if status >= 400:

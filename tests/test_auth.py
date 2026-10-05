@@ -97,7 +97,7 @@ async def _login_answering(status: int) -> TestServer:
     return server
 
 
-@pytest.mark.parametrize("status", [302, 429, 502, 503])
+@pytest.mark.parametrize("status", [302, 408, 429, 502, 503])
 async def test_console_not_ready_to_log_in_is_a_connection_error(status: int) -> None:
     """A console that cannot answer yet must be retried, not asked for a new password."""
     server = await _login_answering(status)
