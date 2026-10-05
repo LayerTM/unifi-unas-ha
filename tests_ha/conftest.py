@@ -24,6 +24,7 @@ from custom_components.unifi_unas_rest.aiounas import (
     NotificationSummary,
     Share,
     Storage,
+    StorageIO,
     SystemIdentity,
     TlsMode,
     UpdateInfo,
@@ -145,6 +146,7 @@ def unas_client() -> AsyncMock:
         return_value=NotificationSummary.from_api(_load("notifications"))
     )
     client.get_log_summary = AsyncMock(return_value=LogSummary.from_api(_load("logs")))
+    client.get_storage_io = AsyncMock(return_value=StorageIO.from_api(_load("storage_io_stats")))
     return client
 
 
@@ -159,6 +161,7 @@ def mock_aiounas(unas_client: AsyncMock) -> Iterator[AsyncMock]:
         updates=True,
         notifications=True,
         logs=True,
+        storage_io=True,
     )
     action = AsyncMock()
     unas_client.action_mock = action  # exposed for control tests

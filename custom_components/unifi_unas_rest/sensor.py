@@ -268,6 +268,31 @@ LOG_ENTRIES = UnasSensorDescription(
     value_fn=lambda d: d.log_summary.total if d.log_summary else None,
 )
 
+# Session-only. System-wide disk throughput, averaged by the console over its
+# latest completed 5-minute bucket — the load the disks are under as a whole.
+STORAGE_IO_SENSORS: tuple[UnasSensorDescription, ...] = (
+    UnasSensorDescription(
+        key="storage_read_rate",
+        translation_key="storage_read_rate",
+        native_unit_of_measurement=UnitOfDataRate.KIBIBYTES_PER_SECOND,
+        device_class=SensorDeviceClass.DATA_RATE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_unit_of_measurement=UnitOfDataRate.MEBIBYTES_PER_SECOND,
+        suggested_display_precision=2,
+        value_fn=lambda d: d.storage_io.read_kbps if d.storage_io else None,
+    ),
+    UnasSensorDescription(
+        key="storage_write_rate",
+        translation_key="storage_write_rate",
+        native_unit_of_measurement=UnitOfDataRate.KIBIBYTES_PER_SECOND,
+        device_class=SensorDeviceClass.DATA_RATE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_unit_of_measurement=UnitOfDataRate.MEBIBYTES_PER_SECOND,
+        suggested_display_precision=2,
+        value_fn=lambda d: d.storage_io.write_kbps if d.storage_io else None,
+    ),
+)
+
 DISK_SENSORS: tuple[UnasDiskSensorDescription, ...] = (
     UnasDiskSensorDescription(
         key="temperature",
@@ -435,6 +460,8 @@ async def async_setup_entry(
         aggregate.append(UnasSensor(coordinator, LAST_EVENT))
     if caps.logs:
         aggregate.append(UnasSensor(coordinator, LOG_ENTRIES))
+    if caps.storage_io:
+        aggregate.extend(UnasSensor(coordinator, d) for d in STORAGE_IO_SENSORS)
     async_add_entities(aggregate)
 
     def _pool(key: str) -> Pool:

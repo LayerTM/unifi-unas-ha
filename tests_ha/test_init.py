@@ -180,6 +180,7 @@ async def test_supplementary_sensors_absent_without_capability(
         updates=True,
         notifications=False,
         logs=False,
+        storage_io=False,
     )
     with patch("custom_components.unifi_unas_rest.probe", AsyncMock(return_value=caps)):
         await _setup(hass, config_entry)
@@ -259,6 +260,7 @@ async def test_no_update_entities_without_capability(
         updates=False,
         notifications=True,
         logs=True,
+        storage_io=True,
     )
     with patch("custom_components.unifi_unas_rest.probe", AsyncMock(return_value=caps)):
         await _setup(hass, config_entry)
@@ -518,6 +520,7 @@ async def test_api_key_out_of_scope_reads_are_named_in_the_log(
         updates=False,
         notifications=False,
         logs=False,
+        storage_io=False,
     )
     with (
         caplog.at_level(logging.INFO, logger="custom_components.unifi_unas_rest"),
@@ -561,6 +564,7 @@ async def _all_caps(**overrides: bool) -> Capabilities:
         updates=True,
         notifications=True,
         logs=True,
+        storage_io=True,
     )
     return Capabilities(**{**base, **overrides})
 
@@ -584,10 +588,16 @@ async def test_narrowing_the_auth_removes_the_readings_it_lost(
     assert any(uid.startswith(f"{config_entry.unique_id}_share") for uid in wide)
     assert f"{config_entry.unique_id}_recent_events" in wide
     assert f"{config_entry.unique_id}_log_entries" in wide
+    assert f"{config_entry.unique_id}_storage_read_rate" in wide
 
     # Second run: the same entry, now reaching only the core readings.
     narrow_caps = await _all_caps(
-        shares=False, users=False, updates=False, notifications=False, logs=False
+        shares=False,
+        users=False,
+        updates=False,
+        notifications=False,
+        logs=False,
+        storage_io=False,
     )
     await hass.config_entries.async_unload(config_entry.entry_id)
     await hass.async_block_till_done()
@@ -603,6 +613,8 @@ async def test_narrowing_the_auth_removes_the_readings_it_lost(
     assert f"{config_entry.unique_id}_recent_events" not in narrow
     assert f"{config_entry.unique_id}_last_event" not in narrow
     assert f"{config_entry.unique_id}_log_entries" not in narrow
+    assert f"{config_entry.unique_id}_storage_read_rate" not in narrow
+    assert f"{config_entry.unique_id}_storage_write_rate" not in narrow
     assert f"{config_entry.unique_id}_applications" not in narrow
     # Nothing is left behind as unavailable.
     assert all(
@@ -648,7 +660,12 @@ async def test_diagnostics_name_the_readings_out_of_scope(
     )
 
     caps = await _all_caps(
-        shares=False, users=False, updates=False, notifications=False, logs=False
+        shares=False,
+        users=False,
+        updates=False,
+        notifications=False,
+        logs=False,
+        storage_io=False,
     )
     with patch("custom_components.unifi_unas_rest.probe", AsyncMock(return_value=caps)):
         await _setup(hass, config_entry)
@@ -660,6 +677,7 @@ async def test_diagnostics_name_the_readings_out_of_scope(
         "firmware updates",
         "notifications",
         "logs",
+        "storage throughput",
     ]
     # Every capability is reported, not a hand-picked subset.
     assert set(diag["capabilities"]) == {
@@ -671,6 +689,7 @@ async def test_diagnostics_name_the_readings_out_of_scope(
         "updates",
         "notifications",
         "logs",
+        "storage_io",
     }
 
 

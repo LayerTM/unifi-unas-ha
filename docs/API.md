@@ -92,6 +92,7 @@ suite.
 | `GET /proxy/drive/api/v1/users` | 403 | 200 |
 | `GET /api/notifications` | 403 | 200 |
 | `GET /proxy/drive/api/v2/systems/logs` | 500 | 200 |
+| `GET /proxy/drive/api/v1/systems/storage-io-stats` | 403 | 200 |
 
 `/v1/users` is read only for a **count** of local accounts (never the account
 list, which is personal data); its denial to an API key is also the clearest
@@ -122,6 +123,7 @@ The client reads these endpoints:
 | GET | `/proxy/drive/api/v1/users` | Local-account **count** only — **session only** |
 | GET | `/api/notifications` | Recent-notification **aggregate** — **session only** |
 | GET | `/proxy/drive/api/v2/systems/logs` | Recent-log **aggregate** — **session only** |
+| GET | `/proxy/drive/api/v1/systems/storage-io-stats` | System-wide disk throughput — **session only** |
 
 `GET /proxy/drive/api/v2/systems/fan-control` returns the active fan **profile**
 (no RPM): `{"availableProfiles": ["cooling", "default", "quiet"], "currentProfile": "<name>"}`.
@@ -341,9 +343,41 @@ a count and the newest `createdAt`. The log `data` payloads are **never retained
 { "logs": [ { "id": "…", "category": "system", "createdAt": "2026-07-02T06:00:00Z" } ] }
 ```
 
+### `GET /proxy/drive/api/v1/systems/storage-io-stats` — session only
+
+Disk throughput of the whole system as a time series. Query: `interval` (bucket
+length, seconds), `start` and `end` (Unix seconds). The console snaps the window
+to **completed** buckets, so `interval=300` with `end - start = 300` returns
+exactly one sample: the most recently finished 5-minute average. In a longer
+window the newest sample is the last element. `v2` of this path is `404`.
+
+```json
+{
+  "err": null,
+  "type": "single",
+  "data": {
+    "series": {
+      "readKBPS": [31.15],
+      "writeKBPS": [547.86],
+      "readIOPS": [null],
+      "writeIOPS": [null]
+    },
+    "window": { "samples": 1, "start": 1791193200, "end": 1791193500, "interval": 300 }
+  }
+}
+```
+
+- `readKBPS` / `writeKBPS` — average KB/s over the bucket.
+- There is **one series for the whole system**, not one per pool.
+- `readIOPS` / `writeIOPS` are `null` in every sample (UniFi OS 5.1.33, Drive
+  4.4.17; checked over 7 days of history) and are not read.
+- The next bucket completes at `window.end + window.interval`; asking earlier
+  returns the same sample (`aiounas.models.StorageIO`).
+
 ## Not available over this REST API
 
 - **Fan RPM** — only the profile is exposed (`fan-control`).
+- **Per-pool throughput and IOPS** — `storage-io-stats` is system-wide and its IOPS series are empty.
 - **Per-process CPU breakdown** — only aggregate `cpu.currentload`.
 - **Full SMART attribute tables** — only the summarized counters and health score
   in `/v2/storage`.

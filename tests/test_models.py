@@ -15,6 +15,7 @@ from aiounas.models import (
     NotificationSummary,
     Share,
     Storage,
+    StorageIO,
     SystemIdentity,
     UpdateInfo,
 )
@@ -198,3 +199,37 @@ def test_a_present_drive_that_is_not_healthy_is_still_at_risk(
     d = Disk.from_api({"slotId": "1", "state": state, "riskReasons": reasons})
     assert d.is_present is True
     assert d.is_at_risk is True
+
+
+def test_storage_io_takes_the_latest_bucket(fixture: Callable[[str], dict[str, Any]]) -> None:
+    io = StorageIO.from_api(fixture("storage_io_stats"))
+    assert io.read_kbps == pytest.approx(31.147149769341972)
+    assert io.write_kbps == pytest.approx(547.8613425728477)
+    assert io.window_end == 1791193500
+    assert io.interval == 300
+
+
+def test_storage_io_newest_sample_is_the_last() -> None:
+    io = StorageIO.from_api(
+        {"data": {"series": {"readKBPS": [1.0, 0], "writeKBPS": [5, 9.5]}, "window": {}}}
+    )
+    assert io.read_kbps == 0.0
+    assert io.write_kbps == 9.5
+    assert io.window_end is None
+    assert io.interval is None
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        {"data": None},
+        {"data": {"series": None, "window": None}},
+        {"data": {"series": {"readKBPS": [], "writeKBPS": "x"}}},
+        {"data": {"series": {"readKBPS": [None], "writeKBPS": [True]}}},
+    ],
+)
+def test_storage_io_tolerates_missing_samples(payload: dict[str, Any]) -> None:
+    io = StorageIO.from_api(payload)
+    assert io.read_kbps is None
+    assert io.write_kbps is None

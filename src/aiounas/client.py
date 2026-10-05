@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import time
+from typing import Any
+
 import aiohttp
 
 from .auth import AbstractAuth
@@ -15,8 +18,10 @@ from .const import (
     PATH_NOTIFICATIONS,
     PATH_SHARES,
     PATH_STORAGE,
+    PATH_STORAGE_IO,
     PATH_SYSTEM,
     PATH_USERS,
+    STORAGE_IO_INTERVAL,
 )
 from .exceptions import UnasApiError, UnasCapabilityError
 from .models import (
@@ -27,6 +32,7 @@ from .models import (
     NotificationSummary,
     Share,
     Storage,
+    StorageIO,
     SystemIdentity,
     UpdateInfo,
 )
@@ -102,14 +108,7 @@ class UnasClient:
         An API key is denied here (403, or 500 on some firmware); both are
         surfaced as :class:`UnasCapabilityError` with a clear hint.
         """
-        try:
-            data = await self._transport.get_json(PATH_SHARES)
-        except UnasCapabilityError as err:
-            raise UnasCapabilityError(_SHARES_HINT) from err
-        except UnasApiError as err:
-            if err.status == 500:
-                raise UnasCapabilityError(_SHARES_HINT) from err
-            raise
+        data = await self._get_session_only(PATH_SHARES, _SHARES_HINT)
         drives = data.get("drives") if isinstance(data, dict) else None
         return [Share.from_api(item) for item in (drives or []) if isinstance(item, dict)]
 
@@ -120,14 +119,7 @@ class UnasClient:
         never returned or stored. Session auth only; an API key is denied
         (403, or 500 on some firmware), surfaced as :class:`UnasCapabilityError`.
         """
-        try:
-            data = await self._transport.get_json(PATH_USERS)
-        except UnasCapabilityError as err:
-            raise UnasCapabilityError(_USERS_HINT) from err
-        except UnasApiError as err:
-            if err.status == 500:
-                raise UnasCapabilityError(_USERS_HINT) from err
-            raise
+        data = await self._get_session_only(PATH_USERS, _USERS_HINT)
         if isinstance(data, dict):
             total = data.get("total")
             if isinstance(total, int):
@@ -142,27 +134,39 @@ class UnasClient:
         Only counts and the latest timestamp are kept; the notification bodies
         (``event_data`` / ``cef_log``) are PII and are never returned or stored.
         """
-        try:
-            return NotificationSummary.from_api(await self._transport.get_json(PATH_NOTIFICATIONS))
-        except UnasCapabilityError as err:
-            raise UnasCapabilityError(_SESSION_HINT) from err
-        except UnasApiError as err:
-            if err.status == 500:
-                raise UnasCapabilityError(_SESSION_HINT) from err
-            raise
+        return NotificationSummary.from_api(await self._get_session_only(PATH_NOTIFICATIONS))
 
     async def get_log_summary(self) -> LogSummary:
         """Recent-log entry count + latest timestamp (session-only).
 
         Log bodies (the ``data`` field) are PII and are never returned or stored.
         """
+        return LogSummary.from_api(await self._get_session_only(PATH_LOGS))
+
+    async def get_storage_io(self) -> StorageIO:
+        """System-wide disk throughput over the latest completed bucket (session-only).
+
+        Asks for exactly one bucket ending now; the console snaps the window to
+        completed buckets, so the answer is the most recent finished average.
+        """
+        end = int(time.time())
+        start = end - STORAGE_IO_INTERVAL
+        path = f"{PATH_STORAGE_IO}?interval={STORAGE_IO_INTERVAL}&start={start}&end={end}"
+        return StorageIO.from_api(await self._get_session_only(path))
+
+    async def _get_session_only(self, path: str, hint: str = _SESSION_HINT) -> Any:
+        """GET a read that UniFi OS serves to a local account only.
+
+        An API key is refused with 403, or 500 on some firmware; both surface as
+        :class:`UnasCapabilityError` carrying *hint*.
+        """
         try:
-            return LogSummary.from_api(await self._transport.get_json(PATH_LOGS))
+            return await self._transport.get_json(path)
         except UnasCapabilityError as err:
-            raise UnasCapabilityError(_SESSION_HINT) from err
+            raise UnasCapabilityError(hint) from err
         except UnasApiError as err:
             if err.status == 500:
-                raise UnasCapabilityError(_SESSION_HINT) from err
+                raise UnasCapabilityError(hint) from err
             raise
 
     async def close(self) -> None:

@@ -6,7 +6,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 from .client import UnasClient
-from .exceptions import UnasAuthError, UnasCapabilityError, UnasError
+from .exceptions import UnasApiError, UnasAuthError, UnasCapabilityError, UnasError
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,6 +21,7 @@ class Capabilities:
     updates: bool
     notifications: bool
     logs: bool
+    storage_io: bool
 
 
 async def _has_update_data(client: UnasClient) -> bool:
@@ -57,11 +58,19 @@ async def _in_scope(call: Callable[[], Awaitable[object]]) -> bool:
     read the key *can* reach and reports success, and setup fails again on the
     same endpoint. The user cannot leave that loop, because nothing about their
     credential is wrong.
+
+    A 404 means the same for a supplementary read: this firmware does not serve
+    it, so the reading is out of reach — not a reason to fail the setup of an
+    entry whose core reads answer.
     """
     try:
         await call()
     except (UnasCapabilityError, UnasAuthError):
         return False
+    except UnasApiError as err:
+        if err.status == 404:
+            return False
+        raise
     return True
 
 
@@ -85,4 +94,5 @@ async def probe(client: UnasClient) -> Capabilities:
         updates=await _has_update_data(client),
         notifications=await optional(client.get_notification_summary),
         logs=await optional(client.get_log_summary),
+        storage_io=await optional(client.get_storage_io),
     )

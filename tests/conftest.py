@@ -89,6 +89,28 @@ async def _users(request: web.Request) -> web.Response:
     return web.json_response({"data": [], "total": 6})
 
 
+def _storage_io(apikey_status: int) -> Callable[[web.Request], Any]:
+    """/v1/systems/storage-io-stats: session-only; insists on a one-bucket window.
+
+    The real console snaps any window to completed buckets; a request that is
+    not exactly one bucket long is answered 400 here so a client that drifts
+    from asking for "the latest bucket" fails loudly.
+    """
+    fixture_handler = _data("storage_io_stats", apikey_status=apikey_status)
+
+    async def handler(request: web.Request) -> web.Response:
+        try:
+            interval = int(request.query["interval"])
+            span = int(request.query["end"]) - int(request.query["start"])
+        except (KeyError, ValueError):
+            return web.json_response({"err": "bad window"}, status=400)
+        if span != interval:
+            return web.json_response({"err": "bad window"}, status=400)
+        return await fixture_handler(request)
+
+    return handler
+
+
 def _write() -> Callable[[web.Request], Any]:
     async def handler(request: web.Request) -> web.Response:
         if _auth_mode(request) is None:
@@ -115,11 +137,19 @@ def _system() -> Callable[[web.Request], Any]:
 # What a console answers an API key with on its session-only reads. The statuses
 # are firmware-dependent — these are UniFi OS 5.1.19 / Drive 4.3.6, captured live
 # — so a test can override one to reproduce another build's choice.
-APIKEY_DENIALS: Final[Mapping[str, int]] = {"drives": 500, "notifications": 403, "logs": 500}
+APIKEY_DENIALS: Final[Mapping[str, int]] = {
+    "drives": 500,
+    "notifications": 403,
+    "logs": 500,
+    "storage_io": 403,
+}
 
 
 def make_app(
-    *, api_key: str = FAKE_API_KEY, apikey_denials: Mapping[str, int] | None = None
+    *,
+    api_key: str = FAKE_API_KEY,
+    apikey_denials: Mapping[str, int] | None = None,
+    storage_io: bool = True,
 ) -> web.Application:
     denials = {**APIKEY_DENIALS, **(apikey_denials or {})}
     app = web.Application()
@@ -143,6 +173,10 @@ def make_app(
     app.router.add_get(
         "/proxy/drive/api/v2/systems/logs", _data("logs", apikey_status=denials["logs"])
     )
+    if storage_io:
+        app.router.add_get(
+            "/proxy/drive/api/v1/systems/storage-io-stats", _storage_io(denials["storage_io"])
+        )
     # write / action endpoints
     app.router.add_post("/api/system/reboot", _write())
     app.router.add_post("/api/system/poweroff", _write())
@@ -183,6 +217,18 @@ async def unas_server_401_notifications() -> AsyncIterator[RunningServer]:
     as on the firmware the default server models, so the 401 is the only variable.
     """
     app = make_app(apikey_denials={"notifications": 401})
+    server = TestServer(app)
+    await server.start_server()
+    try:
+        yield RunningServer(str(server.host), int(server.port), FAKE_API_KEY, app[_WRITES])
+    finally:
+        await server.close()
+
+
+@pytest.fixture
+async def unas_server_without_storage_io() -> AsyncIterator[RunningServer]:
+    """A console whose firmware does not serve storage-io-stats (404 to every caller)."""
+    app = make_app(storage_io=False)
     server = TestServer(app)
     await server.start_server()
     try:

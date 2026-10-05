@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Storage read rate and Storage write rate** sensors: the disk throughput of
+  the whole NAS, as the console's own 5-minute average, enabled by default — so
+  sustained disk activity (a backup churning through small files, for example)
+  shows up without enabling per-disk sensors. They need local-account auth; an
+  API key is refused this reading. The console reports one series for the whole
+  system and leaves its IOPS fields empty, so there are no per-pool or IOPS
+  sensors.
+
 ### Fixed
 
 - **Ready for Home Assistant 2026.10**, which moved setup and repair form

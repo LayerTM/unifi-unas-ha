@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import timedelta
@@ -22,6 +23,7 @@ from .aiounas import (
     NotificationSummary,
     Share,
     Storage,
+    StorageIO,
     UnasApiError,
     UnasAuthError,
     UnasCapabilityError,
@@ -49,6 +51,7 @@ class UnasData:
     fan_control: FanControl | None
     notification_summary: NotificationSummary | None
     log_summary: LogSummary | None
+    storage_io: StorageIO | None
 
 
 class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
@@ -74,6 +77,7 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
         self.hub_device_id: str | None = None
         """Device-registry id of the hub, set by `async_setup_entry` before the
         platforms load. Sub-devices point at it (see `entity.link_to_hub`)."""
+        self._storage_io: StorageIO | None = None
 
     async def _optional[T](self, call: Callable[[], Awaitable[T]]) -> T | None:
         """Run a supplementary (capability-scoped) fetch.
@@ -98,6 +102,25 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
             return await call()
         except (UnasCapabilityError, UnasApiError, UnasAuthError):
             return None
+
+    async def _storage_io_reading(self) -> StorageIO | None:
+        """The latest storage throughput, fetched only once a newer bucket exists.
+
+        The console averages throughput over fixed buckets and reports completed
+        ones only, so asking again before the next bucket ends returns the same
+        numbers. Polling at the entry's interval would repeat the request ten
+        times per bucket at the default 30 s for nothing.
+        """
+        last = self._storage_io
+        if (
+            last is not None
+            and last.window_end is not None
+            and last.interval is not None
+            and time.time() < last.window_end + last.interval
+        ):
+            return last
+        self._storage_io = await self._optional(self.client.get_storage_io)
+        return self._storage_io
 
     async def _async_update_data(self) -> UnasData:
         try:
@@ -132,6 +155,7 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
                 if self.capabilities.logs
                 else None
             )
+            storage_io = await self._storage_io_reading() if self.capabilities.storage_io else None
         except UnasAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except UnasCertificateMismatch as err:
@@ -162,4 +186,5 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
             fan_control=fan_control,
             notification_summary=notifications,
             log_summary=logs,
+            storage_io=storage_io,
         )

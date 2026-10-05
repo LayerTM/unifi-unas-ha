@@ -23,6 +23,10 @@ PATH_SHARES: Final = "/proxy/drive/api/v2/drives"  # session-only
 PATH_USERS: Final = "/proxy/drive/api/v1/users"  # session-only; count only (list is PII)
 PATH_NOTIFICATIONS: Final = "/api/notifications"  # session-only; counts only (bodies are PII)
 PATH_LOGS: Final = "/proxy/drive/api/v2/systems/logs"  # session-only; counts only (data is PII)
+PATH_STORAGE_IO: Final = "/proxy/drive/api/v1/systems/storage-io-stats"  # session-only
+# The console averages disk throughput into buckets of this many seconds and
+# only reports completed ones; asking for exactly one bucket returns the latest.
+STORAGE_IO_INTERVAL: Final = 300
 
 # Write / action endpoints (v2). Power and update paths are well-established;
 # the fan-control payload shape is UNVERIFIED against live hardware.
