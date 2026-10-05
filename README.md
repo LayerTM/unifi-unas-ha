@@ -52,6 +52,7 @@ Everything is grouped under one hub device (the UNAS), with a sub-device per dis
 
 - **Storage** — used / total / free, usage %, RAID level, storage status, pool count.
 - **System** — CPU usage %, CPU temperature, memory usage %, network throughput, link speed, last boot, UniFi OS and Drive app versions.
+- **Storage throughput** *(local-account auth)* — storage read and write rate of the whole NAS, the console's own 5-minute average; enabled by default, so sustained disk activity is visible without per-disk sensors.
 - **Health** — disks-at-risk count, average disk temperature, a `storage problem` binary sensor, and a connectivity (`online`) binary sensor.
 - **Per disk** — temperature, transfer read/write rate, power-on hours, health score, bad sectors, state, and a per-disk `problem` binary sensor.
 - **Per pool** — RAID level, status, storage total / used / usage %, data-scrubbing status.
@@ -117,7 +118,7 @@ Not supported: cloud-only access (UniFi Site Manager), and consoles without the 
 ## Supported functions
 
 - **Monitoring** (either auth method): storage capacity/usage, pool & RAID status, per-disk SMART health (temperature, power-on hours, health score, bad sectors, read/write rate), CPU/memory, network throughput, UniFi OS & Drive versions, update availability, last boot, and link speed. See [Entities](#entities) for the full list.
-- **With a local account**: per-share usage/quota/members/encryption and snapshot/remote-backup status, a privacy-safe account count, and privacy-safe activity aggregates (recent events, last event, log-entry count).
+- **With a local account**: storage read/write throughput of the whole NAS, per-share usage/quota/members/encryption and snapshot/remote-backup status, a privacy-safe account count, and privacy-safe activity aggregates (recent events, last event, log-entry count).
 - **Opt-in control** (local account): reboot, shut down, install updates, and fan-mode selection.
 
 ## Use cases
@@ -145,12 +146,14 @@ The integration **polls** the console's local REST API (`local_polling`) on a fi
   | Account count | no | yes |
   | Firmware and Drive-app updates | no | yes |
   | Notifications and log activity | no | yes |
+  | Storage throughput (read and write rate) | no | yes |
   | Control actions (reboot, shut down, install, fan) | no | yes, owner account for power and firmware |
 
 - **Snapshots are read-only**: the API exposes only a per-share scheduled-snapshot **flag** (shown as the *Snapshots* binary sensor). There is no snapshot list/create/delete endpoint, and the only candidate write is silently ignored by the device (confirmed by a live test), so no snapshot control is offered.
 - **Power/firmware actions require an owner/admin account.** The firmware-install endpoint, auth gating, and its "nothing to update" refusal are verified against live hardware; the actual install-and-reboot path only runs when an update is genuinely available.
 - **No cloud**: only local access is supported; the UniFi Site Manager cloud API exposes none of this data.
-- **High-churn sensors** (network and per-disk throughput) are **disabled by default** — enable them per entity if you want them.
+- **High-churn sensors** (network and per-disk throughput) are **disabled by default** — enable them per entity if you want them. The storage read/write rate is enabled: the console already averages it over 5 minutes, and it is refreshed once per completed 5-minute window rather than on every poll.
+- **Storage throughput is system-wide**, not per pool, and there are no IOPS sensors: the console reports one series for the whole NAS, and its IOPS fields are empty on current firmware.
 - **Certificate pinning is trust on first use.** It detects a certificate that changes later, and it stops credentials reaching a host presenting a different one. It cannot detect interception that was already in place the first time the console was contacted — only comparing the fingerprint against the console's own display closes that.
 - **The CLI and MCP server do not verify anything unless told to** (see below). They are developer tools; the Home Assistant integration pins per entry and is unaffected.
 

@@ -39,16 +39,7 @@ async def async_get_config_entry_diagnostics(
         # Every reading, not a hand-picked four: a report that omits the ones
         # an API key cannot reach cannot answer "why is this entity missing",
         # which is the question diagnostics get attached to an issue for.
-        "capabilities": {
-            "storage": caps.storage,
-            "device_info": caps.device_info,
-            "network_io": caps.network_io,
-            "shares": caps.shares,
-            "users": caps.users,
-            "updates": caps.updates,
-            "notifications": caps.notifications,
-            "logs": caps.logs,
-        },
+        "capabilities": asdict(caps),
         "readings_out_of_scope": readings_out_of_scope(caps),
         "device_info": {
             "model": data.device_info.model,
@@ -60,4 +51,5 @@ async def async_get_config_entry_diagnostics(
         },
         "storage": async_redact_data(storage, DATA_REDACT),
         "share_count": len(data.shares) if data.shares is not None else None,
+        "storage_io": asdict(data.storage_io) if data.storage_io is not None else None,
     }

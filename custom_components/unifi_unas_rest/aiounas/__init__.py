@@ -25,6 +25,7 @@ from .models import (
     RaidGroup,
     Share,
     Storage,
+    StorageIO,
     SystemIdentity,
     UpdateInfo,
 )
@@ -55,6 +56,7 @@ __all__ = [
     "SessionAuth",
     "Share",
     "Storage",
+    "StorageIO",
     "SystemIdentity",
     "TlsMode",
     "UnasActionClient",

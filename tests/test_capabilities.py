@@ -24,6 +24,7 @@ async def test_probe_api_key_denies_shares(session, unas_server) -> None:
     assert caps.updates is False
     assert caps.notifications is False
     assert caps.logs is False
+    assert caps.storage_io is False
 
 
 async def test_probe_session_allows_shares(session, unas_server) -> None:
@@ -34,6 +35,7 @@ async def test_probe_session_allows_shares(session, unas_server) -> None:
     assert caps.updates is True
     assert caps.notifications is True
     assert caps.logs is True
+    assert caps.storage_io is True
 
 
 async def test_probe_api_key_401_on_notifications_is_a_scope_answer(

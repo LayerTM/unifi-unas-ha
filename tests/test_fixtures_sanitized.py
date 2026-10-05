@@ -10,7 +10,14 @@ from typing import Any
 
 import pytest
 
-FIXTURE_NAMES = ["storage", "device_info", "network_io", "system_short", "drives"]
+FIXTURE_NAMES = [
+    "storage",
+    "device_info",
+    "network_io",
+    "system_short",
+    "drives",
+    "storage_io_stats",
+]
 
 
 @pytest.mark.parametrize("name", FIXTURE_NAMES)

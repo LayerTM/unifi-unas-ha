@@ -94,6 +94,7 @@ async def test_two_consoles_give_their_disks_different_names(
         updates=True,
         notifications=True,
         logs=True,
+        storage_io=True,
     )
     with (
         patch("custom_components.unifi_unas_rest.UnasClient", side_effect=build),

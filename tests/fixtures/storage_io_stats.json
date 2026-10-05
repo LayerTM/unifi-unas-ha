@@ -1,0 +1,26 @@
+{
+  "err": null,
+  "type": "single",
+  "data": {
+    "series": {
+      "readKBPS": [
+        31.147149769341972
+      ],
+      "writeKBPS": [
+        547.8613425728477
+      ],
+      "readIOPS": [
+        null
+      ],
+      "writeIOPS": [
+        null
+      ]
+    },
+    "window": {
+      "samples": 1,
+      "start": 1791193200,
+      "end": 1791193500,
+      "interval": 300
+    }
+  }
+}

@@ -119,6 +119,12 @@
       "storage_usage": {
         "name": "Storage usage"
       },
+      "storage_read_rate": {
+        "name": "Storage read rate"
+      },
+      "storage_write_rate": {
+        "name": "Storage write rate"
+      },
       "storage_status": {
         "name": "Storage status"
       },

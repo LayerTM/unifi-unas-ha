@@ -373,6 +373,47 @@ class NetworkIO:
         )
 
 
+def _last_rate(series: Any) -> float | None:
+    """The newest sample of a rate series, or None when there is none."""
+    if not isinstance(series, list) or not series:
+        return None
+    value = series[-1]
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+@dataclass(frozen=True, slots=True)
+class StorageIO:
+    """Disk throughput of the whole system over the latest completed bucket.
+
+    The console reports one system-wide series, not one per pool. Its
+    ``readIOPS``/``writeIOPS`` series are null in every sample (UniFi OS 5.1.33,
+    Drive 4.4.17), so they are not modelled.
+    """
+
+    read_kbps: float | None
+    write_kbps: float | None
+    window_end: int | None
+    """Unix time the reported bucket ends at; the next one completes an interval later."""
+    interval: int | None
+
+    @classmethod
+    def from_api(cls, d: dict[str, Any]) -> StorageIO:
+        data = d.get("data")
+        data = data if isinstance(data, dict) else {}
+        series = data.get("series")
+        series = series if isinstance(series, dict) else {}
+        window = data.get("window")
+        window = window if isinstance(window, dict) else {}
+        return cls(
+            read_kbps=_last_rate(series.get("readKBPS")),
+            write_kbps=_last_rate(series.get("writeKBPS")),
+            window_end=_i(window.get("end")),
+            interval=_i(window.get("interval")),
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class Share:
     """A shared drive (SMB/NFS share)."""

@@ -21,6 +21,7 @@ class Capabilities:
     updates: bool
     notifications: bool
     logs: bool
+    storage_io: bool
 
 
 async def _has_update_data(client: UnasClient) -> bool:
@@ -85,4 +86,5 @@ async def probe(client: UnasClient) -> Capabilities:
         updates=await _has_update_data(client),
         notifications=await optional(client.get_notification_summary),
         logs=await optional(client.get_log_summary),
+        storage_io=await optional(client.get_storage_io),
     )

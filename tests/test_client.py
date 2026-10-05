@@ -12,7 +12,7 @@ from aiohttp.test_utils import TestServer
 
 from aiounas.auth import ApiKeyAuth, SessionAuth
 from aiounas.client import UnasClient
-from aiounas.const import PATH_LOGS, PATH_NOTIFICATIONS
+from aiounas.const import PATH_LOGS, PATH_NOTIFICATIONS, PATH_STORAGE_IO
 from aiounas.exceptions import UnasApiError, UnasCapabilityError
 
 
@@ -168,6 +168,21 @@ async def test_get_log_summary_api_key_denied(session, unas_server) -> None:
         await client.get_log_summary()
 
 
+async def test_get_storage_io_session(session, unas_server) -> None:
+    client = _client(session, unas_server, SessionAuth("user", "pass"))
+    io = await client.get_storage_io()
+    assert io.read_kbps == pytest.approx(31.147149769341972)
+    assert io.write_kbps == pytest.approx(547.8613425728477)
+    assert io.window_end == 1791193500
+    assert io.interval == 300
+
+
+async def test_get_storage_io_api_key_denied(session, unas_server) -> None:
+    client = _client(session, unas_server, ApiKeyAuth(unas_server.api_key))
+    with pytest.raises(UnasCapabilityError, match="session"):
+        await client.get_storage_io()
+
+
 async def test_base_url_and_prepare(session, unas_server) -> None:
     client = _client(session, unas_server, ApiKeyAuth(unas_server.api_key))
     assert client.base_url == f"http://{unas_server.host}:{unas_server.port}"
@@ -261,6 +276,18 @@ async def test_log_summary_propagates_non_capability_error() -> None:
     async with _session_client_at(PATH_LOGS, _error(502)) as client:
         with pytest.raises(UnasApiError):
             await client.get_log_summary()
+
+
+async def test_storage_io_maps_500_to_capability() -> None:
+    async with _session_client_at(PATH_STORAGE_IO, _error(500)) as client:
+        with pytest.raises(UnasCapabilityError, match="session"):
+            await client.get_storage_io()
+
+
+async def test_storage_io_propagates_non_capability_error() -> None:
+    async with _session_client_at(PATH_STORAGE_IO, _error(502)) as client:
+        with pytest.raises(UnasApiError):
+            await client.get_storage_io()
 
 
 async def test_close_is_noop_and_leaves_session_open(session, unas_server) -> None:
