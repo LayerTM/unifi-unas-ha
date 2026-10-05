@@ -281,3 +281,47 @@ async def test_refused_login_is_still_an_auth_error(unas_server) -> None:
         t = _transport(session, unas_server, SessionAuth("user", "bad"))
         with pytest.raises(UnasAuthError, match="invalid credentials"):
             await t.get_json("/proxy/drive/api/v2/storage")
+
+
+async def test_relogin_that_never_answers_times_out_as_a_connection_error() -> None:
+    """The re-login after a 401 is bounded by the same timeout as the first one."""
+    state = {"logged_in": False}
+
+    async def root(_: web.Request) -> web.Response:
+        return web.Response(text="", headers={"X-CSRF-Token": "c"})
+
+    async def login(_: web.Request) -> web.Response:
+        if state["logged_in"]:
+            await asyncio.sleep(10)
+        state["logged_in"] = True
+        resp = web.json_response({"ok": True})
+        resp.set_cookie("TOKEN", "tok", path="/")
+        return resp
+
+    async def storage(_: web.Request) -> web.Response:
+        return web.json_response({}, status=401)
+
+    app = web.Application()
+    app.router.add_get("/", root)
+    app.router.add_post("/api/auth/login", login)
+    app.router.add_get("/proxy/drive/api/v2/storage", storage)
+    server = TestServer(app)
+    await server.start_server()
+    try:
+        async with aiohttp.ClientSession() as session:
+            t = UnasTransport(
+                session,
+                server.host,
+                SessionAuth("u", "p"),
+                port=server.port,
+                use_ssl=False,
+                timeout=1,
+            )
+            started = time.monotonic()
+            with pytest.raises(UnasConnectionError) as exc_info:
+                await t.get_json("/proxy/drive/api/v2/storage")
+            elapsed = time.monotonic() - started
+        assert str(exc_info.value) == "login did not finish within 1s: TimeoutError"
+        assert elapsed < 3
+    finally:
+        await server.close()
