@@ -9,6 +9,7 @@ from aiounas.exceptions import (
     UnasAuthError,
     UnasConnectionError,
     UnasError,
+    describe,
 )
 
 
@@ -26,3 +27,9 @@ def test_error_carries_message() -> None:
 def test_api_error_carries_status() -> None:
     err = UnasApiError("bad", status=500)
     assert err.status == 500
+
+
+def test_describe_never_returns_empty_text() -> None:
+    """A bare timeout has no message; the text must still name the cause."""
+    assert describe(TimeoutError()) == "TimeoutError"
+    assert describe(OSError("refused")) == "refused"

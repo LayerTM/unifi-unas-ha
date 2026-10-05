@@ -36,7 +36,7 @@ from typing import Final
 import aiohttp
 
 from .const import DEFAULT_PORT, DEFAULT_TIMEOUT
-from .exceptions import UnasConnectionError
+from .exceptions import UnasConnectionError, describe
 
 FINGERPRINT_BYTES: Final = 32  # SHA-256; aiohttp rejects md5/sha1 outright
 
@@ -155,7 +155,7 @@ async def async_probe_fingerprint(
             cert = sslobj.getpeercert(binary_form=True)
     except (OSError, ssl.SSLError, TimeoutError) as err:
         raise UnasConnectionError(
-            f"could not read the certificate of {host}:{port}: {err}"
+            f"could not read the certificate of {host}:{port}: {describe(err)}"
         ) from err
     finally:
         if writer is not None:

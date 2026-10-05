@@ -21,7 +21,7 @@ from .const import (
     HEADER_CSRF_UPDATED,
     PATH_LOGIN,
 )
-from .exceptions import UnasAuthError
+from .exceptions import UnasAuthError, describe
 from .tls import mismatch_from
 
 
@@ -115,7 +115,7 @@ class SessionAuth(AbstractAuth):
         except aiohttp.ServerFingerprintMismatch as err:
             raise mismatch_from(err) from err
         except aiohttp.ClientError as err:
-            raise UnasAuthError(f"could not reach console: {err}") from err
+            raise UnasAuthError(f"could not reach console: {describe(err)}") from err
 
         # 2) log in
         payload = {
@@ -140,7 +140,7 @@ class SessionAuth(AbstractAuth):
             # that were always correct.
             raise mismatch_from(err) from err
         except aiohttp.ClientError as err:
-            raise UnasAuthError(f"login request failed: {err}") from err
+            raise UnasAuthError(f"login request failed: {describe(err)}") from err
 
         if not self._token:
             raise UnasAuthError("login did not return a session token")

@@ -25,3 +25,14 @@ class UnasApiError(UnasError):
 
 class UnasCapabilityError(UnasError):
     """The active auth method is not permitted to use this endpoint."""
+
+
+def describe(err: BaseException) -> str:
+    """Text for a caught exception that is never empty.
+
+    Several of the failures this library converts carry no message at all:
+    ``str(TimeoutError())`` is ``""``. Interpolated as-is, the cause vanishes and
+    a timeout reads exactly like every other failure. The type name is the
+    least that still tells them apart.
+    """
+    return str(err) or type(err).__name__

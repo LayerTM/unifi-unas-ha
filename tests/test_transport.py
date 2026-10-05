@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import aiohttp
 import pytest
 from aiohttp import web
@@ -58,6 +60,29 @@ async def test_connection_error_on_closed_port() -> None:
         t = UnasTransport(session, "127.0.0.1", ApiKeyAuth("k"), port=1, use_ssl=False, timeout=2)
         with pytest.raises(UnasConnectionError):
             await t.get_json("/proxy/drive/api/v2/storage")
+
+
+async def test_timeout_names_the_request_and_the_cause() -> None:
+    """``str(TimeoutError())`` is empty; the error must still say what failed."""
+
+    async def hang(_: web.Request) -> web.Response:
+        await asyncio.sleep(5)
+        return web.json_response({})
+
+    app = web.Application()
+    app.router.add_get("/proxy/drive/api/v2/storage", hang)
+    server = TestServer(app)
+    await server.start_server()
+    try:
+        async with aiohttp.ClientSession() as session:
+            t = UnasTransport(
+                session, server.host, ApiKeyAuth("k"), port=server.port, use_ssl=False, timeout=1
+            )
+            with pytest.raises(UnasConnectionError) as exc_info:
+                await t.get_json("/proxy/drive/api/v2/storage")
+        assert str(exc_info.value) == "GET /proxy/drive/api/v2/storage: TimeoutError"
+    finally:
+        await server.close()
 
 
 async def test_session_reauth_on_401() -> None:

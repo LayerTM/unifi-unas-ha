@@ -21,6 +21,11 @@ adheres to [Semantic Versioning](https://semver.org/).
 - **Ready for Home Assistant 2026.10**, which moved setup and repair form
   validation from voluptuous to probatio; earlier releases back to 2025.8 keep
   working unchanged.
+- **Connection errors always name their cause.** A request that timed out was
+  logged as `Error fetching unifi_unas_rest data:` with nothing after the colon;
+  it now reads, for example,
+  `GET /proxy/drive/api/v2/storage: TimeoutError`. The same applies to reading
+  the console's certificate and to signing in.
 
 ## [1.8.7] - 2026-09-11
 

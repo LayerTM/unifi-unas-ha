@@ -28,6 +28,7 @@ from .exceptions import (
     UnasAuthError,
     UnasCapabilityError,
     UnasConnectionError,
+    describe,
 )
 from .tls import mismatch_from
 
@@ -198,4 +199,4 @@ class UnasTransport:
             # act on.
             raise mismatch_from(err) from err
         except (aiohttp.ClientError, TimeoutError) as err:
-            raise UnasConnectionError(str(err)) from err
+            raise UnasConnectionError(f"{method} {path}: {describe(err)}") from err

@@ -149,6 +149,27 @@ async def test_probe_reports_an_unreachable_host() -> None:
         await async_probe_fingerprint("127.0.0.1", 1, timeout=2)
 
 
+async def test_probe_timeout_names_the_cause() -> None:
+    """A peer that accepts TCP and never answers the handshake times out, and
+    ``str(TimeoutError())`` is empty: the message must still say why."""
+    from aiounas.exceptions import UnasConnectionError
+
+    async def silent(_reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        await asyncio.sleep(5)
+        writer.close()
+
+    server = await asyncio.start_server(silent, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    try:
+        with pytest.raises(UnasConnectionError) as exc_info:
+            await async_probe_fingerprint("127.0.0.1", port, timeout=1)
+        assert str(exc_info.value) == (
+            f"could not read the certificate of 127.0.0.1:{port}: TimeoutError"
+        )
+    finally:
+        server.close()
+
+
 async def test_matching_fingerprint_connects(tls_server: _Server) -> None:
     """The branch that must succeed: the pinned certificate is the served one."""
     async with (
