@@ -6,7 +6,12 @@ from collections.abc import Iterator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from custom_components.unifi_unas_rest.aiounas import Capabilities, UnasCapabilityError
+from custom_components.unifi_unas_rest.aiounas import (
+    Capabilities,
+    UnasApiError,
+    UnasCapabilityError,
+    probe,
+)
 from custom_components.unifi_unas_rest.const import DOMAIN
 from homeassistant.const import STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
@@ -108,3 +113,15 @@ async def test_refused_read_is_unknown_and_retried(
     # A failure is not cached: the next cycle asks again.
     await config_entry.runtime_data.coordinator.async_refresh()
     assert mock_aiounas.get_storage_io.await_count == 2
+
+
+async def test_firmware_without_the_endpoint_still_sets_up(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry, clock: MagicMock
+) -> None:
+    """A 404 on the throughput read leaves it out; the entry itself loads."""
+    mock_aiounas.get_storage_io.side_effect = UnasApiError("not found", status=404)
+    with patch("custom_components.unifi_unas_rest.probe", probe):  # the real probe
+        await _setup(hass, config_entry)
+    assert config_entry.runtime_data.coordinator.capabilities.storage_io is False
+    assert _entity_id(hass, "storage_read_rate") is None
+    assert _entity_id(hass, "storage_usage")

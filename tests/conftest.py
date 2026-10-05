@@ -146,7 +146,10 @@ APIKEY_DENIALS: Final[Mapping[str, int]] = {
 
 
 def make_app(
-    *, api_key: str = FAKE_API_KEY, apikey_denials: Mapping[str, int] | None = None
+    *,
+    api_key: str = FAKE_API_KEY,
+    apikey_denials: Mapping[str, int] | None = None,
+    storage_io: bool = True,
 ) -> web.Application:
     denials = {**APIKEY_DENIALS, **(apikey_denials or {})}
     app = web.Application()
@@ -170,9 +173,10 @@ def make_app(
     app.router.add_get(
         "/proxy/drive/api/v2/systems/logs", _data("logs", apikey_status=denials["logs"])
     )
-    app.router.add_get(
-        "/proxy/drive/api/v1/systems/storage-io-stats", _storage_io(denials["storage_io"])
-    )
+    if storage_io:
+        app.router.add_get(
+            "/proxy/drive/api/v1/systems/storage-io-stats", _storage_io(denials["storage_io"])
+        )
     # write / action endpoints
     app.router.add_post("/api/system/reboot", _write())
     app.router.add_post("/api/system/poweroff", _write())
@@ -213,6 +217,18 @@ async def unas_server_401_notifications() -> AsyncIterator[RunningServer]:
     as on the firmware the default server models, so the 401 is the only variable.
     """
     app = make_app(apikey_denials={"notifications": 401})
+    server = TestServer(app)
+    await server.start_server()
+    try:
+        yield RunningServer(str(server.host), int(server.port), FAKE_API_KEY, app[_WRITES])
+    finally:
+        await server.close()
+
+
+@pytest.fixture
+async def unas_server_without_storage_io() -> AsyncIterator[RunningServer]:
+    """A console whose firmware does not serve storage-io-stats (404 to every caller)."""
+    app = make_app(storage_io=False)
     server = TestServer(app)
     await server.start_server()
     try:

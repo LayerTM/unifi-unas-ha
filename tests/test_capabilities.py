@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
+
 import pytest
 
 from aiounas.auth import ApiKeyAuth, SessionAuth
 from aiounas.capabilities import probe
 from aiounas.client import UnasClient
-from aiounas.exceptions import UnasAuthError
+from aiounas.exceptions import UnasApiError, UnasAuthError
 
 
 def _client(session, srv, auth) -> UnasClient:
@@ -70,3 +72,25 @@ async def test_probe_session_unaffected_by_the_relaxed_rule(
     srv = unas_server_401_notifications
     caps = await probe(_client(session, srv, SessionAuth("user", "pass")))
     assert caps.notifications is True
+
+
+async def test_probe_absent_supplementary_read_is_out_of_scope(
+    session, unas_server_without_storage_io
+) -> None:
+    """Firmware without an endpoint answers 404; that reading is skipped, setup is not failed."""
+    srv = unas_server_without_storage_io
+    caps = await probe(_client(session, srv, SessionAuth("user", "pass")))
+    assert caps.storage_io is False
+    assert caps.storage is True
+    assert caps.shares is True
+    assert caps.logs is True
+
+
+async def test_probe_propagates_other_api_errors_on_supplementary_reads() -> None:
+    """Only a 404 means "not served"; a 502 is a real failure and still surfaces."""
+    client = AsyncMock()
+    client.get_storage = AsyncMock(return_value=None)
+    client.get_device_info = AsyncMock(return_value=None)
+    client.get_network_io = AsyncMock(side_effect=UnasApiError("bad gateway", status=502))
+    with pytest.raises(UnasApiError):
+        await probe(client)
