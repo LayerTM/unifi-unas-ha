@@ -6,11 +6,13 @@ API schema documented in ``docs/API.md``.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
 _TB = 1_000_000_000_000
+_CHANNEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,39}")
 
 
 def _f(value: Any, default: float = 0.0) -> float:
@@ -63,6 +65,15 @@ def _dt(value: Any) -> datetime | None:
         return datetime.fromisoformat(value)
     except ValueError:
         return None
+
+
+def _channel(value: Any) -> str | None:
+    """Return a release-channel token (``release-candidate``), else None.
+
+    Anything that is not a short plain token is dropped, so a client never shows
+    markup or prose that arrived in this field.
+    """
+    return value if isinstance(value, str) and _CHANNEL.fullmatch(value) else None
 
 
 def _norm_version(value: Any) -> str:
@@ -486,7 +497,9 @@ class UpdateInfo:
     """Firmware / app update availability from the full /api/system payload.
 
     The full payload is returned to session auth; an API key gets a short payload
-    with no firmware/apps data, so the ``*_latest`` fields come back None.
+    with no firmware/apps data, so the ``*_latest`` fields come back None. The
+    ``*_channel`` fields name the release channel the offered version comes from
+    (``release``, ``release-candidate``, ...).
     """
 
     unifi_os_installed: str
@@ -494,6 +507,8 @@ class UpdateInfo:
     drive_installed: str
     drive_latest: str | None
     applications: tuple[Application, ...]
+    unifi_os_channel: str | None = None
+    drive_channel: str | None = None
 
     @property
     def has_data(self) -> bool:
@@ -526,6 +541,8 @@ class UpdateInfo:
             drive_installed=_s(drive.get("version")),
             drive_latest=(_norm_version(avail) or None) if isinstance(avail, str) else None,
             applications=tuple(Application.from_api(a) for a in installed),
+            unifi_os_channel=_channel(latest.get("channel") or fw.get("releaseChannel")),
+            drive_channel=_channel(drive.get("releaseChannel")),
         )
 
 

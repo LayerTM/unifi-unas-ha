@@ -40,6 +40,31 @@ def test_update_info_normalizes_versions_no_false_update() -> None:
     assert info.drive_latest is None
 
 
+def test_update_info_names_the_offered_release_channel(fixture: Fx) -> None:
+    info = UpdateInfo.from_api(
+        {
+            "firmware": {
+                "releaseChannel": "release",
+                "latest": {"channel": "release-candidate", "version": "v6.0.11+f63375a"},
+            },
+            "apps": {"controllers": [{"name": "drive", "releaseChannel": "release-candidate"}]},
+        }
+    )
+    assert info.unifi_os_channel == "release-candidate"  # the offered build's own channel wins
+    assert info.drive_channel == "release-candidate"
+    full = UpdateInfo.from_api(fixture("system_full"))
+    assert (full.unifi_os_channel, full.drive_channel) == ("release", "release")
+    bare = UpdateInfo.from_api({})
+    assert (bare.unifi_os_channel, bare.drive_channel) == (None, None)
+    odd = UpdateInfo.from_api(
+        {
+            "firmware": {"latest": {"channel": "[beta](http://example.invalid)"}},
+            "apps": {"controllers": [{"name": "drive", "releaseChannel": 7}]},
+        }
+    )
+    assert (odd.unifi_os_channel, odd.drive_channel) == (None, None)
+
+
 def test_storage_parses_pools_and_disks(fixture: Fx) -> None:
     s = Storage.from_api(fixture("storage"))
     assert len(s.pools) == 1

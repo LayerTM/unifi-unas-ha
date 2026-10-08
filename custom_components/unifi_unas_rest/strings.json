@@ -267,10 +267,10 @@
     },
     "update": {
       "unifi_os_update": {
-        "name": "UniFi OS"
+        "name": "UniFi OS firmware"
       },
       "drive_update": {
-        "name": "Drive app"
+        "name": "UniFi Drive app"
       }
     },
     "select": {

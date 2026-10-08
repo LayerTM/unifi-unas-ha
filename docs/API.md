@@ -157,8 +157,14 @@ used for update detection:
   with a leading `v` and a `+build` suffix (e.g. `v5.1.19+3fbc1da`). Normalize
   both sides (strip `v` and `+build`) before comparing, or an up-to-date device
   reads as having an update.
+- `firmware.latest.channel` — the release channel of that latest version
+  (`release`, `release-candidate`, ...); `firmware.releaseChannel` is the
+  channel the console follows. `firmware.latest._links` points to Ubiquiti's
+  cloud firmware service; its changelog link is often not populated, so release
+  notes are not available from the console.
 - `apps.controllers[]` — installed apps; the entry with `name == "drive"` gives
-  the Drive app `version` and its `updateAvailable` (a version string, or null).
+  the Drive app `version`, its `updateAvailable` (a version string, or null) and
+  its `releaseChannel`.
 - `uptime` — seconds since boot.
 
 ### `GET /proxy/drive/api/v2/storage`
