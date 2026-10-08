@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-10-08
+
 ### Added
 
 - **Storage read rate and Storage write rate** sensors: the disk throughput of
@@ -18,9 +20,6 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- **Ready for Home Assistant 2026.10**, which moved setup and repair form
-  validation from voluptuous to probatio; earlier releases back to 2025.8 keep
-  working unchanged.
 - **Connection errors always name their cause.** A request that timed out was
   logged as `Error fetching unifi_unas_rest data:` with nothing after the colon;
   it now reads, for example,
