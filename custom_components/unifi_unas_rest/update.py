@@ -1,4 +1,9 @@
-"""Update platform: UniFi OS firmware and Drive-app updates.
+"""Update platform: the console's UniFi OS firmware and UniFi Drive app updates.
+
+These entities describe software running ON the UNAS, never this integration
+itself (HACS owns that). Home Assistant groups update rows under the integration's
+name, so each entity's ``title`` repeats its translated name, which names the
+device software it installs.
 
 Update entities appear when the full ``/api/system`` payload is available (session
 auth). They surface installed/latest versions read-only; the Install button is
@@ -35,6 +40,7 @@ from .errors import action_error
 class UnasUpdateDescription(UpdateEntityDescription):
     installed_fn: Callable[[UpdateInfo], str | None]
     latest_fn: Callable[[UpdateInfo], str | None]
+    channel_fn: Callable[[UpdateInfo], str | None]
     install_fn: Callable[[UnasActionClient], Awaitable[None]]
 
 
@@ -45,6 +51,7 @@ UPDATES: tuple[UnasUpdateDescription, ...] = (
         device_class=UpdateDeviceClass.FIRMWARE,
         installed_fn=lambda u: u.unifi_os_installed or None,
         latest_fn=lambda u: u.unifi_os_latest or u.unifi_os_installed or None,
+        channel_fn=lambda u: u.unifi_os_channel,
         install_fn=lambda client: client.update_firmware(),
     ),
     UnasUpdateDescription(
@@ -53,6 +60,7 @@ UPDATES: tuple[UnasUpdateDescription, ...] = (
         device_class=UpdateDeviceClass.FIRMWARE,
         installed_fn=lambda u: u.drive_installed or None,
         latest_fn=lambda u: u.drive_latest or u.drive_installed or None,
+        channel_fn=lambda u: u.drive_channel,
         install_fn=lambda client: client.update_drive_app(),
     ),
 )
@@ -104,6 +112,17 @@ class UnasUpdate(UnasEntity, UpdateEntity):
     def latest_version(self) -> str | None:
         info = self._info
         return self.entity_description.latest_fn(info) if info is not None else None
+
+    @property
+    def title(self) -> str | None:
+        name = self.name
+        return name if isinstance(name, str) else None
+
+    @property
+    def release_summary(self) -> str | None:
+        info = self._info
+        channel = self.entity_description.channel_fn(info) if info is not None else None
+        return f"Release channel: {channel.replace('-', ' ')}" if channel else None
 
     async def async_install(self, version: str | None, backup: bool, **kwargs: Any) -> None:
         if self._action_client is None:

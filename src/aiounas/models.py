@@ -486,7 +486,9 @@ class UpdateInfo:
     """Firmware / app update availability from the full /api/system payload.
 
     The full payload is returned to session auth; an API key gets a short payload
-    with no firmware/apps data, so the ``*_latest`` fields come back None.
+    with no firmware/apps data, so the ``*_latest`` fields come back None. The
+    ``*_channel`` fields name the release channel the offered version comes from
+    (``release``, ``release-candidate``, ...).
     """
 
     unifi_os_installed: str
@@ -494,6 +496,8 @@ class UpdateInfo:
     drive_installed: str
     drive_latest: str | None
     applications: tuple[Application, ...]
+    unifi_os_channel: str | None = None
+    drive_channel: str | None = None
 
     @property
     def has_data(self) -> bool:
@@ -526,6 +530,8 @@ class UpdateInfo:
             drive_installed=_s(drive.get("version")),
             drive_latest=(_norm_version(avail) or None) if isinstance(avail, str) else None,
             applications=tuple(Application.from_api(a) for a in installed),
+            unifi_os_channel=_s(latest.get("channel") or fw.get("releaseChannel")) or None,
+            drive_channel=_s(drive.get("releaseChannel")) or None,
         )
 
 

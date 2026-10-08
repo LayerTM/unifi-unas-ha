@@ -57,7 +57,7 @@ Everything is grouped under one hub device (the UNAS), with a sub-device per dis
 - **Per disk** — temperature, transfer read/write rate, power-on hours, health score, bad sectors, state, and a per-disk `problem` binary sensor.
 - **Per pool** — RAID level, status, storage total / used / usage %, data-scrubbing status.
 - **Per share** *(local-account auth)* — storage used / quota, member count, encryption, and snapshot / remote-backup binary sensors. A privacy-safe **account count** is also exposed (only the number of accounts — never the accounts themselves).
-- **Updates** *(local-account auth)* — UniFi OS and Drive-app update entities (install requires opt-in controls with an owner account). An **Applications** sensor lists installed apps/integrations and their versions.
+- **Updates** *(local-account auth)* — **UniFi OS firmware** and **UniFi Drive app** update entities for the console itself, with the release channel the offered version comes from (install requires opt-in controls with an owner account). Home Assistant lists them in **Settings → Updates** under this integration's name; updates of the integration itself come from HACS. An **Applications** sensor lists installed apps/integrations and their versions.
 - **Activity** *(local-account auth)* — recent-event count (with a per-category breakdown), latest-event time, and recent-log-entry count. Only counts, categories and timestamps are read — notification and log **bodies are personal data and are never retained**.
 
 Requires **Home Assistant 2025.8+** — the release that introduced

@@ -6,6 +6,17 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Update entities say what they update.** Settings → Updates lists device
+  updates under the integration's name, so a UniFi OS firmware offer read like an
+  update of this integration. The two update entities are now named **UniFi OS
+  firmware** and **UniFi Drive app**, the update row shows that name before the
+  version (for example `UniFi OS firmware 6.0.11`), and the update details name
+  the release channel the offered version comes from (for example
+  `Release channel: release candidate`). Entity IDs of existing installations do
+  not change.
+
 ## [1.9.0] - 2026-10-08
 
 ### Added
