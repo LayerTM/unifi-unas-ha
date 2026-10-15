@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
 from dataclasses import replace
 from typing import Any
@@ -10,7 +11,7 @@ from unittest.mock import AsyncMock, patch
 import aiohttp
 import pytest
 import yarl
-from custom_components.unifi_unas_rest import async_remove_config_entry_device
+from custom_components.unifi_unas_rest import async_remove_config_entry_device, entity
 from custom_components.unifi_unas_rest.aiounas import (
     ApiKeyAuth,
     Capabilities,
@@ -455,6 +456,18 @@ async def test_real_401_still_triggers_reauth(
         for flow in hass.config_entries.flow.async_progress()
         if flow["context"].get("source") == "reauth"
     ]
+
+
+def test_via_device_id_feature_check_matches_the_device_registry() -> None:
+    """The check on `DeviceInfo` agrees with what the registry itself accepts.
+
+    Run on the oldest and the newest supported core: where the registry takes
+    `via_device_id` the hub link must use it, where it does not it must not.
+    """
+    accepted = (
+        "via_device_id" in inspect.signature(dr.DeviceRegistry.async_get_or_create).parameters
+    )
+    assert entity._ACCEPTS_VIA_DEVICE_ID is accepted
 
 
 async def test_subdevices_link_to_hub_without_deprecated_api(

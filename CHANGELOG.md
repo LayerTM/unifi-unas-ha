@@ -6,6 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Sub-device hub link survives `DeviceInfo` becoming a dataclass.** Home
+  Assistant 2026.11 turns `DeviceInfo` from a `TypedDict` into a dataclass. The
+  check that picks `via_device_id` over the removed `via_device` now reads
+  `DeviceInfo.__annotations__`, which both forms have, instead of
+  `__optional_keys__`, which only a compatibility layer keeps.
+
 ### Changed
 
 - **Update entities say what they update.** Settings → Updates lists device

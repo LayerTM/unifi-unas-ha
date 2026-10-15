@@ -92,8 +92,11 @@ def hub_device_info(coordinator: UnasDataUpdateCoordinator) -> DeviceInfo:
 # 2027.8, warning about it in the log until then. Both state the same fact, so
 # which one to send is asked of `DeviceInfo` itself rather than of a version
 # number: that keeps the 2025.8 floor this integration supports, with nothing to
-# revisit when the old key finally goes.
-_ACCEPTS_VIA_DEVICE_ID = "via_device_id" in DeviceInfo.__optional_keys__
+# revisit when the old key finally goes. `__annotations__` is read rather than
+# `__optional_keys__` because it exists on a TypedDict and on the dataclass core
+# is moving `DeviceInfo` to alike; `__optional_keys__` only survives there in a
+# compatibility layer.
+_ACCEPTS_VIA_DEVICE_ID = "via_device_id" in DeviceInfo.__annotations__
 
 
 def link_to_hub(info: DeviceInfo, coordinator: UnasDataUpdateCoordinator) -> DeviceInfo:
