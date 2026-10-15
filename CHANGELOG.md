@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-10-15
+
 ### Fixed
 
 - **Sub-device hub link survives `DeviceInfo` becoming a dataclass.** Home
