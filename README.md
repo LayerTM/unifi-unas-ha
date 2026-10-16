@@ -236,6 +236,33 @@ unifi-unas-mcp                    # read tools only; set UNAS_MCP_ALLOW_WRITES t
 
 **Safety model:** reads are always open; writes require explicit confirmation — the CLI prompts (or `--yes`), and MCP write tools appear only with `UNAS_MCP_ALLOW_WRITES` set **and** each call must pass `confirm=true`.
 
+## Development
+
+Clone the repository and install the library with its development extras:
+
+```bash
+pip install -e ".[dev,cli,mcp]"
+```
+
+Before opening a pull request, run the same checks CI runs:
+
+```bash
+ruff check . && ruff format --check .
+mypy --strict src/aiounas
+pytest --cov=aiounas --cov-report=term-missing --cov-fail-under=90
+python scripts/secret_scan.py .
+```
+
+The Home Assistant integration has its own checks (needs Python 3.14):
+
+```bash
+pip install -e ".[dev,ha]"
+python scripts/vendor_aiounas.py        # refreshes the bundled copy of aiounas
+git diff --exit-code custom_components/unifi_unas_rest/aiounas
+mypy --strict --python-version 3.14 custom_components/unifi_unas_rest
+PYTHONPATH=. pytest tests_ha/
+```
+
 ## License
 
 [MIT](LICENSE) © LayerTM
