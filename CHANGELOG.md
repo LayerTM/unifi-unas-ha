@@ -6,6 +6,15 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **A drive at risk raises a repair.** When the console reports a drive as at
+  risk, Settings → System → Repairs shows *Disk N of <console> may be failing*
+  with the bay, model, state and the reasons given. The notice is withdrawn when
+  the drive recovers or is removed, and when the entry is unloaded. An empty bay
+  on a NAS that is not fully populated never raises one. The serial number is not
+  part of the text.
+
 ## [1.9.1] - 2026-10-15
 
 ### Fixed

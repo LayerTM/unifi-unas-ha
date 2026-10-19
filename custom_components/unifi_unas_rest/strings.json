@@ -308,6 +308,10 @@
     }
   },
   "issues": {
+    "disk_at_risk": {
+      "title": "Disk {bay} of {console} may be failing",
+      "description": "{console} reports the drive in bay {bay} ({model}) as {state}. Reasons given: {reasons}.\n\nBack up the data on this {console} and plan to replace the drive. This notice goes away by itself once the console no longer reports the drive as at risk."
+    },
     "cert_mismatch": {
       "title": "UniFi UNAS certificate changed",
       "fix_flow": {
