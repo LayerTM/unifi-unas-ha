@@ -7,7 +7,7 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import AsyncMock
 
-from custom_components.unifi_unas_rest.aiounas import Storage
+from custom_components.unifi_unas_rest.aiounas import Storage, UnasConnectionError
 from custom_components.unifi_unas_rest.const import DOMAIN
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
@@ -131,3 +131,44 @@ async def test_unloading_the_entry_withdraws_its_repairs(
     assert await hass.config_entries.async_unload(config_entry.entry_id)
 
     assert _disk_issues(hass) == {}
+
+
+async def test_a_failed_poll_keeps_an_existing_repair(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    """Not knowing the drives' state is not the same as the drive recovering."""
+    mock_aiounas.get_storage = AsyncMock(return_value=_with_state(_partial(), 0, "degraded"))
+    await _setup(hass, config_entry)
+    before = set(_disk_issues(hass))
+    assert len(before) == 1
+
+    mock_aiounas.get_storage = AsyncMock(side_effect=UnasConnectionError("console restarting"))
+    coordinator = config_entry.runtime_data.coordinator
+    await coordinator.async_refresh()
+
+    assert not coordinator.last_update_success
+    assert set(_disk_issues(hass)) == before
+
+
+async def test_two_entries_with_the_same_bay_keep_separate_repairs(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    other = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="AABBCC000002",
+        title="Second console",
+        data={**config_entry.data, "host": "192.0.2.11"},
+    )
+    mock_aiounas.get_storage = AsyncMock(return_value=_with_state(_partial(), 0, "degraded"))
+    await _setup(hass, config_entry)
+    await _setup(hass, other)
+
+    slot = _partial().disks[0].slot
+    assert set(_disk_issues(hass)) == {
+        f"disk_at_risk_{config_entry.entry_id}_{slot}",
+        f"disk_at_risk_{other.entry_id}_{slot}",
+    }
+
+    assert await hass.config_entries.async_unload(other.entry_id)
+
+    assert set(_disk_issues(hass)) == {f"disk_at_risk_{config_entry.entry_id}_{slot}"}
