@@ -55,6 +55,7 @@ Everything is grouped under one hub device (the UNAS), with a sub-device per dis
 - **Storage throughput** *(local-account auth)* — storage read and write rate of the whole NAS, the console's own 5-minute average; enabled by default, so sustained disk activity is visible without per-disk sensors.
 - **Health** — disks-at-risk count, average disk temperature, a `storage problem` binary sensor, and a connectivity (`online`) binary sensor.
 - **Per disk** — temperature, transfer read/write rate, power-on hours, health score, bad sectors, state, and a per-disk `problem` binary sensor.
+- **Repairs** — a drive the console reports as at risk also raises a notice in **Settings → System → Repairs** naming the bay and model (never the serial number). It goes away by itself when the drive recovers or is removed; an empty bay never raises one.
 - **Per pool** — RAID level, status, storage total / used / usage %, data-scrubbing status.
 - **Per share** *(local-account auth)* — storage used / quota, member count, encryption, and snapshot / remote-backup binary sensors. A privacy-safe **account count** is also exposed (only the number of accounts — never the accounts themselves).
 - **Updates** *(local-account auth)* — **UniFi OS firmware** and **UniFi Drive app** update entities for the console itself, with the release channel the offered version comes from (install requires opt-in controls with an owner account). Home Assistant lists them in **Settings → Updates** under this integration's name; updates of the integration itself come from HACS. An **Applications** sensor lists installed apps/integrations and their versions.
@@ -123,7 +124,7 @@ Not supported: cloud-only access (UniFi Site Manager), and consoles without the 
 
 ## Use cases
 
-- **Health alerting** — automate on the `storage problem` / per-disk `problem` binary sensors, `disks at risk`, or a disk temperature threshold to get notified before data loss.
+- **Health alerting** — a failing drive shows up in Repairs on its own; to be notified elsewhere, automate on the `storage problem` / per-disk `problem` binary sensors, `disks at risk`, or a disk temperature threshold before data loss.
 - **Capacity planning** — track storage usage % and per-share usage over time in the HA history/statistics.
 - **Presence-aware power** — shut the NAS down when everyone leaves and no backups are running, then reboot on a schedule.
 - **Dashboards** — surface RAID status, temperatures, and throughput on a storage dashboard.
@@ -262,6 +263,10 @@ git diff --exit-code custom_components/unifi_unas_rest/aiounas
 mypy --strict --python-version 3.14 custom_components/unifi_unas_rest
 PYTHONPATH=. pytest tests_ha/
 ```
+
+## See also
+
+- [UniFi gateway for Home Assistant](https://github.com/LayerTM/unifi-ucg-fiber-ha) — the same non-invasive approach for UCG-Fiber / UCG / UDM / UXG gateways: WAN, ISP, speedtest, failover and console health.
 
 ## License
 

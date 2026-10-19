@@ -42,6 +42,7 @@ CONF_CERT_FINGERPRINT: Final = "cert_fingerprint"
 DEFAULT_TLS_MODE: Final = TlsMode.FINGERPRINT
 ISSUE_CERT_MISMATCH: Final = "cert_mismatch"
 ISSUE_TLS_INSECURE: Final = "tls_insecure"
+ISSUE_DISK_AT_RISK: Final = "disk_at_risk"
 
 DEFAULT_VERIFY_SSL: Final = False
 DEFAULT_SCAN_INTERVAL: Final = 30
