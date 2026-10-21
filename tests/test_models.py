@@ -258,3 +258,27 @@ def test_storage_io_tolerates_missing_samples(payload: dict[str, Any]) -> None:
     io = StorageIO.from_api(payload)
     assert io.read_kbps is None
     assert io.write_kbps is None
+
+
+@pytest.mark.parametrize(
+    ("model", "vendor"),
+    [
+        ("WDC WUH722424ALE6L4", "Western Digital"),
+        ("WDC  WD120EFBX-68B0EN0", "Western Digital"),
+        ("WD120EFBX-68B0EN0", "Western Digital"),
+        ("WD Red SN700 1000GB", "Western Digital"),
+        ("WD_BLACK SN850X 2000GB", "Western Digital"),
+        ("WD_Blue SA510 2.5 1000GB", "Western Digital"),
+        ("ST12000VN0008-2YS101", "Seagate"),
+        ("Seagate IronWolf ZA500NM10002", "Seagate"),
+        ("HGST HUH721212ALE604", "HGST"),
+        ("TOSHIBA MG09ACA18TE", "Toshiba"),
+        ("Samsung SSD 870 EVO 1TB", "Samsung"),
+        # A part number that names no maker we know is not a maker.
+        ("CT1000MX500SSD1", None),
+        ("STORAGE DEVICE", None),
+        ("", None),
+    ],
+)
+def test_disk_vendor(model: str, vendor: str | None) -> None:
+    assert Disk.from_api({"model": model}).vendor == vendor

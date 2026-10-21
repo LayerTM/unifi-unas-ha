@@ -135,7 +135,7 @@ class UnasDiskEntity(CoordinatorEntity[UnasDataUpdateCoordinator]):
         assert entry is not None
         self._attr_unique_id = f"{entry.unique_id}_disk{slot}_{key}"
         disk = self.disk
-        vendor = disk.model.split()[0] if disk and disk.model else MANUFACTURER
+        vendor = (disk.vendor if disk else None) or MANUFACTURER
         self._attr_device_info = link_to_hub(
             DeviceInfo(
                 identifiers={(DOMAIN, f"{entry.entry_id}_disk{slot}")},
