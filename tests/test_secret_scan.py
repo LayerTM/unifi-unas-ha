@@ -44,7 +44,8 @@ SHOULD_FLAG: list[str] = [
     "AKIAABCDEFGHIJKLMNOP",  # AWS access key id
     "-----BEGIN OPENSSH PRIVATE KEY-----",  # private key block
     "contact me@gmail.com now",  # personal gmail
-    "connect to 192.168.1.207",  # private LAN IP
+    # made-up example address, assembled so the literal never appears in the source
+    "connect to " + ".".join(["192", "168", "123", "45"]),  # private LAN IP
     "host 10.0.0.42",  # private LAN IP
 ]
 
