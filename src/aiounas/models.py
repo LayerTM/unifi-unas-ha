@@ -14,6 +14,21 @@ from typing import Any
 _TB = 1_000_000_000_000
 _CHANNEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,39}")
 
+# A drive's model string as the console reports it (the ATA/NVMe identify model).
+# Some vendors lead with their name ("WDC WUH722424ALE6L4", "TOSHIBA MG09ACA18TE",
+# "Samsung SSD 870 EVO 1TB"); Seagate and bare WD part numbers do not
+# ("ST12000VN0008-2YS101", "WD120EFBX-68B0EN0"), so the vendor is read from a
+# known leading word first, then from a known part-number prefix.
+_DISK_VENDOR_WORDS = {
+    "WDC": "Western Digital",
+    "WD": "Western Digital",
+    "HGST": "HGST",
+    "TOSHIBA": "Toshiba",
+    "SEAGATE": "Seagate",
+    "SAMSUNG": "Samsung",
+}
+_DISK_VENDOR_PART = ((re.compile(r"ST\d"), "Seagate"), (re.compile(r"WD\d"), "Western Digital"))
+
 
 def _f(value: Any, default: float = 0.0) -> float:
     """Coerce to float; bools and non-numerics fall back to *default*."""
@@ -135,6 +150,22 @@ class Disk:
     @property
     def size_tb(self) -> float:
         return round(self.size / _TB, 2)
+
+    @property
+    def vendor(self) -> str | None:
+        """The drive maker named by the model string, or None when it names none we know.
+
+        Never the model itself: a part number such as ``ST12000VN0008-2YS101``
+        is not a manufacturer.
+        """
+        words = self.model.split()
+        if not words:
+            return None
+        if (name := _DISK_VENDOR_WORDS.get(words[0].upper())) is not None:
+            return name
+        return next(
+            (name for part, name in _DISK_VENDOR_PART if part.match(words[0].upper())), None
+        )
 
     @classmethod
     def from_api(cls, d: dict[str, Any]) -> Disk:
