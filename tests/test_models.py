@@ -267,6 +267,8 @@ def test_storage_io_tolerates_missing_samples(payload: dict[str, Any]) -> None:
         ("WDC  WD120EFBX-68B0EN0", "Western Digital"),
         ("WD120EFBX-68B0EN0", "Western Digital"),
         ("WD Red SN700 1000GB", "Western Digital"),
+        ("WD_BLACK SN850X 2000GB", "Western Digital"),
+        ("WD_Blue SA510 2.5 1000GB", "Western Digital"),
         ("ST12000VN0008-2YS101", "Seagate"),
         ("Seagate IronWolf ZA500NM10002", "Seagate"),
         ("HGST HUH721212ALE604", "HGST"),

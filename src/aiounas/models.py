@@ -16,9 +16,10 @@ _CHANNEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,39}")
 
 # A drive's model string as the console reports it (the ATA/NVMe identify model).
 # Some vendors lead with their name ("WDC WUH722424ALE6L4", "TOSHIBA MG09ACA18TE",
-# "Samsung SSD 870 EVO 1TB"); Seagate and bare WD part numbers do not
-# ("ST12000VN0008-2YS101", "WD120EFBX-68B0EN0"), so the vendor is read from a
-# known leading word first, then from a known part-number prefix.
+# "Samsung SSD 870 EVO 1TB"); Seagate, bare WD part numbers and WD's product
+# lines do not ("ST12000VN0008-2YS101", "WD120EFBX-68B0EN0", "WD_BLACK SN850X"),
+# so the vendor is read from a known leading word first, then from a known
+# part-number prefix.
 _DISK_VENDOR_WORDS = {
     "WDC": "Western Digital",
     "WD": "Western Digital",
@@ -27,7 +28,7 @@ _DISK_VENDOR_WORDS = {
     "SEAGATE": "Seagate",
     "SAMSUNG": "Samsung",
 }
-_DISK_VENDOR_PART = ((re.compile(r"ST\d"), "Seagate"), (re.compile(r"WD\d"), "Western Digital"))
+_DISK_VENDOR_PART = ((re.compile(r"ST\d"), "Seagate"), (re.compile(r"WD[\d_]"), "Western Digital"))
 
 
 def _f(value: Any, default: float = 0.0) -> float:

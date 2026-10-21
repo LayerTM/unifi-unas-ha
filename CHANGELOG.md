@@ -21,9 +21,10 @@ adheres to [Semantic Versioning](https://semver.org/).
   model string does not start with the maker's name (every Seagate drive, such
   as `ST12000VN0008-2YS101`, and bare WD part numbers) was listed as made by its
   own model. The maker is now read from a known leading word (`WDC`, `WD`,
-  `HGST`, `TOSHIBA`, `Seagate`, `Samsung`) or part-number prefix (`ST`, `WD`
-  followed by a digit); a model that names neither is listed under Ubiquiti, as
-  the other sub-devices are. The library exposes it as `Disk.vendor`.
+  `HGST`, `TOSHIBA`, `Seagate`, `Samsung`) or part-number prefix (`ST` followed
+  by a digit, `WD` followed by a digit or `_` as in `WD_BLACK`); a model that
+  names neither is listed under Ubiquiti, as the other sub-devices are. The
+  library exposes it as `Disk.vendor`.
 
 ## [1.9.1] - 2026-10-15
 
