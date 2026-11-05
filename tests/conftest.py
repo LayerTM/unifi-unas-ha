@@ -17,8 +17,15 @@ import aiohttp
 import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestServer
+from pytest_socket import socket_allow_hosts
 
 _FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def pytest_runtest_setup() -> None:
+    """Refuse any connection but loopback: see test_no_network.py for why."""
+    socket_allow_hosts(["127.0.0.1", "::1"], allow_unix_socket=True)
+
 
 # A realistic-length placeholder key (>=16 chars) so the client sends X-API-Key.
 FAKE_API_KEY = "test-api-key-0123456789"
