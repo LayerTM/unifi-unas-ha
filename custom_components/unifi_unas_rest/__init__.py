@@ -29,6 +29,7 @@ from .aiounas import (
     SessionAuth,
     TlsMode,
     UnasActionClient,
+    UnasApiError,
     UnasAuthError,
     UnasCertificateMismatch,
     UnasClient,
@@ -96,7 +97,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: UnasConfigEntry) -> bool
         raise ConfigEntryNotReady(str(err)) from err
     except UnasAuthError as err:
         raise ConfigEntryAuthFailed(str(err)) from err
-    except UnasConnectionError as err:
+    except (UnasConnectionError, UnasApiError) as err:
+        # UnasApiError is what a console that is booting, updating or restarting
+        # produces: it answers an API path with its web UI (non-JSON, or a
+        # redirect). That is transient, and only ConfigEntryNotReady makes Home
+        # Assistant retry; any other exception is a terminal setup error.
         raise ConfigEntryNotReady(str(err)) from err
 
     _async_review_tls(hass, entry)

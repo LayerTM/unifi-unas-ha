@@ -11,10 +11,12 @@ from unittest.mock import AsyncMock, patch
 import aiohttp
 import pytest
 import yarl
+from custom_components import unifi_unas_rest as integration
 from custom_components.unifi_unas_rest import async_remove_config_entry_device, entity
 from custom_components.unifi_unas_rest.aiounas import (
     ApiKeyAuth,
     Capabilities,
+    UnasApiError,
     UnasAuthError,
     UnasClient,
     UnasConnectionError,
@@ -368,6 +370,40 @@ async def test_connection_error_retries(
     assert not await hass.config_entries.async_setup(config_entry.entry_id)
     await hass.async_block_till_done()
     assert config_entry.state is ConfigEntryState.SETUP_RETRY
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "non-JSON response for /proxy/drive/api/v2/storage: the console served its web UI",
+        "console redirected /proxy/drive/api/v2/storage to its web UI",
+    ],
+)
+async def test_booting_console_retries_setup_then_loads(
+    hass: HomeAssistant,
+    mock_aiounas: AsyncMock,
+    config_entry: MockConfigEntry,
+    message: str,
+) -> None:
+    """A console still booting answers with its web UI; setup must retry, not fail.
+
+    The probe's first read raises UnasApiError for both shapes of that answer (a
+    non-JSON 200 and a redirect). That used to escape async_setup_entry as
+    SETUP_ERROR, which Home Assistant never retries, so a reboot of the console
+    left the entry dead until the user reloaded it by hand.
+    """
+    caps = await integration.probe(mock_aiounas)  # the fixture's patched probe
+    probe = AsyncMock(side_effect=[UnasApiError(message), caps])
+    with patch("custom_components.unifi_unas_rest.probe", probe):
+        config_entry.add_to_hass(hass)
+        assert not await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+        assert config_entry.state is ConfigEntryState.SETUP_RETRY
+
+        # The console is up on the next attempt.
+        await hass.config_entries.async_reload(config_entry.entry_id)
+        await hass.async_block_till_done()
+    assert config_entry.state is ConfigEntryState.LOADED
 
 
 class _UiResponse:
