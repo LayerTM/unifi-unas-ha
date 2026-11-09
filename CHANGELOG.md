@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.10.1] - 2026-11-09
+
 ### Fixed
 
 - **A console that is still starting no longer leaves the integration failed.**
