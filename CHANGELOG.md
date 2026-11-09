@@ -6,6 +6,15 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **A console that is still starting no longer leaves the integration failed.**
+  When Home Assistant started or reloaded the integration while the console was
+  booting, updating or restarting, the console answered with its web page instead
+  of data. Setup then ended in an error that Home Assistant never retries, so the
+  entities stayed unavailable until the entry was reloaded by hand. Setup is now
+  retried automatically, with increasing delays, until the console answers.
+
 ## [1.10.0] - 2026-10-22
 
 ### Added
