@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator, Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Final
 
@@ -31,6 +31,8 @@ def pytest_runtest_setup() -> None:
 FAKE_API_KEY = "test-api-key-0123456789"
 _API_KEY = web.AppKey("api_key", str)
 _WRITES = web.AppKey("writes", list)
+# path -> (status, JSON body) a write answers with instead of a bodyless 200
+_REPLIES = web.AppKey("replies", dict)
 
 
 def load_fixture(name: str) -> dict[str, Any]:
@@ -123,6 +125,9 @@ def _write() -> Callable[[web.Request], Any]:
         if _auth_mode(request) is None:
             return web.json_response({"error": {"code": 401}}, status=401)
         body = await request.json() if request.can_read_body else None
+        reply = request.app[_REPLIES].get(request.path)
+        if reply is not None:
+            return web.json_response(reply[1], status=reply[0])
         request.app[_WRITES].append({"method": request.method, "path": request.path, "json": body})
         return web.Response(status=200)  # real writes reply with no JSON body
 
@@ -162,6 +167,7 @@ def make_app(
     app = web.Application()
     app[_API_KEY] = api_key
     app[_WRITES] = []
+    app[_REPLIES] = {}
     app.router.add_get("/", _root)
     app.router.add_post("/api/auth/login", _login)
     app.router.add_get("/api/system", _system())
@@ -199,6 +205,7 @@ class RunningServer:
     port: int
     api_key: str
     writes: list[dict[str, Any]]
+    replies: dict[str, tuple[int, Any]] = field(default_factory=dict)
 
     @property
     def base_url(self) -> str:
@@ -211,7 +218,9 @@ async def unas_server() -> AsyncIterator[RunningServer]:
     server = TestServer(app)
     await server.start_server()
     try:
-        yield RunningServer(str(server.host), int(server.port), FAKE_API_KEY, app[_WRITES])
+        yield RunningServer(
+            str(server.host), int(server.port), FAKE_API_KEY, app[_WRITES], app[_REPLIES]
+        )
     finally:
         await server.close()
 
@@ -227,7 +236,9 @@ async def unas_server_401_notifications() -> AsyncIterator[RunningServer]:
     server = TestServer(app)
     await server.start_server()
     try:
-        yield RunningServer(str(server.host), int(server.port), FAKE_API_KEY, app[_WRITES])
+        yield RunningServer(
+            str(server.host), int(server.port), FAKE_API_KEY, app[_WRITES], app[_REPLIES]
+        )
     finally:
         await server.close()
 
@@ -239,7 +250,9 @@ async def unas_server_without_storage_io() -> AsyncIterator[RunningServer]:
     server = TestServer(app)
     await server.start_server()
     try:
-        yield RunningServer(str(server.host), int(server.port), FAKE_API_KEY, app[_WRITES])
+        yield RunningServer(
+            str(server.host), int(server.port), FAKE_API_KEY, app[_WRITES], app[_REPLIES]
+        )
     finally:
         await server.close()
 

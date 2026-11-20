@@ -29,6 +29,7 @@ from .exceptions import (
     UnasAuthError,
     UnasCapabilityError,
     UnasConnectionError,
+    UnasOperationBlocked,
     describe,
 )
 from .tls import mismatch_from
@@ -41,6 +42,40 @@ class _NonJsonBody:
 
 
 _NON_JSON = _NonJsonBody()
+
+CRITICAL_OPERATION_IN_PROGRESS = "CRITICAL_OPERATION_IN_PROGRESS"
+
+
+def _critical_blockers(status: int, data: Any) -> tuple[str, ...] | None:
+    """The operations a ``409`` names as blocking the request, else None.
+
+    The console's own UI reads this body: ``{"code": "CRITICAL_OPERATION_IN_PROGRESS",
+    "data": {"blockers": [{"description", "kind", "domain", ...}]}}``. Each
+    blocker is named by its description, falling back to its kind and domain.
+    Any other 409 is an ordinary refusal.
+    """
+    if status != 409 or not isinstance(data, dict):
+        return None
+    if data.get("code") != CRITICAL_OPERATION_IN_PROGRESS:
+        return None
+    body = data.get("data")
+    raw = body.get("blockers") if isinstance(body, dict) else None
+    names: list[str] = []
+    for blocker in raw if isinstance(raw, list) else []:
+        if not isinstance(blocker, dict):
+            continue
+        name = next(
+            (
+                v.strip()
+                for v in (blocker.get("description"), blocker.get("kind"), blocker.get("domain"))
+                if isinstance(v, str) and v.strip()
+            ),
+            None,
+        )
+        if name is not None:
+            names.append(name)
+    return tuple(names)
+
 
 _T = TypeVar("_T")
 
@@ -148,6 +183,9 @@ class UnasTransport:
                 "it is most likely booting, updating or restarting",
                 status=status,
             )
+        blockers = _critical_blockers(status, data)
+        if blockers is not None:
+            raise UnasOperationBlocked(path, blockers)
         if not (200 <= status < 300):
             raise UnasApiError(f"unexpected status {status} for {path}", status=status)
         if data is _NON_JSON:
@@ -209,7 +247,14 @@ class UnasTransport:
                         return status, json.loads(raw)
                     except (ValueError, UnicodeDecodeError):
                         return status, _NON_JSON
-                await resp.read()
+                raw = await resp.read()
+                if status == 409:
+                    # The one refusal whose body carries a reason the caller
+                    # must see (see `_critical_blockers`).
+                    try:
+                        return status, json.loads(raw)
+                    except (ValueError, UnicodeDecodeError):
+                        return status, None
                 return status, None
         except aiohttp.ServerFingerprintMismatch as err:
             # Must precede ClientError: this IS one, and collapsing it into a

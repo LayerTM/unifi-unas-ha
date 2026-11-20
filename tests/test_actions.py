@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from aiounas import ApiKeyAuth, UnasActionClient
-from aiounas.exceptions import UnasAuthError
+from aiounas.exceptions import UnasApiError, UnasAuthError, UnasOperationBlocked
 
 
 def _client(session, srv, key: str | None = None) -> UnasActionClient:
@@ -46,3 +46,64 @@ async def test_write_auth_failure_raises(session, unas_server) -> None:
     with pytest.raises(UnasAuthError):
         await _client(session, unas_server, key="wrong-key-000000000000").reboot()
     assert unas_server.writes == []  # nothing recorded on failed auth
+
+
+_BLOCKED = {
+    "code": "CRITICAL_OPERATION_IN_PROGRESS",
+    "data": {
+        "blockers": [
+            {
+                "operationId": "op-1",
+                "domain": "storage",
+                "kind": "raid-rebuild",
+                "description": "Rebuilding storage pool 1",
+            },
+            {
+                "operationId": "op-2",
+                "domain": "system",
+                "kind": "firmware-install",
+                "description": "",
+            },
+            "not an object",
+        ]
+    },
+}
+
+
+@pytest.mark.parametrize(
+    ("action", "path"),
+    [
+        ("reboot", "/api/system/reboot"),
+        ("shutdown", "/api/system/poweroff"),
+        ("update_firmware", "/api/firmware/update"),
+        ("update_drive_app", "/api/applications/drive/update"),
+    ],
+)
+async def test_a_critical_operation_refusal_names_what_blocks_it(
+    session, unas_server, action: str, path: str
+) -> None:
+    unas_server.replies[path] = (409, _BLOCKED)
+    with pytest.raises(UnasOperationBlocked) as caught:
+        await getattr(_client(session, unas_server), action)()
+    assert caught.value.blockers == ("Rebuilding storage pool 1", "firmware-install")
+    assert caught.value.status == 409
+    assert "Rebuilding storage pool 1" in str(caught.value)
+    assert unas_server.writes == []
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"code": "SOMETHING_ELSE"},
+        {"code": "CRITICAL_OPERATION_IN_PROGRESS", "data": None},
+        ["not", "an", "object"],
+    ],
+)
+async def test_any_other_409_is_an_ordinary_refusal(session, unas_server, body) -> None:
+    unas_server.replies["/api/firmware/update"] = (409, body)
+    with pytest.raises(UnasApiError) as caught:
+        await _client(session, unas_server).update_firmware()
+    blocked = isinstance(caught.value, UnasOperationBlocked)
+    named = body == {"code": "CRITICAL_OPERATION_IN_PROGRESS", "data": None}
+    assert blocked is named  # the code alone is the signal; no blockers listed then
+    assert caught.value.status == 409

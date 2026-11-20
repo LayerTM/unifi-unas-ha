@@ -108,6 +108,26 @@ Non-2xx responses return JSON:
 { "error": { "code": 401, "message": "Unauthorized" } }
 ```
 
+A write that would interrupt a critical operation (UniFi OS 6.0.11+: for example
+a RAID rebuild or a firmware install in progress) is refused with `409` and the
+operations in the way:
+
+```json
+{
+  "code": "CRITICAL_OPERATION_IN_PROGRESS",
+  "data": {
+    "blockers": [
+      { "operationId": "…", "domain": "…", "kind": "…", "description": "…" }
+    ]
+  }
+}
+```
+
+`aiounas` raises `UnasOperationBlocked` with each blocker's `description`
+(falling back to `kind`, then `domain`). The console accepts an override to
+proceed anyway; this library never sends it. Any other `409` (for example a
+firmware install with nothing to install) stays a plain `UnasApiError`.
+
 ## Endpoints
 
 The client reads these endpoints:

@@ -11,6 +11,7 @@ from custom_components.unifi_unas_rest.aiounas.exceptions import (
     UnasAuthError,
     UnasCapabilityError,
     UnasConnectionError,
+    UnasOperationBlocked,
 )
 from custom_components.unifi_unas_rest.const import (
     AUTH_API_KEY,
@@ -291,3 +292,36 @@ async def test_an_api_key_entry_keeps_no_control_rows(
         for e in er.async_entries_for_config_entry(registry, entry.entry_id)
         if e.domain in ("button", "select")
     ] == []
+
+
+_REBUILD = UnasOperationBlocked("/api/system/reboot", ("Rebuilding storage pool 1",))
+
+
+async def test_a_press_during_a_critical_operation_names_it_and_is_not_retried(
+    hass: HomeAssistant, mock_aiounas: AsyncMock
+) -> None:
+    mock_aiounas.action_mock.reboot = AsyncMock(side_effect=_REBUILD)
+    await _setup(hass, _entry(controls=True, session=True))
+    with pytest.raises(HomeAssistantError) as caught:
+        await hass.services.async_call(
+            "button", "press", {ATTR_ENTITY_ID: _reboot_eid(hass)}, blocking=True
+        )
+    assert caught.value.translation_key == "operation_blocked"
+    assert caught.value.translation_placeholders == {"operations": "Rebuilding storage pool 1"}
+    assert "Rebuilding storage pool 1" in str(caught.value)
+    mock_aiounas.action_mock.reboot.assert_awaited_once()
+
+
+async def test_an_install_during_a_critical_operation_is_refused_with_the_reason(
+    hass: HomeAssistant, mock_aiounas: AsyncMock
+) -> None:
+    blocked = UnasOperationBlocked("/api/firmware/update", ())
+    mock_aiounas.action_mock.update_firmware = AsyncMock(side_effect=blocked)
+    await _setup(hass, _entry(controls=True, session=True))
+    with pytest.raises(HomeAssistantError) as caught:
+        await hass.services.async_call(
+            "update", "install", {ATTR_ENTITY_ID: _update_eid(hass)}, blocking=True
+        )
+    assert caught.value.translation_key == "operation_blocked"
+    assert caught.value.translation_placeholders == {"operations": "not described by the console"}
+    mock_aiounas.action_mock.update_firmware.assert_awaited_once()
