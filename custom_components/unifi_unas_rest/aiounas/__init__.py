@@ -16,6 +16,7 @@ from .exceptions import (
 )
 from .models import (
     Application,
+    ConsoleBackup,
     DeviceInfo,
     Disk,
     FanControl,
@@ -46,6 +47,7 @@ __all__ = [
     "ApiKeyAuth",
     "Application",
     "Capabilities",
+    "ConsoleBackup",
     "DeviceInfo",
     "Disk",
     "FanControl",

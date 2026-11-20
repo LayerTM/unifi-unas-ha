@@ -50,6 +50,12 @@ OPTIONAL_READINGS: Final = (
     Reading("firmware updates", "updates", ("applications", "unifi_os_update", "drive_update")),
     Reading("notifications", "notifications", ("recent_events", "last_event")),
     Reading("logs", "logs", ("log_entries",)),
+    Reading("backup tasks", "backup_tasks", ("backup_tasks",)),
+    Reading(
+        "console backup",
+        "console_backup",
+        ("console_auto_backup", "console_backup_frequency"),
+    ),
     Reading("storage throughput", "storage_io", ("storage_read_rate", "storage_write_rate")),
 )
 """Readings a local account can reach and an API key cannot.

@@ -55,6 +55,7 @@ Everything is grouped under one hub device (the UNAS), with a sub-device per dis
 - **Storage** — used / total / free, usage %, RAID level, storage status, pool count.
 - **System** — CPU usage %, CPU temperature, memory usage %, network throughput, link speed, last boot, UniFi OS and Drive app versions.
 - **Storage throughput** *(local-account auth)* — storage read and write rate of the whole NAS, the console's own 5-minute average; enabled by default, so sustained disk activity is visible without per-disk sensors.
+- **Backups** *(local-account auth)* — diagnostic sensors: the number of Drive backup tasks (remote and Microsoft 365 together), whether the console's own auto-backup is on, and how often it runs. These report configuration, not results: whether a backup succeeded or when the last console backup ran is not read.
 - **Health** — disks-at-risk count, average disk temperature, a `storage problem` binary sensor, and a connectivity (`online`) binary sensor.
 - **Per disk** — temperature, transfer read/write rate, power-on hours, health score, bad sectors, state, and a per-disk `problem` binary sensor.
 - **Repairs** — a drive the console reports as at risk also raises a notice in **Settings → System → Repairs** naming the bay and model (never the serial number); so does a pool the console reports at risk (for example bad blocks on its array: the console recommends a data scrub) or with file-system errors. Each notice goes away by itself when the condition clears; an empty bay never raises one. Repairing a file system can lose data, so the integration points to UniFi Drive and never starts it.
@@ -158,6 +159,8 @@ The integration **polls** the console's local REST API (`local_polling`) on a fi
   | Firmware and Drive-app updates | no | yes |
   | Notifications and log activity | no | yes |
   | Storage throughput (read and write rate) | no | yes |
+  | Console auto-backup setting and frequency | no | yes |
+  | Backup task count | not verified (treated as out of reach if refused) | yes |
   | Control actions (reboot, shut down, install, fan) | no | yes, owner account for power and firmware |
 
 - **Snapshots are read-only**: the API exposes only a per-share scheduled-snapshot **flag** (shown as the *Snapshots* binary sensor). There is no snapshot list/create/delete endpoint, and the only candidate write is silently ignored by the device (confirmed by a live test), so no snapshot control is offered.

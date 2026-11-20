@@ -8,6 +8,12 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Backup readings.** Diagnostic sensors for the number of Drive backup tasks
+  (remote and Microsoft 365 together), whether the console's own auto-backup is
+  on, and how often it runs. They read configuration only; whether a backup
+  succeeded is not reported. They appear when the console serves the readings
+  and are simply absent otherwise, never a setup or re-authentication failure.
+
 - **Storage pool operations and health.** Each pool reports the progress of a
   running rebuild, sync, expansion, repair or data scrub; whether a scrub
   schedule is on, when the last scrub finished, its result, and when the next

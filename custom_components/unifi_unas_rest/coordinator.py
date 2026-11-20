@@ -16,6 +16,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .aiounas import (
     Capabilities,
+    ConsoleBackup,
     DeviceInfo,
     FanControl,
     LogSummary,
@@ -52,6 +53,8 @@ class UnasData:
     notification_summary: NotificationSummary | None
     log_summary: LogSummary | None
     storage_io: StorageIO | None
+    backup_task_count: int | None = None
+    console_backup: ConsoleBackup | None = None
 
 
 class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
@@ -156,6 +159,16 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
                 else None
             )
             storage_io = await self._storage_io_reading() if self.capabilities.storage_io else None
+            backup_task_count = (
+                await self._optional(self.client.get_backup_task_count)
+                if self.capabilities.backup_tasks
+                else None
+            )
+            console_backup = (
+                await self._optional(self.client.get_console_backup)
+                if self.capabilities.console_backup
+                else None
+            )
         except UnasAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except UnasCertificateMismatch as err:
@@ -193,4 +206,6 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
             notification_summary=notifications,
             log_summary=logs,
             storage_io=storage_io,
+            backup_task_count=backup_task_count,
+            console_backup=console_backup,
         )

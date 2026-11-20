@@ -27,6 +27,8 @@ async def test_probe_api_key_denies_shares(session, unas_server) -> None:
     assert caps.notifications is False
     assert caps.logs is False
     assert caps.storage_io is False
+    assert caps.backup_tasks is False
+    assert caps.console_backup is False
 
 
 async def test_probe_session_allows_shares(session, unas_server) -> None:
@@ -38,6 +40,8 @@ async def test_probe_session_allows_shares(session, unas_server) -> None:
     assert caps.notifications is True
     assert caps.logs is True
     assert caps.storage_io is True
+    assert caps.backup_tasks is True
+    assert caps.console_backup is True
 
 
 async def test_probe_api_key_401_on_notifications_is_a_scope_answer(
@@ -83,6 +87,18 @@ async def test_probe_absent_supplementary_read_is_out_of_scope(
     assert caps.storage_io is False
     assert caps.storage is True
     assert caps.shares is True
+    assert caps.logs is True
+
+
+async def test_probe_absent_backup_task_lists_are_out_of_scope(
+    session, unas_server_without_backup_tasks
+) -> None:
+    """A console that serves neither task list gets no backup-task reading and still sets up."""
+    srv = unas_server_without_backup_tasks
+    caps = await probe(_client(session, srv, SessionAuth("user", "pass")))
+    assert caps.backup_tasks is False
+    assert caps.console_backup is True
+    assert caps.storage is True
     assert caps.logs is True
 
 

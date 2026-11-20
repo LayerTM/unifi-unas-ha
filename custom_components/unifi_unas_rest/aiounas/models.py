@@ -689,6 +689,35 @@ class FanControl:
 
 
 @dataclass(frozen=True, slots=True)
+class ConsoleBackup:
+    """The console's own auto-backup configuration, from the full /api/system.
+
+    Configuration only: whether the console backs itself up and how often. When
+    the last backup ran is behind a permission the integration does not ask for.
+    ``frequency`` is lower-cased (``daily``, ``weekly``, ``monthly``); a payload
+    without the field leaves the matching value None.
+    """
+
+    enabled: bool | None
+    frequency: str | None
+
+    @property
+    def has_data(self) -> bool:
+        """True when the full (session) payload carried the backup settings."""
+        return self.enabled is not None or self.frequency is not None
+
+    @classmethod
+    def from_api(cls, d: dict[str, Any]) -> ConsoleBackup:
+        enabled = d.get("autoBackupEnabled")
+        schedule = d.get("backupSchedule")
+        frequency = schedule.get("frequency") if isinstance(schedule, dict) else None
+        return cls(
+            enabled=enabled if isinstance(enabled, bool) else None,
+            frequency=frequency.lower() if isinstance(frequency, str) and frequency else None,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class NotificationSummary:
     """Privacy-safe summary of recent notifications: counts and latest time only.
 

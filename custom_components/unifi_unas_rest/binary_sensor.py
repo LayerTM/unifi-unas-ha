@@ -28,7 +28,7 @@ from .entity import (
 
 @dataclass(frozen=True, kw_only=True)
 class UnasBinaryDescription(BinarySensorEntityDescription):
-    value_fn: Callable[[UnasData], bool]
+    value_fn: Callable[[UnasData], bool | None]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -106,6 +106,15 @@ SHARE_BINARY_SENSORS: tuple[UnasShareBinaryDescription, ...] = (
 )
 
 
+# Session-only. Whether the console backs itself up on a schedule (a setting).
+CONSOLE_AUTO_BACKUP = UnasBinaryDescription(
+    key="console_auto_backup",
+    translation_key="console_auto_backup",
+    entity_category=EntityCategory.DIAGNOSTIC,
+    value_fn=lambda d: d.console_backup.enabled if d.console_backup else None,
+)
+
+
 PARALLEL_UPDATES = 0  # read-only; all data comes from the shared coordinator
 
 
@@ -118,6 +127,8 @@ async def async_setup_entry(
     coordinator = entry.runtime_data.coordinator
     aggregate: list[BinarySensorEntity] = [UnasConnectivity(coordinator)]
     aggregate.extend(UnasBinarySensor(coordinator, d) for d in BINARY_SENSORS)
+    if coordinator.capabilities.console_backup:
+        aggregate.append(UnasBinarySensor(coordinator, CONSOLE_AUTO_BACKUP))
     async_add_entities(aggregate)
 
     def _pool(key: str) -> Pool:
@@ -184,7 +195,7 @@ class UnasBinarySensor(UnasEntity, BinarySensorEntity):
         self.entity_description = description
 
     @property
-    def is_on(self) -> bool:
+    def is_on(self) -> bool | None:
         return self.entity_description.value_fn(self.coordinator.data)
 
 

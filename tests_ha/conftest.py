@@ -17,6 +17,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from custom_components.unifi_unas_rest.aiounas import (
     Capabilities,
+    ConsoleBackup,
     DeviceInfo,
     FanControl,
     LogSummary,
@@ -147,6 +148,8 @@ def unas_client() -> AsyncMock:
     )
     client.get_log_summary = AsyncMock(return_value=LogSummary.from_api(_load("logs")))
     client.get_storage_io = AsyncMock(return_value=StorageIO.from_api(_load("storage_io_stats")))
+    client.get_backup_task_count = AsyncMock(return_value=3)
+    client.get_console_backup = AsyncMock(return_value=ConsoleBackup.from_api(_load("system_full")))
     return client
 
 
@@ -162,6 +165,8 @@ def mock_aiounas(unas_client: AsyncMock) -> Iterator[AsyncMock]:
         notifications=True,
         logs=True,
         storage_io=True,
+        backup_tasks=True,
+        console_backup=True,
     )
     action = AsyncMock()
     unas_client.action_mock = action  # exposed for control tests

@@ -154,6 +154,7 @@ APIKEY_DENIALS: Final[Mapping[str, int]] = {
     "notifications": 403,
     "logs": 500,
     "storage_io": 403,
+    "backup_tasks": 403,
 }
 
 
@@ -162,6 +163,7 @@ def make_app(
     api_key: str = FAKE_API_KEY,
     apikey_denials: Mapping[str, int] | None = None,
     storage_io: bool = True,
+    backup_tasks: bool = True,
 ) -> web.Application:
     denials = {**APIKEY_DENIALS, **(apikey_denials or {})}
     app = web.Application()
@@ -189,6 +191,15 @@ def make_app(
     if storage_io:
         app.router.add_get(
             "/proxy/drive/api/v1/systems/storage-io-stats", _storage_io(denials["storage_io"])
+        )
+    if backup_tasks:
+        app.router.add_get(
+            "/proxy/drive/api/v1/remote-backup/tasks",
+            _data("remote_backup_tasks", apikey_status=denials["backup_tasks"]),
+        )
+        app.router.add_get(
+            "/proxy/drive/api/v2/m365-backup/tasks",
+            _data("m365_backup_tasks", apikey_status=denials["backup_tasks"]),
         )
     # write / action endpoints
     app.router.add_post("/api/system/reboot", _write())
@@ -233,6 +244,20 @@ async def unas_server_401_notifications() -> AsyncIterator[RunningServer]:
     as on the firmware the default server models, so the 401 is the only variable.
     """
     app = make_app(apikey_denials={"notifications": 401})
+    server = TestServer(app)
+    await server.start_server()
+    try:
+        yield RunningServer(
+            str(server.host), int(server.port), FAKE_API_KEY, app[_WRITES], app[_REPLIES]
+        )
+    finally:
+        await server.close()
+
+
+@pytest.fixture
+async def unas_server_without_backup_tasks() -> AsyncIterator[RunningServer]:
+    """A console whose firmware does not serve the backup task lists (404 to every caller)."""
+    app = make_app(backup_tasks=False)
     server = TestServer(app)
     await server.start_server()
     try:
