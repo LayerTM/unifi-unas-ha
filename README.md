@@ -114,7 +114,7 @@ Quality: the integration self-reports against Home Assistant's Integration Quali
 
 ## Supported devices
 
-Any Ubiquiti console running **UniFi OS with the UniFi Drive application** and reachable on your LAN. Verified against a UniFi UNAS console (model `UNAS2B`) on **UniFi OS 5.1.19 / Drive 4.3.6**; other UniFi OS consoles that host the Drive app (including the UNAS Pro) are expected to work but have not been verified. Devices are identified by their MAC, so a single Home Assistant can monitor several consoles.
+Any Ubiquiti console running **UniFi OS with the UniFi Drive application** and reachable on your LAN. Verified against a UniFi UNAS console (model `UNAS2B`) on **UniFi OS 6.0.18 / Drive 4.5.7**; other UniFi OS consoles that host the Drive app (including the UNAS Pro) are expected to work but have not been verified. Devices are identified by their MAC, so a single Home Assistant can monitor several consoles.
 
 Not supported: cloud-only access (UniFi Site Manager), and consoles without the Drive app (there is no storage API to read).
 

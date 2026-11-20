@@ -20,23 +20,27 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
   "Typing :: Typed",
 ]
-dependencies = ["aiohttp>=3.9", "yarl>=1.9"]
+# Floors are the versions CI runs: the library suite installs the newest release
+# of each, so an older one is untested and not promised.
+dependencies = ["aiohttp>=3.14.5", "yarl>=1.25.1"]
 
 [project.optional-dependencies]
-cli = ["typer>=0.12", "rich>=13"]              # unifi-unas CLI
-mcp = ["mcp>=2"]                                  # unifi-unas-mcp server
+cli = ["typer>=0.29.2", "rich>=15"]           # unifi-unas CLI
+mcp = ["mcp>=2.3.0"]                              # unifi-unas-mcp server
 # ruff and mypy are not listed: their versions are stated once, hash-locked, in
 # `.github/ci-tools/requirements.txt`, which CI and contributors install.
 dev = [
-  "pytest>=8",
-  "pytest-asyncio>=0.23",
-  "pytest-cov>=5",
-  "pytest-socket>=0.7",
+  # The newest Home Assistant harness pins pytest and pytest-asyncio exactly, so
+  # these floors are the versions it pins, not the newest releases.
+  "pytest>=9.0.3",
+  "pytest-asyncio>=1.4.0",
+  "pytest-cov>=7.1.0",
+  "pytest-socket>=0.8.1",
   # Declared, not inherited: the TLS tests issue a real handshake against a
   # self-signed certificate they generate, so the pinning is exercised rather
   # than mocked. cryptography arrives transitively today; a transitive
   # dependency is not a contract.
-  "cryptography>=43",
+  "cryptography>=50.0.2",
 ]
 # Home Assistant integration dev/test. The harness pins a Home Assistant that
 # requires Python 3.14.2, while the library itself supports 3.12+ — so the
