@@ -300,6 +300,9 @@
     "action_failed": {
       "message": "The UNAS could not complete the action{detail}."
     },
+    "operation_blocked": {
+      "message": "The UNAS refused the action because a critical operation is in progress: {operations}. Wait for it to finish, then try again."
+    },
     "share_gone": {
       "message": "That share is no longer present on the UNAS."
     },

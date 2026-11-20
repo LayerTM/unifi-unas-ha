@@ -8,6 +8,12 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Controls refuse clearly while a critical operation runs.** From UniFi OS
+  6.0.11 the console refuses a reboot, shut-down or install that would
+  interrupt a critical operation such as a RAID rebuild or a firmware install.
+  The buttons and update entities now say so and name the operation, instead
+  of reporting a generic failure. The console's override is never sent.
+
 - **Integration categories for the Home Assistant Marketplace.** The manifest
   declares `computers_network.nas_servers` and `computers_network.monitoring`,
   so the integration is listed with NAS devices and monitoring tools.

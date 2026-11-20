@@ -23,6 +23,23 @@ class UnasApiError(UnasError):
         self.status = status
 
 
+class UnasOperationBlocked(UnasApiError):
+    """The console refused a write because a critical operation is running.
+
+    UniFi OS answers ``409`` with code ``CRITICAL_OPERATION_IN_PROGRESS`` and the
+    operations in the way (for example a RAID rebuild or a firmware install)
+    when a reboot, power-off or update would interrupt them. The console offers
+    an override; this library never sends it, so the refusal is final.
+    """
+
+    def __init__(self, path: str, blockers: tuple[str, ...]) -> None:
+        listed = "; ".join(blockers) or "not described"
+        super().__init__(
+            f"{path} refused: a critical operation is in progress ({listed})", status=409
+        )
+        self.blockers = blockers
+
+
 class UnasCapabilityError(UnasError):
     """The active auth method is not permitted to use this endpoint."""
 

@@ -14,6 +14,7 @@ from .aiounas.exceptions import (
     UnasCapabilityError,
     UnasConnectionError,
     UnasError,
+    UnasOperationBlocked,
 )
 from .aiounas.tls import UnasCertificateMismatch
 from .const import DOMAIN
@@ -40,6 +41,14 @@ def action_error(err: UnasError) -> HomeAssistantError:
             translation_domain=DOMAIN,
             translation_key="cannot_connect",
             translation_placeholders={"error": str(err)},
+        )
+    if isinstance(err, UnasOperationBlocked):
+        return HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="operation_blocked",
+            translation_placeholders={
+                "operations": "; ".join(err.blockers) or "not described by the console"
+            },
         )
     status = getattr(err, "status", None)
     return HomeAssistantError(
