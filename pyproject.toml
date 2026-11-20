@@ -20,10 +20,14 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
   "Typing :: Typed",
 ]
-dependencies = ["aiohttp>=3.9", "yarl>=1.9"]
+# Floors are the oldest versions the library works on, proven by the
+# `test-minimum-deps` job. aiohttp 3.9.2 is the first to honour `ssl=True` on a
+# request, which the certificate-authority TLS mode sends.
+dependencies = ["aiohttp>=3.9.2", "yarl>=1.9"]
 
 [project.optional-dependencies]
-cli = ["typer>=0.12", "rich>=13"]              # unifi-unas CLI
+# typer 0.12 allows any click, and its options break from click 8.3.
+cli = ["typer>=0.13", "rich>=13"]              # unifi-unas CLI
 mcp = ["mcp>=2"]                                  # unifi-unas-mcp server
 # ruff and mypy are not listed: their versions are stated once, hash-locked, in
 # `.github/ci-tools/requirements.txt`, which CI and contributors install.

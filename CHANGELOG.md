@@ -24,6 +24,15 @@ adheres to [Semantic Versioning](https://semver.org/).
   nothing changes in use today; this follows the contract before that ends.
   Releases down to 2025.8 keep the form they require.
 
+### Fixed
+
+- **The `aiounas` library requires aiohttp 3.9.2 and, for the CLI, typer 0.13.**
+  With aiohttp 3.9.0 and 3.9.1 the certificate-authority TLS mode did not verify
+  the console's certificate: those releases do not honour `ssl=True` on a
+  request. typer 0.12 allows any click release, and its options stop working
+  with click 8.3 and later. Every other minimum is unchanged, and CI now tests
+  the library on the oldest version each dependency allows.
+
 ## [1.10.1] - 2026-11-09
 
 ### Fixed
