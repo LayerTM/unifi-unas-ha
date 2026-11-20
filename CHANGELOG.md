@@ -23,11 +23,6 @@ adheres to [Semantic Versioning](https://semver.org/).
   false. Home Assistant still accepts the old form from custom integrations, so
   nothing changes in use today; this follows the contract before that ends.
   Releases down to 2025.8 keep the form they require.
-- **The `aiounas` library requires the dependency versions it is tested with.**
-  The minimums are now aiohttp 3.14.5 and yarl 1.25.1, with typer 0.29.2 and
-  rich 15 for the CLI and mcp 2.3.0 for the MCP server. Older releases were
-  allowed but never tested. The Home Assistant integration is not affected: it
-  uses the versions Home Assistant ships.
 
 ## [1.10.1] - 2026-11-09
 
