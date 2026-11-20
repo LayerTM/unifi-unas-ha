@@ -37,11 +37,6 @@ from .entity import (
 )
 
 
-def _pool_key(pool: Pool) -> str:
-    """Stable per-pool key, identical to UnasPoolEntity's device grouping."""
-    return pool.id or str(pool.number)
-
-
 @dataclass(frozen=True, kw_only=True)
 class UnasSensorDescription(SensorEntityDescription):
     """Aggregate/system sensor bound to a UnasData accessor."""
@@ -61,7 +56,7 @@ class UnasDiskSensorDescription(SensorEntityDescription):
 class UnasPoolSensorDescription(SensorEntityDescription):
     """Per-pool sensor bound to a Pool accessor."""
 
-    value_fn: Callable[[Pool], StateType]
+    value_fn: Callable[[Pool], StateType | datetime]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -400,6 +395,34 @@ POOL_SENSORS: tuple[UnasPoolSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda p: p.scrubbing_status or None,
     ),
+    UnasPoolSensorDescription(
+        key="operation_progress",
+        translation_key="pool_operation_progress",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        value_fn=lambda p: p.operation_progress,
+    ),
+    UnasPoolSensorDescription(
+        key="scrubbing_last_result",
+        translation_key="pool_scrubbing_last_result",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda p: p.scrubbing_last_result or None,
+    ),
+    UnasPoolSensorDescription(
+        key="scrubbing_last_run",
+        translation_key="pool_scrubbing_last_run",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda p: p.scrubbing_last_run,
+    ),
+    UnasPoolSensorDescription(
+        key="scrubbing_next_run",
+        translation_key="pool_scrubbing_next_run",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda p: p.scrubbing_next_run,
+    ),
 )
 
 SHARE_SENSORS: tuple[UnasShareSensorDescription, ...] = (
@@ -465,7 +488,7 @@ async def async_setup_entry(
     async_add_entities(aggregate)
 
     def _pool(key: str) -> Pool:
-        return next(p for p in coordinator.data.storage.pools if _pool_key(p) == key)
+        return next(p for p in coordinator.data.storage.pools if p.key == key)
 
     def _share(key: str) -> Share:
         return next(s for s in (coordinator.data.shares or []) if s.id == key)
@@ -480,7 +503,7 @@ async def async_setup_entry(
         add_new_entities(
             async_add_entities,
             set(),
-            lambda: [_pool_key(p) for p in coordinator.data.storage.pools],
+            lambda: [p.key for p in coordinator.data.storage.pools],
             lambda key: [UnasPoolSensor(coordinator, _pool(key), d) for d in POOL_SENSORS],
         ),
         add_new_entities(
@@ -551,7 +574,7 @@ class UnasPoolSensor(UnasPoolEntity, SensorEntity):
         self.entity_description = description
 
     @property
-    def native_value(self) -> StateType:
+    def native_value(self) -> StateType | datetime:
         pool = self.pool
         return self.entity_description.value_fn(pool) if pool is not None else None
 

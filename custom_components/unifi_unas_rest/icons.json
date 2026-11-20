@@ -30,10 +30,15 @@
       "pool_status": { "default": "mdi:database-check" },
       "pool_usage": { "default": "mdi:gauge" },
       "pool_scrubbing": { "default": "mdi:broom" },
+      "pool_operation_progress": { "default": "mdi:progress-clock" },
+      "pool_scrubbing_last_result": { "default": "mdi:broom" },
+      "pool_scrubbing_last_run": { "default": "mdi:calendar-check" },
+      "pool_scrubbing_next_run": { "default": "mdi:calendar-clock" },
       "share_members": { "default": "mdi:account-multiple" },
       "share_encryption": { "default": "mdi:lock" }
     },
     "binary_sensor": {
+      "pool_scrubbing_scheduled": { "default": "mdi:calendar-sync" },
       "share_snapshot": { "default": "mdi:file-restore" },
       "share_backup": { "default": "mdi:cloud-upload-outline" }
     },

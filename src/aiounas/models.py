@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 _TB = 1_000_000_000_000
@@ -81,6 +81,22 @@ def _dt(value: Any) -> datetime | None:
         return datetime.fromisoformat(value)
     except ValueError:
         return None
+
+
+def _when(value: Any) -> datetime | None:
+    """Parse a Drive task timestamp: ISO-8601, or epoch milliseconds.
+
+    The Drive UI hands these fields to one formatter that accepts either form,
+    so both are read the same way here.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        try:
+            return datetime.fromtimestamp(value / 1000, tz=UTC)
+        except (OverflowError, OSError, ValueError):
+            return None
+    return _dt(value)
 
 
 def _channel(value: Any) -> str | None:
@@ -194,6 +210,13 @@ class Disk:
         )
 
 
+# Pool states, as the console's own UI groups them.
+_POOL_SCRUBBING = frozenset({"scrubbing", "scrubbingPaused"})
+_POOL_RAID_OPERATIONS = frozenset({"syncing", "expanding", "replacing", "repairing"})
+_POOL_AT_RISK = frozenset({"atRisk", "raidBadBlocksDetected", "raidBadBlocksAtRisk"})
+_POOL_FILESYSTEM_ISSUE = "fileSystemIssue"
+
+
 @dataclass(frozen=True, slots=True)
 class RaidGroup:
     """A RAID group within a pool."""
@@ -205,6 +228,7 @@ class RaidGroup:
     expected_protection: int
     is_ssd_cache: bool
     progress: int
+    id: str = ""
 
     @classmethod
     def from_api(cls, d: dict[str, Any]) -> RaidGroup:
@@ -216,6 +240,7 @@ class RaidGroup:
             expected_protection=_i0(d.get("expectedProtection")),
             is_ssd_cache=_b(d.get("isSSDCache")),
             progress=_i0(d.get("progress")),
+            id=_s(d.get("id")),
         )
 
 
@@ -233,6 +258,22 @@ class Pool:
     raid_groups: tuple[RaidGroup, ...]
     initializing_status: str
     scrubbing_status: str
+    active_raid_group_id: str = ""
+    scrubbing_progress: int = 0
+    scrubbing_scheduled: bool = False
+    scrubbing_last_result: str = ""
+    scrubbing_last_run: datetime | None = None
+    scrubbing_next_run: datetime | None = None
+    bad_blocks_severity: str = ""
+
+    @property
+    def key(self) -> str:
+        """Stable identity: the pool id, its number only on firmware that omits it.
+
+        `number` defaults to 0 when the field is missing, which would collide
+        across pools, so it is the fallback, never the identity.
+        """
+        return self.id or str(self.number)
 
     @property
     def raid_level(self) -> str:
@@ -252,10 +293,57 @@ class Pool:
     def is_healthy(self) -> bool:
         return self.status == "fullyOperational"
 
+    @property
+    def operation_progress(self) -> int | None:
+        """Percent done of the operation the pool is running, else None.
+
+        The console reports one progress per pool: the scrub's while scrubbing,
+        otherwise the active RAID group's while it syncs, rebuilds, expands or
+        is repaired. Outside those states the field is a stale 0, so it is None.
+        """
+        if self.status in _POOL_SCRUBBING:
+            return self.scrubbing_progress
+        if self.status in _POOL_RAID_OPERATIONS:
+            group = next(
+                (g for g in self.raid_groups if g.id == self.active_raid_group_id),
+                self.raid_groups[0] if self.raid_groups else None,
+            )
+            return group.progress if group is not None else None
+        return None
+
+    @property
+    def is_at_risk(self) -> bool:
+        """The console flags the pool at risk or reports bad blocks on its array.
+
+        The vendor's remedy is a data scrub; a file-system issue is separate
+        (`has_filesystem_issue`).
+        """
+        return self.status in _POOL_AT_RISK or bool(self.bad_blocks_severity)
+
+    @property
+    def has_filesystem_issue(self) -> bool:
+        """The console detected file-system errors on the pool."""
+        return self.status == _POOL_FILESYSTEM_ISSUE
+
+    @property
+    def has_problem(self) -> bool:
+        """The pool needs attention: anything but healthy or a routine scrub.
+
+        A scrub is maintenance and leaves redundancy intact, so it is not a
+        problem. A RAID operation (sync, rebuild, expansion, repair) is: the
+        array runs with reduced redundancy until it finishes. Bad blocks count
+        even while the status still reads healthy.
+        """
+        healthy = self.status == "fullyOperational" or self.status in _POOL_SCRUBBING
+        return not healthy or self.is_at_risk
+
     @classmethod
     def from_api(cls, d: dict[str, Any]) -> Pool:
         groups = tuple(RaidGroup.from_api(g) for g in d.get("raidGroups") or [])
         scrub = d.get("dataScrubbing") or {}
+        schedule = scrub.get("schedule") or {}
+        last_run = scrub.get("lastTaskRun") or {}
+        bad_blocks = d.get("raidBadBlocks") or {}
         return cls(
             number=_i0(d.get("number")),
             id=_s(d.get("id")),
@@ -267,6 +355,13 @@ class Pool:
             raid_groups=groups,
             initializing_status=_s(d.get("initializingStatus")),
             scrubbing_status=_s(scrub.get("status")),
+            active_raid_group_id=_s(d.get("activeRaidGroupId")),
+            scrubbing_progress=_i0(scrub.get("progress")),
+            scrubbing_scheduled=_b(schedule.get("enabled")),
+            scrubbing_last_result=_s(last_run.get("status")),
+            scrubbing_last_run=_when(last_run.get("finishedAt")),
+            scrubbing_next_run=_when(scrub.get("nextRun")),
+            bad_blocks_severity=_s(bad_blocks.get("severity")),
         )
 
 

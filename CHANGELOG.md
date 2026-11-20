@@ -8,6 +8,14 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Storage pool operations and health.** Each pool reports the progress of a
+  running rebuild, sync, expansion, repair or data scrub; whether a scrub
+  schedule is on, when the last scrub finished, its result, and when the next
+  one runs; and `at risk` and `file-system issue` binary sensors. A pool the
+  console reports at risk (including the bad-block detection of UniFi OS 6.0.11)
+  or with file-system errors also raises a repair, which goes away by itself
+  when the condition clears. The integration never starts a file-system repair.
+
 - **Controls refuse clearly while a critical operation runs.** From UniFi OS
   6.0.11 the console refuses a reboot, shut-down or install that would
   interrupt a critical operation such as a RAID rebuild or a firmware install.
@@ -31,6 +39,12 @@ adheres to [Semantic Versioning](https://semver.org/).
   Releases down to 2025.8 keep the form they require.
 
 ### Fixed
+
+- **A routine data scrub no longer turns on `Storage problem`.** The binary
+  sensor came on for any pool state other than healthy, so every scheduled
+  scrub raised it. A scrub leaves redundancy intact and now counts as healthy;
+  a sync, rebuild, expansion or repair, a pool at risk, bad blocks and
+  file-system errors still turn it on.
 
 - **The `aiounas` library requires aiohttp 3.9.2 and, for the CLI, typer 0.13.**
   With aiohttp 3.9.0 and 3.9.1 the certificate-authority TLS mode did not verify

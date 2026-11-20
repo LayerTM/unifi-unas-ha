@@ -221,6 +221,18 @@
       "pool_scrubbing": {
         "name": "Data scrubbing"
       },
+      "pool_operation_progress": {
+        "name": "Operation progress"
+      },
+      "pool_scrubbing_last_result": {
+        "name": "Data scrubbing last result"
+      },
+      "pool_scrubbing_last_run": {
+        "name": "Data scrubbing last run"
+      },
+      "pool_scrubbing_next_run": {
+        "name": "Data scrubbing next run"
+      },
       "share_usage": {
         "name": "Storage used"
       },
@@ -243,6 +255,15 @@
       },
       "disk_problem": {
         "name": "Problem"
+      },
+      "pool_at_risk": {
+        "name": "At risk"
+      },
+      "pool_filesystem_issue": {
+        "name": "File-system issue"
+      },
+      "pool_scrubbing_scheduled": {
+        "name": "Data scrubbing scheduled"
       },
       "share_snapshot": {
         "name": "Snapshots"
@@ -314,6 +335,14 @@
     "disk_at_risk": {
       "title": "Disk {bay} of {console} may be failing",
       "description": "{console} reports the drive in bay {bay} ({model}) as {state}. Reasons given: {reasons}.\n\nBack up the data on this {console} and plan to replace the drive. This notice goes away by itself once the console no longer reports the drive as at risk."
+    },
+    "pool_at_risk": {
+      "title": "Pool {pool} of {console} is at risk",
+      "description": "{console} reports storage pool {pool} as {state}: the console found a problem on the pool's array, such as bad blocks.\n\nBack up the data on this pool, then open UniFi Drive → Storage and run data scrubbing on the pool, as the console recommends. This notice goes away by itself once the console no longer reports the pool at risk."
+    },
+    "pool_filesystem_issue": {
+      "title": "Pool {pool} of {console} has file-system errors",
+      "description": "{console} detected file-system errors on storage pool {pool}.\n\nBack up the data on this pool, then open UniFi Drive → Storage and follow the console's repair guidance there. Repairing a file system can lose data, so this integration does not start it. This notice goes away by itself once the console no longer reports the errors."
     },
     "cert_mismatch": {
       "title": "UniFi UNAS certificate changed",

@@ -15,9 +15,15 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import UnasConfigEntry
-from .aiounas import Disk, Share
+from .aiounas import Disk, Pool, Share
 from .coordinator import UnasData, UnasDataUpdateCoordinator
-from .entity import UnasDiskEntity, UnasEntity, UnasShareEntity, add_new_entities
+from .entity import (
+    UnasDiskEntity,
+    UnasEntity,
+    UnasPoolEntity,
+    UnasShareEntity,
+    add_new_entities,
+)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -31,13 +37,18 @@ class UnasDiskBinaryDescription(BinarySensorEntityDescription):
 
 
 @dataclass(frozen=True, kw_only=True)
+class UnasPoolBinaryDescription(BinarySensorEntityDescription):
+    value_fn: Callable[[Pool], bool]
+
+
+@dataclass(frozen=True, kw_only=True)
 class UnasShareBinaryDescription(BinarySensorEntityDescription):
     value_fn: Callable[[Share], bool]
 
 
 def _has_storage_problem(data: UnasData) -> bool:
     pools = data.storage.pools
-    return any(p.status != "fullyOperational" for p in pools) or data.storage.at_risk_disk_count > 0
+    return any(p.has_problem for p in pools) or data.storage.at_risk_disk_count > 0
 
 
 BINARY_SENSORS: tuple[UnasBinaryDescription, ...] = (
@@ -55,6 +66,27 @@ DISK_BINARY_SENSORS: tuple[UnasDiskBinaryDescription, ...] = (
         translation_key="disk_problem",
         device_class=BinarySensorDeviceClass.PROBLEM,
         value_fn=lambda disk: disk.is_at_risk,
+    ),
+)
+
+POOL_BINARY_SENSORS: tuple[UnasPoolBinaryDescription, ...] = (
+    UnasPoolBinaryDescription(
+        key="at_risk",
+        translation_key="pool_at_risk",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        value_fn=lambda p: p.is_at_risk,
+    ),
+    UnasPoolBinaryDescription(
+        key="filesystem_issue",
+        translation_key="pool_filesystem_issue",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        value_fn=lambda p: p.has_filesystem_issue,
+    ),
+    UnasPoolBinaryDescription(
+        key="scrubbing_scheduled",
+        translation_key="pool_scrubbing_scheduled",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda p: p.scrubbing_scheduled,
     ),
 )
 
@@ -88,6 +120,9 @@ async def async_setup_entry(
     aggregate.extend(UnasBinarySensor(coordinator, d) for d in BINARY_SENSORS)
     async_add_entities(aggregate)
 
+    def _pool(key: str) -> Pool:
+        return next(p for p in coordinator.data.storage.pools if p.key == key)
+
     def _share(key: str) -> Share:
         return next(s for s in (coordinator.data.shares or []) if s.id == key)
 
@@ -97,6 +132,14 @@ async def async_setup_entry(
             set(),
             lambda: [d.slot for d in coordinator.data.storage.disks],
             lambda slot: [UnasDiskBinarySensor(coordinator, slot, d) for d in DISK_BINARY_SENSORS],
+        ),
+        add_new_entities(
+            async_add_entities,
+            set(),
+            lambda: [p.key for p in coordinator.data.storage.pools],
+            lambda key: [
+                UnasPoolBinarySensor(coordinator, _pool(key), d) for d in POOL_BINARY_SENSORS
+            ],
         ),
         add_new_entities(
             async_add_entities,
@@ -161,6 +204,24 @@ class UnasDiskBinarySensor(UnasDiskEntity, BinarySensorEntity):
     def is_on(self) -> bool | None:
         disk = self.disk
         return self.entity_description.value_fn(disk) if disk is not None else None
+
+
+class UnasPoolBinarySensor(UnasPoolEntity, BinarySensorEntity):
+    entity_description: UnasPoolBinaryDescription
+
+    def __init__(
+        self,
+        coordinator: UnasDataUpdateCoordinator,
+        pool: Pool,
+        description: UnasPoolBinaryDescription,
+    ) -> None:
+        super().__init__(coordinator, pool, description.key)
+        self.entity_description = description
+
+    @property
+    def is_on(self) -> bool | None:
+        pool = self.pool
+        return self.entity_description.value_fn(pool) if pool is not None else None
 
 
 class UnasShareBinarySensor(UnasShareEntity, BinarySensorEntity):
