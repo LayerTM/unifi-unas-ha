@@ -38,3 +38,28 @@ jobs:
         run: mypy --strict
       - name: Tests + coverage gate
         run: pytest --cov=aiounas --cov-report=term-missing --cov-fail-under=90
+
+  # Every floor in `pyproject.toml` is a promise that the library works on that
+  # version; `test` above only sees the newest release of each. This installs the
+  # oldest version every direct dependency allows, on the oldest supported
+  # Python, and runs the same suite. A floor is raised only when this fails, to
+  # the oldest version that passes, with the reason beside it. Deprecation
+  # warnings are not errors here: they are about the newest releases, and `test`
+  # turns them into failures.
+  test-minimum-deps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Install CI tools
+        run: pip install --require-hashes --no-deps -r .github/ci-tools/requirements.txt
+      - name: Install the oldest version each dependency allows
+        run: uv pip install --system --resolution lowest-direct -e ".[dev,cli,mcp]"
+      - name: Versions under test
+        run: pip list --format=freeze
+      - name: Tests + coverage gate
+        run: >-
+          pytest -o filterwarnings= -W default::DeprecationWarning
+          --cov=aiounas --cov-report=term-missing --cov-fail-under=90

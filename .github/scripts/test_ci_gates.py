@@ -77,6 +77,8 @@ check("the project with extras floats", floating(complaint('pip install -e ".[de
 check("the project alone floats", floating(complaint('pip install -e "."')), True)
 check("the minimum harness resolution floats", floating(complaint(
     'uv pip install --system --exclude-newer "$CUTOFF" \\\n  "pytest-homeassistant-custom-component" "homeassistant==$MIN"')), True)
+check("the floors job floats", floating(complaint('uv pip install --system --resolution lowest-direct -e ".[dev,cli,mcp]"')), True)
+check("lowest-direct of a named package does not float", floating(complaint("uv pip install --system --resolution lowest-direct uv")), False)
 check("a named package does not float", floating(complaint("pip install uv")), False)
 check("the project plus a package does not float", floating(complaint('pip install -e "." uv')), False)
 check("another path does not float", floating(complaint('pip install -e "../other"')), False)

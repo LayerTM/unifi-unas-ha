@@ -45,8 +45,13 @@ FLOATING = (
     # The project with its extras: the library and test dependencies are lower
     # bounds, and CI tests the newest release of each.
     re.compile(r'pip install -e "\.(\[[a-z,]+\])?"'),
+    # The project with its extras at the oldest version each dependency allows:
+    # the job that proves the floors in `pyproject.toml`.
+    re.compile(r'pip install --system --resolution lowest-direct -e "\.(\[[a-z,]+\])?"'),
     # The minimum-version job resolves the harness for the oldest supported Home
-    # Assistant as of the day that release was published.
+    # Assistant as of the day that release was published. Any package list is
+    # accepted after the cut-off: `--exclude-newer` pins the whole resolution to
+    # that date, which is what this job is for.
     re.compile(r'pip install --system --exclude-newer "\$CUTOFF"\s.*'),
 )
 
