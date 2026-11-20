@@ -142,11 +142,13 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
                 if self.capabilities.users
                 else None
             )
-            update_info = (
-                await self._optional(self.client.get_update_info)
-                if self.capabilities.updates
+            # One /api/system read serves every reading derived from it.
+            system = (
+                await self._optional(self.client.get_system_readings)
+                if self.capabilities.updates or self.capabilities.console_backup
                 else None
             )
+            update_info = system.update_info if system and self.capabilities.updates else None
             fan_control = await self._optional(self.client.get_fan_control)
             notifications = (
                 await self._optional(self.client.get_notification_summary)
@@ -165,9 +167,7 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
                 else None
             )
             console_backup = (
-                await self._optional(self.client.get_console_backup)
-                if self.capabilities.console_backup
-                else None
+                system.console_backup if system and self.capabilities.console_backup else None
             )
         except UnasAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err

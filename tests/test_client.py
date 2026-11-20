@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from typing import Any
 
 import aiohttp
 import pytest
@@ -204,6 +205,23 @@ async def test_backup_task_count_propagates_non_capability_error() -> None:
     async with _session_client_at(PATH_REMOTE_BACKUP_TASKS, _error(502)) as client:
         with pytest.raises(UnasApiError):
             await client.get_backup_task_count()
+
+
+async def test_system_readings_are_one_request(session, unas_server) -> None:
+    """Update info and the console backup setting derive from a single /api/system read."""
+    client = _client(session, unas_server, SessionAuth("user", "pass"))
+    calls: list[str] = []
+    real = client._transport.get_json
+
+    async def counting(path: str) -> Any:
+        calls.append(path)
+        return await real(path)
+
+    client._transport.get_json = counting  # type: ignore[method-assign]
+    readings = await client.get_system_readings()
+    assert calls == ["/api/system"]
+    assert readings.console_backup.frequency == "weekly"
+    assert readings.update_info.has_data
 
 
 async def test_get_console_backup_session(session, unas_server) -> None:

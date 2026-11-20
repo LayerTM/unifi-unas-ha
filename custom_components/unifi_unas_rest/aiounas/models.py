@@ -718,6 +718,22 @@ class ConsoleBackup:
 
 
 @dataclass(frozen=True, slots=True)
+class SystemReadings:
+    """Everything read from one full /api/system payload.
+
+    The payload is fetched once and every reading derived from it, so adding a
+    reading does not add a request.
+    """
+
+    update_info: UpdateInfo
+    console_backup: ConsoleBackup
+
+    @classmethod
+    def from_api(cls, d: dict[str, Any]) -> SystemReadings:
+        return cls(update_info=UpdateInfo.from_api(d), console_backup=ConsoleBackup.from_api(d))
+
+
+@dataclass(frozen=True, slots=True)
 class NotificationSummary:
     """Privacy-safe summary of recent notifications: counts and latest time only.
 

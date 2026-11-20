@@ -37,6 +37,7 @@ from .models import (
     Storage,
     StorageIO,
     SystemIdentity,
+    SystemReadings,
     UpdateInfo,
 )
 from .transport import UnasTransport
@@ -115,6 +116,10 @@ class UnasClient:
         payload with no firmware/apps data (the latest-version fields are None).
         """
         return UpdateInfo.from_api(await self._transport.get_json(PATH_SYSTEM))
+
+    async def get_system_readings(self) -> SystemReadings:
+        """Update availability and console backup setting from ONE /api/system read."""
+        return SystemReadings.from_api(await self._transport.get_json(PATH_SYSTEM))
 
     async def get_console_backup(self) -> ConsoleBackup:
         """Console auto-backup setting and schedule frequency from the full /api/system.

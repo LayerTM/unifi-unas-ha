@@ -29,6 +29,7 @@ from .models import (
     Storage,
     StorageIO,
     SystemIdentity,
+    SystemReadings,
     UpdateInfo,
 )
 from .tls import (
@@ -61,6 +62,7 @@ __all__ = [
     "Storage",
     "StorageIO",
     "SystemIdentity",
+    "SystemReadings",
     "TlsMode",
     "UnasActionClient",
     "UnasApiError",
