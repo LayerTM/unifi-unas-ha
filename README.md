@@ -114,7 +114,7 @@ Nothing is written to or left on the NAS, so no cleanup is needed on the device 
 
 ## Control actions (opt-in)
 
-Off by default. Enable **Configure → Enable control actions** to add buttons for **reboot, shut down, install UniFi OS update, install Drive-app update**, a **fan-mode selector**, and the **Install** buttons on the update entities. Controls require **username/password** auth — an API key is read-only, and **power/firmware need an owner/admin account**; a refused action reports a clear permissions error.
+Off by default. Enable **Configure → Enable control actions** to add buttons for **reboot, shut down, install UniFi OS update, install Drive-app update**, a **fan-mode selector**, and the **Install** buttons on the update entities. Controls require **username/password** auth — an API key is read-only, and **power/firmware need an owner/admin account**; a refused action reports a clear permissions error. While the console runs a critical operation (UniFi OS 6.0.11+: for example a RAID rebuild or a firmware install), it refuses reboot, shut-down and installs, and the error names the operation in the way. The console's override is never sent: wait for the operation to finish.
 
 > Snapshot control is intentionally **not** offered: the UNAS API exposes no writable snapshot endpoint (a live test showed the only candidate write is silently ignored). The read-only *Snapshots* binary sensor reflects each share's scheduled-snapshot flag.
 
@@ -181,7 +181,7 @@ The integration **polls** the console's local REST API (`local_polling`) on a fi
 - **"Failed to set up: unauthorized for /api/notifications" with an API key** — fixed in **v1.8.2**. UniFi OS 5.1.33 with Drive 4.4.9 refuses an API key on the session-only readings with `401` where earlier firmware used `403`, and earlier versions read that as an invalid credential: setup failed, re-authentication reported success, and setup failed again on the same endpoint. Update to v1.8.2; the key needs no changes.
 - **It keeps asking to re-authenticate, but the credential still works** — fixed in **v1.7.3**. Earlier versions read a console that was busy restarting (typically during a firmware update) as an expired session, and Home Assistant treats that as final: polling stops until you click through re-authentication. Update, then reload the entry — reloading also clears the stale *"Authentication expired"* repair.
 - **Controls don't appear after enabling them** — controls require **username/password** auth; with an API key the option is rejected. Power and firmware actions additionally need an **owner/admin** account.
-- **A control returns an error** — the message states the cause (insufficient permissions, auth failed, or the device rejected it). Owner rights are required for reboot/shutdown/firmware.
+- **A control returns an error** — the message states the cause (insufficient permissions, auth failed, a critical operation in progress, or the device rejected it). Owner rights are required for reboot/shutdown/firmware.
 - **A removed disk/share lingers as a device** — it goes *unavailable*; delete it from the device page (the integration allows removing sub-devices that no longer exist).
 - **Diagnostics** — download redacted diagnostics from the device page (serials and credentials are masked) when reporting an issue.
 

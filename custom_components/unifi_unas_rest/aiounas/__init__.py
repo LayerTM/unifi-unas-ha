@@ -12,6 +12,7 @@ from .exceptions import (
     UnasCapabilityError,
     UnasConnectionError,
     UnasError,
+    UnasOperationBlocked,
 )
 from .models import (
     Application,
@@ -67,6 +68,7 @@ __all__ = [
     "UnasClient",
     "UnasConnectionError",
     "UnasError",
+    "UnasOperationBlocked",
     "UnasTransport",
     "UpdateInfo",
     "async_probe_fingerprint",
