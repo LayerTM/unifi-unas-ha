@@ -108,7 +108,11 @@ implicit_reexport = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-addopts = "-q --strict-markers"
+# The Home Assistant harness installs respx, whose pytest plugin imports httpx
+# when it loads; core must alias httpx before that import, and plugins load in no
+# fixed order, so the run fails at startup whenever respx loads first. These
+# tests do not use respx, so its plugin stays off, as in core's own configuration.
+addopts = "-q --strict-markers -p no:respx"
 testpaths = ["tests"]
 # Home Assistant reports the deprecations it catches an integration using through
 # its logs, which `tests_ha/conftest.py` watches. Everything else — the standard
