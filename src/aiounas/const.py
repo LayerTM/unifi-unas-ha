@@ -27,6 +27,9 @@ PATH_STORAGE_IO: Final = "/proxy/drive/api/v1/systems/storage-io-stats"  # sessi
 # The console averages disk throughput into buckets of this many seconds and
 # only reports completed ones; asking for exactly one bucket returns the latest.
 STORAGE_IO_INTERVAL: Final = 300
+# Drive backup tasks: two task lists, one per kind. Only their totals are read.
+PATH_REMOTE_BACKUP_TASKS: Final = "/proxy/drive/api/v1/remote-backup/tasks"
+PATH_M365_BACKUP_TASKS: Final = "/proxy/drive/api/v2/m365-backup/tasks"
 
 # Write / action endpoints (v2). Power and update paths are well-established;
 # the fan-control payload shape is UNVERIFIED against live hardware.

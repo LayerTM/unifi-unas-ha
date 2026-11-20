@@ -27,6 +27,7 @@ from homeassistant.helpers.typing import StateType
 
 from . import UnasConfigEntry
 from .aiounas import Disk, Pool, Share
+from .const import BACKUP_FREQUENCIES
 from .coordinator import UnasData, UnasDataUpdateCoordinator
 from .entity import (
     UnasDiskEntity,
@@ -288,6 +289,29 @@ STORAGE_IO_SENSORS: tuple[UnasSensorDescription, ...] = (
     ),
 )
 
+# Session-only. How many Drive backup tasks exist — a count, nothing about them.
+BACKUP_TASKS = UnasSensorDescription(
+    key="backup_tasks",
+    translation_key="backup_tasks",
+    state_class=SensorStateClass.MEASUREMENT,
+    entity_category=EntityCategory.DIAGNOSTIC,
+    value_fn=lambda d: d.backup_task_count,
+)
+
+# Session-only. How often the console backs itself up (a setting, not a result).
+CONSOLE_BACKUP_FREQUENCY = UnasSensorDescription(
+    key="console_backup_frequency",
+    translation_key="console_backup_frequency",
+    device_class=SensorDeviceClass.ENUM,
+    options=list(BACKUP_FREQUENCIES),
+    entity_category=EntityCategory.DIAGNOSTIC,
+    value_fn=lambda d: (
+        d.console_backup.frequency
+        if d.console_backup and d.console_backup.frequency in BACKUP_FREQUENCIES
+        else None
+    ),
+)
+
 DISK_SENSORS: tuple[UnasDiskSensorDescription, ...] = (
     UnasDiskSensorDescription(
         key="temperature",
@@ -483,6 +507,10 @@ async def async_setup_entry(
         aggregate.append(UnasSensor(coordinator, LAST_EVENT))
     if caps.logs:
         aggregate.append(UnasSensor(coordinator, LOG_ENTRIES))
+    if caps.backup_tasks:
+        aggregate.append(UnasSensor(coordinator, BACKUP_TASKS))
+    if caps.console_backup:
+        aggregate.append(UnasSensor(coordinator, CONSOLE_BACKUP_FREQUENCY))
     if caps.storage_io:
         aggregate.extend(UnasSensor(coordinator, d) for d in STORAGE_IO_SENSORS)
     async_add_entities(aggregate)

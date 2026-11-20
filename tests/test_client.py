@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from typing import Any
 
 import aiohttp
 import pytest
@@ -12,7 +13,7 @@ from aiohttp.test_utils import TestServer
 
 from aiounas.auth import ApiKeyAuth, SessionAuth
 from aiounas.client import UnasClient
-from aiounas.const import PATH_LOGS, PATH_NOTIFICATIONS, PATH_STORAGE_IO
+from aiounas.const import PATH_LOGS, PATH_NOTIFICATIONS, PATH_REMOTE_BACKUP_TASKS, PATH_STORAGE_IO
 from aiounas.exceptions import UnasApiError, UnasCapabilityError
 
 
@@ -181,6 +182,62 @@ async def test_get_storage_io_api_key_denied(session, unas_server) -> None:
     client = _client(session, unas_server, ApiKeyAuth(unas_server.api_key))
     with pytest.raises(UnasCapabilityError, match="session"):
         await client.get_storage_io()
+
+
+async def test_get_backup_task_count_sums_both_lists(session, unas_server) -> None:
+    client = _client(session, unas_server, SessionAuth("user", "pass"))
+    assert await client.get_backup_task_count() == 3
+
+
+async def test_get_backup_task_count_api_key_denied(session, unas_server) -> None:
+    client = _client(session, unas_server, ApiKeyAuth(unas_server.api_key))
+    with pytest.raises(UnasCapabilityError, match="session"):
+        await client.get_backup_task_count()
+
+
+async def test_backup_task_count_maps_403_to_capability() -> None:
+    async with _session_client_at(PATH_REMOTE_BACKUP_TASKS, _error(403)) as client:
+        with pytest.raises(UnasCapabilityError, match="session"):
+            await client.get_backup_task_count()
+
+
+async def test_backup_task_count_propagates_non_capability_error() -> None:
+    async with _session_client_at(PATH_REMOTE_BACKUP_TASKS, _error(502)) as client:
+        with pytest.raises(UnasApiError):
+            await client.get_backup_task_count()
+
+
+async def test_system_readings_are_one_request(session, unas_server) -> None:
+    """Update info and the console backup setting derive from a single /api/system read."""
+    client = _client(session, unas_server, SessionAuth("user", "pass"))
+    calls: list[str] = []
+    real = client._transport.get_json
+
+    async def counting(path: str) -> Any:
+        calls.append(path)
+        return await real(path)
+
+    client._transport.get_json = counting  # type: ignore[method-assign]
+    readings = await client.get_system_readings()
+    assert calls == ["/api/system"]
+    assert readings.console_backup.frequency == "weekly"
+    assert readings.update_info.has_data
+
+
+async def test_get_console_backup_session(session, unas_server) -> None:
+    client = _client(session, unas_server, SessionAuth("user", "pass"))
+    backup = await client.get_console_backup()
+    assert backup.enabled is True
+    assert backup.frequency == "weekly"
+    assert backup.has_data
+
+
+async def test_get_console_backup_api_key_has_no_data(session, unas_server) -> None:
+    """An API key gets the short payload: nothing to report, nothing invented."""
+    client = _client(session, unas_server, ApiKeyAuth(unas_server.api_key))
+    backup = await client.get_console_backup()
+    assert (backup.enabled, backup.frequency) == (None, None)
+    assert not backup.has_data
 
 
 async def test_base_url_and_prepare(session, unas_server) -> None:

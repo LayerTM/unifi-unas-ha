@@ -22,12 +22,23 @@ class Capabilities:
     notifications: bool
     logs: bool
     storage_io: bool
+    # Defaulted so a Capabilities built before these readings existed still works.
+    backup_tasks: bool = False
+    console_backup: bool = False
 
 
 async def _has_update_data(client: UnasClient) -> bool:
     """True if the full /api/system (session) exposes firmware update info."""
     try:
         return (await client.get_update_info()).has_data
+    except UnasError:
+        return False
+
+
+async def _has_console_backup(client: UnasClient) -> bool:
+    """True if the full /api/system (session) carries the console backup settings."""
+    try:
+        return (await client.get_console_backup()).has_data
     except UnasError:
         return False
 
@@ -95,4 +106,6 @@ async def probe(client: UnasClient) -> Capabilities:
         notifications=await optional(client.get_notification_summary),
         logs=await optional(client.get_log_summary),
         storage_io=await optional(client.get_storage_io),
+        backup_tasks=await optional(client.get_backup_task_count),
+        console_backup=await _has_console_backup(client),
     )

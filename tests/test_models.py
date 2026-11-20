@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from aiounas.models import (
+    ConsoleBackup,
     DeviceInfo,
     Disk,
     LogSummary,
@@ -403,3 +404,21 @@ def test_storage_io_tolerates_missing_samples(payload: dict[str, Any]) -> None:
 )
 def test_disk_vendor(model: str, vendor: str | None) -> None:
     assert Disk.from_api({"model": model}).vendor == vendor
+
+
+@pytest.mark.parametrize(
+    ("payload", "enabled", "frequency"),
+    [
+        ({"autoBackupEnabled": True, "backupSchedule": {"frequency": "weekly"}}, True, "weekly"),
+        ({"autoBackupEnabled": False, "backupSchedule": {"frequency": "DAILY"}}, False, "daily"),
+        ({"autoBackupEnabled": "yes", "backupSchedule": {"frequency": ""}}, None, None),
+        ({"backupSchedule": None}, None, None),
+        ({}, None, None),
+    ],
+)
+def test_console_backup_reads_only_what_is_there(
+    payload: dict[str, Any], enabled: bool | None, frequency: str | None
+) -> None:
+    backup = ConsoleBackup.from_api(payload)
+    assert (backup.enabled, backup.frequency) == (enabled, frequency)
+    assert backup.has_data is (enabled is not None or frequency is not None)

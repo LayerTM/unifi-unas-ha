@@ -16,6 +16,7 @@ from .exceptions import (
 )
 from .models import (
     Application,
+    ConsoleBackup,
     DeviceInfo,
     Disk,
     FanControl,
@@ -28,6 +29,7 @@ from .models import (
     Storage,
     StorageIO,
     SystemIdentity,
+    SystemReadings,
     UpdateInfo,
 )
 from .tls import (
@@ -46,6 +48,7 @@ __all__ = [
     "ApiKeyAuth",
     "Application",
     "Capabilities",
+    "ConsoleBackup",
     "DeviceInfo",
     "Disk",
     "FanControl",
@@ -59,6 +62,7 @@ __all__ = [
     "Storage",
     "StorageIO",
     "SystemIdentity",
+    "SystemReadings",
     "TlsMode",
     "UnasActionClient",
     "UnasApiError",

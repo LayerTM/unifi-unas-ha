@@ -182,6 +182,17 @@
       "log_entries": {
         "name": "Log entries"
       },
+      "backup_tasks": {
+        "name": "Backup tasks"
+      },
+      "console_backup_frequency": {
+        "name": "Console backup frequency",
+        "state": {
+          "daily": "Daily",
+          "weekly": "Weekly",
+          "monthly": "Monthly"
+        }
+      },
       "disk_temperature": {
         "name": "Temperature"
       },
@@ -252,6 +263,9 @@
       },
       "storage_problem": {
         "name": "Storage problem"
+      },
+      "console_auto_backup": {
+        "name": "Console auto-backup"
       },
       "disk_problem": {
         "name": "Problem"

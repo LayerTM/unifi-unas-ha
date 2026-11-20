@@ -14,8 +14,10 @@ from .const import (
     PATH_DEVICE_INFO,
     PATH_FAN_CONTROL,
     PATH_LOGS,
+    PATH_M365_BACKUP_TASKS,
     PATH_NETWORK_IO,
     PATH_NOTIFICATIONS,
+    PATH_REMOTE_BACKUP_TASKS,
     PATH_SHARES,
     PATH_STORAGE,
     PATH_STORAGE_IO,
@@ -25,6 +27,7 @@ from .const import (
 )
 from .exceptions import UnasApiError, UnasCapabilityError
 from .models import (
+    ConsoleBackup,
     DeviceInfo,
     FanControl,
     LogSummary,
@@ -34,6 +37,7 @@ from .models import (
     Storage,
     StorageIO,
     SystemIdentity,
+    SystemReadings,
     UpdateInfo,
 )
 from .transport import UnasTransport
@@ -41,6 +45,17 @@ from .transport import UnasTransport
 _SHARES_HINT = "shares require session (username/password) auth"
 _USERS_HINT = "the user count requires session (username/password) auth"
 _SESSION_HINT = "requires session (username/password) auth"
+
+
+def _task_total(body: Any, rows_key: str) -> int:
+    """The number of tasks in one backup task list; 0 for an unexpected shape."""
+    if not isinstance(body, dict):
+        return 0
+    total = body.get("total")
+    if isinstance(total, int) and not isinstance(total, bool):
+        return total
+    rows = body.get(rows_key)
+    return len(rows) if isinstance(rows, list) else 0
 
 
 class UnasClient:
@@ -101,6 +116,29 @@ class UnasClient:
         payload with no firmware/apps data (the latest-version fields are None).
         """
         return UpdateInfo.from_api(await self._transport.get_json(PATH_SYSTEM))
+
+    async def get_system_readings(self) -> SystemReadings:
+        """Update availability and console backup setting from ONE /api/system read."""
+        return SystemReadings.from_api(await self._transport.get_json(PATH_SYSTEM))
+
+    async def get_console_backup(self) -> ConsoleBackup:
+        """Console auto-backup setting and schedule frequency from the full /api/system.
+
+        Like :meth:`get_update_info`, an API key gets the short payload, so both
+        values come back None (``has_data`` is False).
+        """
+        return ConsoleBackup.from_api(await self._transport.get_json(PATH_SYSTEM))
+
+    async def get_backup_task_count(self) -> int:
+        """Return how many Drive backup tasks exist (remote plus Microsoft 365).
+
+        Only the totals are read; task names, targets and run history are never
+        returned. Both lists must answer: a count of one list would read as the
+        count of all of them. A refusal surfaces as :class:`UnasCapabilityError`.
+        """
+        remote = await self._get_session_only(PATH_REMOTE_BACKUP_TASKS)
+        m365 = await self._get_session_only(PATH_M365_BACKUP_TASKS)
+        return _task_total(remote, "data") + _task_total(m365, "tasks")
 
     async def get_shares(self) -> list[Share]:
         """Return shared drives (session auth only).

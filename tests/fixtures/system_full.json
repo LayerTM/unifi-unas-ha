@@ -1,4 +1,6 @@
 {
+  "autoBackupEnabled": true,
+  "backupSchedule": {"frequency": "weekly", "hour": 3, "dayOfWeek": 1, "localRetention": 5, "destinations": ["local"]},
   "mac": "AABBCC000001",
   "name": "Name-Example",
   "deviceState": "setup",

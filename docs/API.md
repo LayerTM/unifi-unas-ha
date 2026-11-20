@@ -144,6 +144,8 @@ The client reads these endpoints:
 | GET | `/api/notifications` | Recent-notification **aggregate** — **session only** |
 | GET | `/proxy/drive/api/v2/systems/logs` | Recent-log **aggregate** — **session only** |
 | GET | `/proxy/drive/api/v1/systems/storage-io-stats` | System-wide disk throughput — **session only** |
+| GET | `/proxy/drive/api/v1/remote-backup/tasks` | Remote backup tasks — only `total` is read |
+| GET | `/proxy/drive/api/v2/m365-backup/tasks` | Microsoft 365 backup tasks — only the list length is read |
 
 `GET /proxy/drive/api/v2/systems/fan-control` returns the active fan **profile**
 (no RPM): `{"availableProfiles": ["cooling", "default", "quiet"], "currentProfile": "<name>"}`.
@@ -381,6 +383,21 @@ a count and the newest `createdAt`. The log `data` payloads are **never retained
 ```json
 { "logs": [ { "id": "…", "category": "system", "createdAt": "2026-07-02T06:00:00Z" } ] }
 ```
+
+### Backup tasks and the console's auto-backup setting
+
+The backup task count is the remote total plus the Microsoft 365 list length.
+Both lists must answer; if either is refused or absent on a firmware, the count
+is not offered. Measured with a local account: both answer `200`, with
+`{"err": null, "type": "…", "data": [], "offset": 0, "limit": 50, "total": 0}`
+and `{"tasks": []}` when no task exists. Local and rsync tasks have no readable
+list at `v1` or `v2` (`404`).
+
+The console's own auto-backup is read from the full `/api/system` payload
+(local account): `autoBackupEnabled` (boolean) and `backupSchedule.frequency`
+(`daily`, `weekly` or `monthly`, case varies by firmware; anything else reads as
+unknown). An API key gets the short payload without either. When the last
+console backup ran is behind a separate account permission and is not read.
 
 ### `GET /proxy/drive/api/v1/systems/storage-io-stats` — session only
 

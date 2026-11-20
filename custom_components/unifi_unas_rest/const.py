@@ -51,4 +51,7 @@ DEFAULT_SCAN_INTERVAL: Final = 30
 MIN_SCAN_INTERVAL: Final = 15
 MAX_SCAN_INTERVAL: Final = 3600
 
+# The schedule frequencies a console backs itself up at; an unknown one reads as no value.
+BACKUP_FREQUENCIES: Final = ("daily", "weekly", "monthly")
+
 MANUFACTURER: Final = "Ubiquiti"

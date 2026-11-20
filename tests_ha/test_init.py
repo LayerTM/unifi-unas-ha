@@ -665,6 +665,8 @@ async def _all_caps(**overrides: bool) -> Capabilities:
         notifications=True,
         logs=True,
         storage_io=True,
+        backup_tasks=True,
+        console_backup=True,
     )
     return Capabilities(**{**base, **overrides})
 
@@ -766,6 +768,8 @@ async def test_diagnostics_name_the_readings_out_of_scope(
         notifications=False,
         logs=False,
         storage_io=False,
+        backup_tasks=False,
+        console_backup=False,
     )
     with patch("custom_components.unifi_unas_rest.probe", AsyncMock(return_value=caps)):
         await _setup(hass, config_entry)
@@ -777,6 +781,8 @@ async def test_diagnostics_name_the_readings_out_of_scope(
         "firmware updates",
         "notifications",
         "logs",
+        "backup tasks",
+        "console backup",
         "storage throughput",
     ]
     # Every capability is reported, not a hand-picked subset.
@@ -790,6 +796,8 @@ async def test_diagnostics_name_the_readings_out_of_scope(
         "notifications",
         "logs",
         "storage_io",
+        "backup_tasks",
+        "console_backup",
     }
 
 

@@ -23,6 +23,8 @@
       "applications": { "default": "mdi:apps" },
       "recent_events": { "default": "mdi:bell-outline" },
       "log_entries": { "default": "mdi:format-list-bulleted" },
+      "backup_tasks": { "default": "mdi:backup-restore" },
+      "console_backup_frequency": { "default": "mdi:calendar-clock" },
       "disk_state": { "default": "mdi:harddisk" },
       "disk_health_score": { "default": "mdi:heart-pulse" },
       "disk_bad_sectors": { "default": "mdi:alert-circle-outline" },
