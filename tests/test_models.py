@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -13,6 +14,7 @@ from aiounas.models import (
     LogSummary,
     NetworkIO,
     NotificationSummary,
+    Pool,
     Share,
     Storage,
     StorageIO,
@@ -88,6 +90,105 @@ def test_storage_parses_pools_and_disks(fixture: Fx) -> None:
     assert s.total_capacity == 23991544709120
     assert s.at_risk_disk_count == 0
     assert s.average_disk_temperature == 48.0
+
+
+def _pool(fixture: Fx, **changes: Any) -> Pool:
+    raw = fixture("storage")["pools"][0]
+    raw.update(changes)
+    return Storage.from_api({"pools": [raw]}).pools[0]
+
+
+def test_idle_pool_reports_no_operation_and_no_scrub_history(fixture: Fx) -> None:
+    p = _pool(fixture)
+    assert p.key == "00000000-0000-4000-8000-000000000001"
+    assert p.operation_progress is None  # a stale 0 outside an operation is not progress
+    assert p.scrubbing_scheduled is False
+    assert (p.scrubbing_last_result, p.scrubbing_last_run, p.scrubbing_next_run) == ("", None, None)
+    assert (p.is_at_risk, p.has_filesystem_issue) == (False, False)
+
+
+@pytest.mark.parametrize("status", ["syncing", "expanding", "replacing", "repairing"])
+def test_raid_operation_progress_comes_from_the_active_raid_group(fixture: Fx, status: str) -> None:
+    raw = fixture("storage")["pools"][0]
+    first = dict(raw["raidGroups"][0], progress=10)
+    active = dict(first, id="00000000:00000000:00000000:00000002", number=2, progress=42)
+    p = _pool(
+        fixture,
+        status=status,
+        raidGroups=[first, active],
+        activeRaidGroupId=active["id"],
+    )
+    assert p.operation_progress == 42
+
+
+def test_raid_operation_without_an_active_group_id_uses_the_first_group(fixture: Fx) -> None:
+    raw = fixture("storage")["pools"][0]
+    group = dict(raw["raidGroups"][0], progress=17)
+    p = _pool(fixture, status="syncing", raidGroups=[group], activeRaidGroupId=None)
+    assert p.operation_progress == 17
+    assert _pool(fixture, status="syncing", raidGroups=[]).operation_progress is None
+
+
+@pytest.mark.parametrize("status", ["scrubbing", "scrubbingPaused"])
+def test_scrub_progress_comes_from_the_scrub_not_the_raid_group(fixture: Fx, status: str) -> None:
+    raw = fixture("storage")["pools"][0]
+    scrub = dict(raw["dataScrubbing"], status="inProgress", progress=63)
+    group = dict(raw["raidGroups"][0], progress=5)
+    p = _pool(fixture, status=status, dataScrubbing=scrub, raidGroups=[group])
+    assert p.operation_progress == 63
+
+
+def test_scrub_schedule_and_last_run_are_parsed(fixture: Fx) -> None:
+    raw = fixture("storage")["pools"][0]
+    scrub = dict(
+        raw["dataScrubbing"],
+        schedule={"enabled": True},
+        lastTaskRun={"status": "repaired", "finishedAt": "2026-01-04T03:00:00Z"},
+        nextRun="2026-02-01T02:00:00Z",
+    )
+    p = _pool(fixture, dataScrubbing=scrub)
+    assert p.scrubbing_scheduled is True
+    assert p.scrubbing_last_result == "repaired"
+    assert p.scrubbing_last_run == datetime(2026, 1, 4, 3, 0, tzinfo=UTC)
+    assert p.scrubbing_next_run == datetime(2026, 2, 1, 2, 0, tzinfo=UTC)
+
+
+def test_scrub_timestamps_also_read_epoch_milliseconds(fixture: Fx) -> None:
+    raw = fixture("storage")["pools"][0]
+    when = datetime(2026, 1, 4, 3, 0, tzinfo=UTC)
+    scrub = dict(
+        raw["dataScrubbing"],
+        lastTaskRun={"status": "optimal", "finishedAt": int(when.timestamp() * 1000)},
+        nextRun=True,
+    )
+    p = _pool(fixture, dataScrubbing=scrub)
+    assert p.scrubbing_last_run == when
+    assert p.scrubbing_next_run is None
+    out_of_range = dict(scrub, nextRun=10**30)
+    assert _pool(fixture, dataScrubbing=out_of_range).scrubbing_next_run is None
+
+
+@pytest.mark.parametrize("status", ["atRisk", "raidBadBlocksDetected", "raidBadBlocksAtRisk"])
+def test_pool_states_the_console_calls_at_risk(fixture: Fx, status: str) -> None:
+    p = _pool(fixture, status=status)
+    assert (p.is_at_risk, p.has_filesystem_issue) == (True, False)
+
+
+@pytest.mark.parametrize("severity", ["warning", "atRisk"])
+def test_bad_blocks_on_the_array_mark_the_pool_at_risk(fixture: Fx, severity: str) -> None:
+    p = _pool(fixture, raidBadBlocks={"severity": severity})
+    assert p.status == "fullyOperational"
+    assert p.is_at_risk is True
+    assert p.bad_blocks_severity == severity
+
+
+def test_file_system_issue_is_its_own_condition(fixture: Fx) -> None:
+    p = _pool(fixture, status="fileSystemIssue")
+    assert (p.is_at_risk, p.has_filesystem_issue) == (False, True)
+
+
+def test_pool_without_an_id_is_keyed_by_number(fixture: Fx) -> None:
+    assert _pool(fixture, id=None, number=3).key == "3"
 
 
 def test_device_info_derived(fixture: Fx) -> None:

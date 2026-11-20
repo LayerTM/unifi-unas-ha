@@ -8,6 +8,14 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Storage pool operations and health.** Each pool reports the progress of a
+  running rebuild, sync, expansion, repair or data scrub; whether a scrub
+  schedule is on, when the last scrub finished, its result, and when the next
+  one runs; and `at risk` and `file-system issue` binary sensors. A pool the
+  console reports at risk (including the bad-block detection of UniFi OS 6.0.11)
+  or with file-system errors also raises a repair, which goes away by itself
+  when the condition clears. The integration never starts a file-system repair.
+
 - **Integration categories for the Home Assistant Marketplace.** The manifest
   declares `computers_network.nas_servers` and `computers_network.monitoring`,
   so the integration is listed with NAS devices and monitoring tools.

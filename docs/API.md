@@ -183,9 +183,11 @@ temperature, power-on-hours and health are available here.
       "status": "fullyOperational",
       "capacity": 23991544709120,
       "usage": 8894504435712,
+      "activeRaidGroupId": "00000000:00000000:00000000:00000001",
       "raidGroups": [
         {
           "number": 1,
+          "id": "00000000:00000000:00000000:00000001",
           "currentLevel": "raid1",
           "configLevel": "raid1",
           "currentProtection": 1,
@@ -195,7 +197,12 @@ temperature, power-on-hours and health are available here.
         }
       ],
       "initializingStatus": "successful",
-      "dataScrubbing": { "status": "idle", "schedule": { "enabled": false } }
+      "dataScrubbing": {
+        "status": "idle",
+        "schedule": { "enabled": false },
+        "lastTaskRun": null,
+        "nextRun": null
+      }
     }
   ],
   "disks": [
@@ -226,10 +233,16 @@ temperature, power-on-hours and health are available here.
 | Path | Type | Meaning |
 |---|---|---|
 | `pools[].capacity`, `pools[].usage` | int | bytes (decimal) |
-| `pools[].status` | str | `fullyOperational` when healthy |
+| `pools[].status` | str | `fullyOperational` when healthy; an operation: `syncing`, `expanding`, `replacing`, `repairing`, `scrubbing`, `scrubbingPaused`; a problem: `atRisk`, `raidBadBlocksDetected`, `raidBadBlocksAtRisk`, `fileSystemIssue` (and others, e.g. `failed`) |
 | `pools[].raidGroups[0].currentLevel` | str | active RAID level, e.g. `raid1` |
 | `pools[].raidGroups[0].currentProtection` | int | redundancy count |
-| `pools[].dataScrubbing.status` | str | e.g. `idle` |
+| `pools[].activeRaidGroupId`, `pools[].raidGroups[].id` | str | the group whose `progress` (0–100) the running RAID operation reports |
+| `pools[].raidBadBlocks.severity` | str | `warning` or `atRisk`; the object is absent while the array has no bad blocks |
+| `pools[].dataScrubbing.status` | str | `idle`, `inProgress`, `paused` |
+| `pools[].dataScrubbing.progress` | int | 0–100; present while a scrub runs |
+| `pools[].dataScrubbing.schedule.enabled` | bool | a scrub schedule is on |
+| `pools[].dataScrubbing.lastTaskRun.status` | str | result: `optimal`, `repaired`, `critical`, `interrupted`, `aborted_manual`, `aborted_skipped`; `null` before the first scrub |
+| `pools[].dataScrubbing.lastTaskRun.finishedAt`, `pools[].dataScrubbing.nextRun` | str or int | timestamp, ISO-8601 or epoch milliseconds (the Drive UI accepts both); `null` when there is none |
 | `disks[].slotId` | str | drive bay id |
 | `disks[].state` | str | `optimal` when healthy |
 | `disks[].temperature` | int | °C |

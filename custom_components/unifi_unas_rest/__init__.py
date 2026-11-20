@@ -48,7 +48,7 @@ from .const import (
 )
 from .coordinator import UnasDataUpdateCoordinator
 from .entity import hub_device_info
-from .issues import clear_cert_mismatch, clear_disk_risk, raise_cert_mismatch
+from .issues import clear_cert_mismatch, clear_storage_issues, raise_cert_mismatch
 from .scope import prune_registry, readings_out_of_scope
 from .tls import ssl_for_entry, tls_mode_of
 
@@ -174,8 +174,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: UnasConfigEntry) -> boo
     elif not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         return False
     # Nothing polls any more, so nothing would ever withdraw these; the next
-    # setup raises them again if the drives are still at risk.
-    clear_disk_risk(hass, entry)
+    # setup raises them again if the drives or pools are still at risk.
+    clear_storage_issues(hass, entry)
     return _succeeded()
 
 

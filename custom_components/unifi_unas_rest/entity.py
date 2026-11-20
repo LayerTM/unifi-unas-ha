@@ -167,9 +167,7 @@ class UnasPoolEntity(CoordinatorEntity[UnasDataUpdateCoordinator]):
 
     def __init__(self, coordinator: UnasDataUpdateCoordinator, pool: Pool, key: str) -> None:
         super().__init__(coordinator)
-        # Identity uses the stable pool id; `number` can default to 0 on firmware
-        # that omits the field, which would collide across multiple pools.
-        self._pool_key = pool.id or str(pool.number)
+        self._pool_key = pool.key
         entry = coordinator.config_entry
         assert entry is not None
         self._attr_unique_id = f"{entry.unique_id}_pool{self._pool_key}_{key}"
@@ -187,11 +185,7 @@ class UnasPoolEntity(CoordinatorEntity[UnasDataUpdateCoordinator]):
     def pool(self) -> Pool | None:
         """Return the current model for this pool, if present."""
         return next(
-            (
-                p
-                for p in self.coordinator.data.storage.pools
-                if (p.id or str(p.number)) == self._pool_key
-            ),
+            (p for p in self.coordinator.data.storage.pools if p.key == self._pool_key),
             None,
         )
 

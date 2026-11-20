@@ -33,7 +33,7 @@ from .aiounas import (
     UpdateInfo,
 )
 from .const import DOMAIN
-from .issues import clear_cert_mismatch, raise_cert_mismatch, sync_disk_risk
+from .issues import clear_cert_mismatch, raise_cert_mismatch, sync_storage_issues
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -176,11 +176,11 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
         # that is no longer served.
         if self.config_entry is not None:
             clear_cert_mismatch(self.hass, self.config_entry)
-            sync_disk_risk(
+            sync_storage_issues(
                 self.hass,
                 self.config_entry,
                 device_info.name or "UNAS",
-                storage.disks,
+                storage,
             )
         return UnasData(
             storage=storage,

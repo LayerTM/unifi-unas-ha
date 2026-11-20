@@ -369,7 +369,7 @@ async def test_unload_on_a_core_that_takes_a_boolean(
     clear = MagicMock()
     with (
         patch.object(integration, "_RESULT_IS_NONE", False),
-        patch.object(integration, "clear_disk_risk", clear),
+        patch.object(integration, "clear_storage_issues", clear),
         patch.object(
             hass.config_entries,
             "async_unload_platforms",
@@ -390,7 +390,7 @@ async def test_failed_unload_is_raised_and_keeps_the_repairs(
     clear = MagicMock()
     with (
         patch.object(integration, "_RESULT_IS_NONE", True),
-        patch.object(integration, "clear_disk_risk", clear),
+        patch.object(integration, "clear_storage_issues", clear),
         patch.object(
             hass.config_entries,
             "async_unload_platforms_or_raise",
