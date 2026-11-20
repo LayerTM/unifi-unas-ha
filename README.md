@@ -245,6 +245,7 @@ Clone the repository and install the library with its development extras:
 
 ```bash
 pip install -e ".[dev,cli,mcp]"
+pip install --require-hashes --no-deps -r .github/ci-tools/requirements.txt   # ruff, mypy
 ```
 
 Before opening a pull request, run the same checks CI runs:
@@ -260,6 +261,7 @@ The Home Assistant integration has its own checks (needs Python 3.14):
 
 ```bash
 pip install -e ".[dev,ha]"
+pip install --require-hashes --no-deps -r .github/ci-tools/requirements.txt
 python scripts/vendor_aiounas.py        # refreshes the bundled copy of aiounas
 git diff --exit-code custom_components/unifi_unas_rest/aiounas
 mypy --strict --python-version 3.14 custom_components/unifi_unas_rest

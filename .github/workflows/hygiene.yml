@@ -4,6 +4,12 @@ on:
   push:
   pull_request:
 
+# Every `run:` under a pipefail shell: GitHub's default returns only the last
+# command of a pipe, so a failing producer would leave the step green.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   hygiene:
     runs-on: ubuntu-latest
