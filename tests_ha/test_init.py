@@ -6,7 +6,7 @@ import inspect
 import logging
 from dataclasses import replace
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 import pytest
@@ -24,6 +24,7 @@ from custom_components.unifi_unas_rest.aiounas import (
 from custom_components.unifi_unas_rest.const import DOMAIN
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from multidict import CIMultiDict
@@ -365,8 +366,10 @@ async def test_unload_on_a_core_that_takes_a_boolean(
     where coverage is measured, by asking the module for the older contract.
     """
     await _setup(hass, config_entry)
+    clear = MagicMock()
     with (
         patch.object(integration, "_RESULT_IS_NONE", False),
+        patch.object(integration, "clear_disk_risk", clear),
         patch.object(
             hass.config_entries,
             "async_unload_platforms",
@@ -375,6 +378,29 @@ async def test_unload_on_a_core_that_takes_a_boolean(
     ):
         assert integration._succeeded() is True
         assert await integration.async_unload_entry(hass, config_entry) is platforms_unloaded
+    # The drive-risk repairs are withdrawn only when the entry really unloaded.
+    assert clear.called is platforms_unloaded
+
+
+async def test_failed_unload_is_raised_and_keeps_the_repairs(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    """On a core that raises a failed unload, the failure propagates with its reason."""
+    await _setup(hass, config_entry)
+    clear = MagicMock()
+    with (
+        patch.object(integration, "_RESULT_IS_NONE", True),
+        patch.object(integration, "clear_disk_risk", clear),
+        patch.object(
+            hass.config_entries,
+            "async_unload_platforms_or_raise",
+            AsyncMock(side_effect=ConfigEntryError("platforms did not unload")),
+            create=True,
+        ),
+        pytest.raises(ConfigEntryError),
+    ):
+        await integration.async_unload_entry(hass, config_entry)
+    clear.assert_not_called()
 
 
 async def test_auth_failure_sets_error(

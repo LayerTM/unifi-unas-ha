@@ -55,11 +55,13 @@ from .tls import ssl_for_entry, tls_mode_of
 _LOGGER = logging.getLogger(__name__)
 
 # Home Assistant 2026.11 made `None` the result of a successful setup or unload,
-# with failure raised, and reports an integration that still returns a boolean.
-# Older releases accept only a boolean and fail a setup that returns anything
-# else. Which contract applies is asked of core rather than of a version number:
-# the raising unload arrived with it. That keeps the 2025.8 floor this
-# integration supports, with nothing to revisit when the boolean form goes.
+# and a failure is raised so that it carries its reason. A boolean is still
+# accepted from a custom integration without a word: core hands it to its usage
+# report, which so far only acts on core's own integrations. Older releases
+# accept only a boolean and fail a setup that returns anything else. Which
+# contract applies is asked of core rather than of a version number: the raising
+# unload arrived with it. That keeps the 2025.8 floor this integration supports,
+# with nothing to revisit when the boolean form goes.
 _RESULT_IS_NONE = hasattr(ConfigEntries, "async_unload_platforms_or_raise")
 
 

@@ -9,9 +9,11 @@ adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - **Follows the Home Assistant 2026.11 contract for setting up and unloading.**
-  On Home Assistant 2026.11 and later, setup and unload now report success the
-  way core expects, and a failed unload is raised instead of returned. Older
-  releases down to 2025.8 keep the form they require.
+  On Home Assistant 2026.11 and later, setup and unload signal success the new
+  way, and a failed unload is raised with its reason instead of returned as
+  false. Home Assistant still accepts the old form from custom integrations, so
+  nothing changes in use today; this follows the contract before that ends.
+  Releases down to 2025.8 keep the form they require.
 
 ## [1.10.1] - 2026-11-09
 
