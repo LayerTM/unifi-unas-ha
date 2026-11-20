@@ -59,8 +59,8 @@ Everything is grouped under one hub device (the UNAS), with a sub-device per dis
 - **Per disk** — temperature, transfer read/write rate, power-on hours, health score, bad sectors, state, and a per-disk `problem` binary sensor.
 - **Repairs** — a drive the console reports as at risk also raises a notice in **Settings → System → Repairs** naming the bay and model (never the serial number). It goes away by itself when the drive recovers or is removed; an empty bay never raises one.
 - **Per pool** — RAID level, status, storage total / used / usage %, data-scrubbing status.
-- **Per share** *(local-account auth)* — storage used / quota, member count, encryption, and snapshot / remote-backup binary sensors. A privacy-safe **account count** is also exposed (only the number of accounts — never the accounts themselves).
-- **Updates** *(local-account auth)* — **UniFi OS firmware** and **UniFi Drive app** update entities for the console itself, with the release channel the offered version comes from (install requires opt-in controls with an owner account). Home Assistant lists them in **Settings → Updates** under this integration's name; updates of the integration itself come from HACS. An **Applications** sensor lists installed apps/integrations and their versions.
+- **Per share** *(local-account auth)* — storage used / quota, member count, encryption, and snapshot / remote-backup binary sensors (remote backup is the flag the Drive app reports for the share; since Drive 4.4.25 remote NAS backups are set up in Site Manager, and the sensor has been verified only for shares without one). A privacy-safe **account count** is also exposed (only the number of accounts — never the accounts themselves).
+- **Updates** *(local-account auth)* — **UniFi OS firmware** and **UniFi Drive app** update entities for the console itself, with the release channel the offered version comes from (install requires opt-in controls with an owner account). Home Assistant lists them in **Settings → Updates** under this integration's name; updates of the integration itself come from the Marketplace (HACS before Home Assistant 2026.11). An **Applications** sensor lists installed apps/integrations and their versions.
 - **Activity** *(local-account auth)* — recent-event count (with a per-category breakdown), latest-event time, and recent-log-entry count. Only counts, categories and timestamps are read — notification and log **bodies are personal data and are never retained**.
 
 Requires **Home Assistant 2025.8+** — the release that introduced
@@ -69,11 +69,16 @@ Development and CI run against the current release. Configuration is through the
 
 ## Installation
 
-This integration is in the HACS default list, so no custom repository is needed:
+This integration is in the default community catalog, so no custom repository is needed.
 
-1. **HACS → Integrations**, search for **UniFi UNAS (non-invasive)** and download it.
-2. Restart Home Assistant.
-3. **Settings → Devices & Services → Add Integration → UniFi UNAS**, then complete the flow:
+1. Install it:
+   - **Home Assistant 2026.11 and later:** **Settings → Marketplace**, search for
+     **UniFi UNAS (non-invasive)**, open it and select **Install**. A first
+     install loads without a restart; when Home Assistant needs one, a repair
+     asks for it.
+   - **Earlier releases:** **HACS**, search for **UniFi UNAS (non-invasive)**,
+     download it and restart Home Assistant.
+2. **Settings → Devices & Services → Add Integration → UniFi UNAS**, then complete the flow:
    - **Host / Port** of the UNAS console, and how to trust its certificate:
      - **Trust this console's certificate** (default) — the certificate the
        console is serving is shown to you once, and from then on the integration
@@ -87,12 +92,15 @@ This integration is in the HACS default list, so no custom repository is needed:
 
 Use a least-privilege credential — an API key or a dedicated limited local admin — rather than your owner account.
 
-The `aiounas` client is bundled inside the integration and has no external dependencies (Home Assistant already ships `aiohttp` and `yarl`), so HACS installs everything. See [`docs/API.md`](docs/API.md) for the API reference.
+The `aiounas` client is bundled inside the integration and has no external dependencies (Home Assistant already ships `aiohttp` and `yarl`), so the Marketplace or HACS installs everything. See [`docs/API.md`](docs/API.md) for the API reference.
 
 ## Removal
 
 1. **Settings → Devices & Services → UniFi UNAS**, open the ⋮ menu on the integration entry and choose **Delete**. This removes the config entry and all its devices and entities; the stored credential is discarded.
-2. Optional — to remove the integration itself, delete it in **HACS → UniFi UNAS (non-invasive) → Remove**, then restart Home Assistant.
+2. Optional — remove the integration itself, then restart Home Assistant:
+   - **Home Assistant 2026.11 and later:** **Settings → Marketplace**, open the ⋮
+     menu on **UniFi UNAS (non-invasive)** and choose **Uninstall**.
+   - **Earlier releases:** **HACS → UniFi UNAS (non-invasive) → Remove**.
 
 Nothing is written to or left on the NAS, so no cleanup is needed on the device side.
 
@@ -114,7 +122,7 @@ Quality: the integration self-reports against Home Assistant's Integration Quali
 
 ## Supported devices
 
-Any Ubiquiti console running **UniFi OS with the UniFi Drive application** and reachable on your LAN. Verified against a UniFi UNAS console (model `UNAS2B`) on **UniFi OS 5.1.19 / Drive 4.3.6**; other UniFi OS consoles that host the Drive app (including the UNAS Pro) are expected to work but have not been verified. Devices are identified by their MAC, so a single Home Assistant can monitor several consoles.
+Any Ubiquiti console running **UniFi OS with the UniFi Drive application** and reachable on your LAN. Verified against a UniFi UNAS console (model `UNAS2B`) on **UniFi OS 6.0.18 / Drive 4.5.7**; other UniFi OS consoles that host the Drive app (including the UNAS Pro) are expected to work but have not been verified. Devices are identified by their MAC, so a single Home Assistant can monitor several consoles.
 
 Not supported: cloud-only access (UniFi Site Manager), and consoles without the Drive app (there is no storage API to read).
 

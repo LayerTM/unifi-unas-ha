@@ -1,6 +1,7 @@
 {
   "domain": "unifi_unas_rest",
   "name": "UniFi UNAS (non-invasive)",
+  "categories": ["computers_network.nas_servers", "computers_network.monitoring"],
   "codeowners": [
     "@LayerTM"
   ],
