@@ -8,6 +8,12 @@ on:
   schedule:
     - cron: "30 4 * * *"
 
+# Every `run:` under a pipefail shell: GitHub's default returns only the last
+# command of a pipe, so a failing producer would leave the step green.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   integration:
     # Two cells: the oldest Home Assistant this integration claims to support, and
@@ -33,7 +39,10 @@ jobs:
 
       - name: Install library + newest Home Assistant test stack
         if: matrix.ha == 'latest'
-        run: pip install -e ".[dev,ha]"
+        # The CI tools (mypy) come hash-locked from .github/ci-tools/requirements.txt.
+        run: |
+          pip install -e ".[dev,ha]"
+          pip install --require-hashes --no-deps -r .github/ci-tools/requirements.txt
 
       - name: Home Assistant is the newest release
         if: matrix.ha == 'latest'
@@ -89,14 +98,14 @@ jobs:
         run: |
           MIN=$(python -c 'import json; print(json.load(open("hacs.json"))["homeassistant"])')
           echo "Floor declared in hacs.json: $MIN"
-          CUTOFF=$(curl -fsS "https://pypi.org/pypi/homeassistant/$MIN/json" | python -c '
+          CUTOFF=$(curl -fsS --retry 3 --retry-all-errors "https://pypi.org/pypi/homeassistant/$MIN/json" | python -c '
           import datetime, json, sys
           uploaded = json.load(sys.stdin)["urls"][0]["upload_time_iso_8601"]
           at = datetime.datetime.fromisoformat(uploaded.replace("Z", "+00:00"))
           print((at + datetime.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ"))
           ')
           echo "Resolving as of: $CUTOFF"
-          pip install uv
+          pip install --require-hashes --no-deps -r .github/ci-tools/requirements.txt
           pip install -e ".[dev]"
           uv pip install --system --exclude-newer "$CUTOFF" \
             "pytest-homeassistant-custom-component" "homeassistant==$MIN"

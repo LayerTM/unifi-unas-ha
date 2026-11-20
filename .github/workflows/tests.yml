@@ -8,6 +8,12 @@ on:
   schedule:
     - cron: "30 4 * * *"
 
+# Every `run:` under a pipefail shell: GitHub's default returns only the last
+# command of a pipe, so a failing producer would leave the step green.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -21,7 +27,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install
-        run: pip install -e ".[dev,cli,mcp]"
+        # The CI tools (mypy) come hash-locked from .github/ci-tools/requirements.txt.
+        run: |
+          pip install -e ".[dev,cli,mcp]"
+          pip install --require-hashes --no-deps -r .github/ci-tools/requirements.txt
       - name: Type check (strict)
         # No path argument: an explicit one OVERRIDES `files =` in pyproject.toml,
         # so the config could widen its scope while CI kept checking the old set.

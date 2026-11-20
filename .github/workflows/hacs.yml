@@ -6,6 +6,12 @@ on:
   schedule:
     - cron: "30 4 * * *"
 
+# Every `run:` under a pipefail shell: GitHub's default returns only the last
+# command of a pipe, so a failing producer would leave the step green.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   hacs:
     runs-on: ubuntu-latest
