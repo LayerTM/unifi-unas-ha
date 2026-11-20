@@ -32,7 +32,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 
 _BASE = {CONF_HOST: "192.0.2.10", CONF_PORT: 443, CONF_TLS_MODE: TlsMode.INSECURE}
 _ERRORS = [

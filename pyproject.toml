@@ -47,9 +47,12 @@ dev = [
 # Deliberately a floor and not a pin: an exact pin held CI on Home Assistant
 # 2026.6 while users ran 2026.9, so the deprecation warnings core logs against
 # this integration could not appear in any test run. A floating harness makes
-# those the build's problem instead of the user's.
+# those the build's problem instead of the user's. The harness is Home
+# Assistant's own, released with each version and pinning it exactly; the CI
+# job that installs this extra fails when it lands on anything but the newest
+# Home Assistant release, so a harness that stops following core is caught.
 ha = [
-  "pytest-homeassistant-custom-component>=0.13.340; python_full_version >= '3.14.2'",
+  "pytest-homeassistant>=2026.11.2; python_full_version >= '3.14.2'",
 ]
 
 [project.urls]
@@ -105,7 +108,11 @@ implicit_reexport = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-addopts = "-q --strict-markers"
+# The Home Assistant harness installs respx, whose pytest plugin imports httpx
+# when it loads; core must alias httpx before that import, and plugins load in no
+# fixed order, so the run fails at startup whenever respx loads first. These
+# tests do not use respx, so its plugin stays off, as in core's own configuration.
+addopts = "-q --strict-markers -p no:respx"
 testpaths = ["tests"]
 # Home Assistant reports the deprecations it catches an integration using through
 # its logs, which `tests_ha/conftest.py` watches. Everything else — the standard
@@ -113,7 +120,15 @@ testpaths = ["tests"]
 # and a floating harness is what carries those releases in. An unrelated project
 # deprecating something is a real reason for this to go red; scope an `ignore`
 # to that warning, with the reason, rather than lowering the setting.
-filterwarnings = ["error::DeprecationWarning"]
+filterwarnings = [
+  "error::DeprecationWarning",
+  # Core's HTTP server subclasses aiohttp's `web.Application` on purpose and
+  # ignores this warning in its own test configuration with the same filter.
+  "ignore:Inheritance class HomeAssistantApplication from web.Application is discouraged:DeprecationWarning",
+  # `backoff`, which core's frontend loads, is archived upstream with this fixed
+  # in an unreleased change; core ignores it with the same filter.
+  "ignore:'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16:DeprecationWarning:(backoff._decorator|backoff._async)",
+]
 
 [tool.coverage.run]
 branch = true
