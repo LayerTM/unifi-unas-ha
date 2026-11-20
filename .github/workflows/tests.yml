@@ -3,6 +3,10 @@ name: tests
 on:
   push:
   pull_request:
+  # Daily as well: every dependency here floats to its newest release, so a
+  # release upstream can break this suite on a day nothing is pushed.
+  schedule:
+    - cron: "30 4 * * *"
 
 jobs:
   test:

@@ -1,6 +1,6 @@
 """Fixtures for the UniFi UNAS integration tests.
 
-pytest-homeassistant-custom-component auto-loads (entry point), so its fixtures
+The Home Assistant test harness auto-loads (entry point), so its fixtures
 (hass, enable_custom_integrations, ...) are available without pytest_plugins.
 The aiounas client is mocked with models built from the sanitized library
 fixtures, so no network is touched.
@@ -41,7 +41,7 @@ from homeassistant.const import (
     CONF_PORT,
 )
 from homeassistant.helpers import frame
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 
 _FX = Path(__file__).resolve().parents[1] / "tests" / "fixtures"
 

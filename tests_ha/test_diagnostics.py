@@ -10,7 +10,7 @@ from custom_components.unifi_unas_rest.diagnostics import (
 )
 from homeassistant.const import CONF_API_KEY
 from homeassistant.core import HomeAssistant
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 
 
 async def test_diagnostics_redacts_secrets(

@@ -16,7 +16,7 @@ from custom_components.unifi_unas_rest.const import DOMAIN
 from homeassistant.const import STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 
 # The fixture's bucket ends at this instant and is 300 s long, so the next one
 # completes at WINDOW_END + 300.

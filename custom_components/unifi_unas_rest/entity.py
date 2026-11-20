@@ -106,7 +106,7 @@ def link_to_hub(info: DeviceInfo, coordinator: UnasDataUpdateCoordinator) -> Dev
     if _ACCEPTS_VIA_DEVICE_ID and (hub_id := coordinator.hub_device_id) is not None:
         info["via_device_id"] = hub_id
     else:
-        info["via_device"] = (DOMAIN, entry.entry_id)  # type: ignore[typeddict-unknown-key]
+        info["via_device"] = (DOMAIN, entry.entry_id)
     return info
 
 
