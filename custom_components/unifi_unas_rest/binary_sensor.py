@@ -48,7 +48,7 @@ class UnasShareBinaryDescription(BinarySensorEntityDescription):
 
 def _has_storage_problem(data: UnasData) -> bool:
     pools = data.storage.pools
-    return any(p.status != "fullyOperational" for p in pools) or data.storage.at_risk_disk_count > 0
+    return any(p.has_problem for p in pools) or data.storage.at_risk_disk_count > 0
 
 
 BINARY_SENSORS: tuple[UnasBinaryDescription, ...] = (

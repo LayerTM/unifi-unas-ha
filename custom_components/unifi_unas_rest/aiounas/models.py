@@ -325,6 +325,18 @@ class Pool:
         """The console detected file-system errors on the pool."""
         return self.status == _POOL_FILESYSTEM_ISSUE
 
+    @property
+    def has_problem(self) -> bool:
+        """The pool needs attention: anything but healthy or a routine scrub.
+
+        A scrub is maintenance and leaves redundancy intact, so it is not a
+        problem. A RAID operation (sync, rebuild, expansion, repair) is: the
+        array runs with reduced redundancy until it finishes. Bad blocks count
+        even while the status still reads healthy.
+        """
+        healthy = self.status == "fullyOperational" or self.status in _POOL_SCRUBBING
+        return not healthy or self.is_at_risk
+
     @classmethod
     def from_api(cls, d: dict[str, Any]) -> Pool:
         groups = tuple(RaidGroup.from_api(g) for g in d.get("raidGroups") or [])

@@ -187,6 +187,26 @@ def test_file_system_issue_is_its_own_condition(fixture: Fx) -> None:
     assert (p.is_at_risk, p.has_filesystem_issue) == (False, True)
 
 
+@pytest.mark.parametrize(
+    ("changes", "problem"),
+    [
+        ({}, False),
+        ({"status": "scrubbing"}, False),
+        ({"status": "scrubbingPaused"}, False),
+        ({"status": "syncing"}, True),
+        ({"status": "replacing"}, True),
+        ({"status": "atRisk"}, True),
+        ({"status": "fileSystemIssue"}, True),
+        ({"status": "failed"}, True),
+        ({"raidBadBlocks": {"severity": "warning"}}, True),
+    ],
+)
+def test_a_routine_scrub_is_not_a_problem_but_reduced_redundancy_is(
+    fixture: Fx, changes: dict[str, Any], problem: bool
+) -> None:
+    assert _pool(fixture, **changes).has_problem is problem
+
+
 def test_pool_without_an_id_is_keyed_by_number(fixture: Fx) -> None:
     assert _pool(fixture, id=None, number=3).key == "3"
 

@@ -34,6 +34,12 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A routine data scrub no longer turns on `Storage problem`.** The binary
+  sensor came on for any pool state other than healthy, so every scheduled
+  scrub raised it. A scrub leaves redundancy intact and now counts as healthy;
+  a sync, rebuild, expansion or repair, a pool at risk, bad blocks and
+  file-system errors still turn it on.
+
 - **The `aiounas` library requires aiohttp 3.9.2 and, for the CLI, typer 0.13.**
   With aiohttp 3.9.0 and 3.9.1 the certificate-authority TLS mode did not verify
   the console's certificate: those releases do not honour `ssl=True` on a

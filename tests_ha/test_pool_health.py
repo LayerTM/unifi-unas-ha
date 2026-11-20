@@ -150,3 +150,32 @@ async def test_unloading_withdraws_the_pool_repairs(
     await hass.async_block_till_done()
 
     assert _pool_issues(hass) == {}
+
+
+@pytest.mark.parametrize(
+    ("status", "problem"),
+    [
+        ("scrubbing", STATE_OFF),
+        ("scrubbingPaused", STATE_OFF),
+        ("atRisk", STATE_ON),
+        ("fileSystemIssue", STATE_ON),
+        ("replacing", STATE_ON),
+    ],
+)
+async def test_storage_problem_ignores_a_routine_scrub(
+    hass: HomeAssistant,
+    mock_aiounas: AsyncMock,
+    config_entry: MockConfigEntry,
+    status: str,
+    problem: str,
+) -> None:
+    mock_aiounas.get_storage = AsyncMock(return_value=_storage(status=status))
+    await _setup(hass, config_entry)
+
+    eid = er.async_get(hass).async_get_entity_id(
+        "binary_sensor", DOMAIN, "AABBCC000001_storage_problem"
+    )
+    assert eid
+    state = hass.states.get(eid)
+    assert state is not None
+    assert state.state == problem
