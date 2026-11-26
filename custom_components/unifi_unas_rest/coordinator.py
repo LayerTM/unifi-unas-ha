@@ -110,7 +110,7 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
         self.capabilities = capabilities
         self.hub_device_id: str | None = None
         """Device-registry id of the hub, set by `async_setup_entry` before the
-        platforms load. Sub-devices point at it (see `entity.link_to_hub`)."""
+        platforms load. Sub-devices point at it (see `entity.hub_link`)."""
         self._storage_io: StorageIO | None = None
         self._failing: set[Read] = set()
         """Reads that failed the last time they were asked, to log each outage once."""

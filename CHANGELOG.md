@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.11.2] - 2026-11-26
+
 ### Changed
 
 - **A short console interruption is now less likely to make every entity
@@ -18,6 +20,12 @@ adheres to [Semantic Versioning](https://semver.org/).
   unavailable. Setup and control actions are not repeated.
 - The `aiounas` library has `UnasClient.allow_one_retry()` and `cancel_retry()`;
   without a call to the first it retries nothing, as before.
+
+### Fixed
+
+- Device descriptions are no longer edited or unpacked as dictionaries. Home
+  Assistant 2026.12 reports that use, and 2027.12 removes it. Devices, their
+  names and their link to the hub are unchanged.
 
 ## [1.11.1] - 2026-11-26
 
