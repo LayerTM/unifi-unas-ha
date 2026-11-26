@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from collections.abc import Awaitable, Callable
 from typing import Any, TypeVar
 
@@ -32,7 +33,42 @@ from .exceptions import (
     UnasOperationBlocked,
     describe,
 )
-from .tls import mismatch_from
+from .tls import UnasCertificateMismatch, mismatch_from
+
+_LOGGER = logging.getLogger(__name__)
+
+# What a console answers while the application behind its proxy is briefly away.
+_TRANSIENT_STATUSES = frozenset({502, 503, 504})
+
+
+class _DelayedRetry:
+    """One wait, shared by the reads that fail around the same time.
+
+    The first failure starts the wait. A read that was sent before the wait ended
+    joins it and may be sent once more; one sent afterwards has had its chance.
+    However many reads fail, the caller is therefore held up by one wait.
+    """
+
+    def __init__(self, delay: float) -> None:
+        self._delay = delay
+        self._ends: float | None = None
+        self._cancelled = asyncio.Event()
+
+    async def wait(self, sent_at: float) -> bool:
+        """Wait out the delay for a read sent at *sent_at*; True to send it again."""
+        if self._ends is None:
+            self._ends = asyncio.get_running_loop().time() + self._delay
+        elif sent_at >= self._ends:
+            return False
+        try:
+            async with asyncio.timeout_at(self._ends):
+                await self._cancelled.wait()
+        except TimeoutError:
+            return True
+        return False
+
+    def cancel(self) -> None:
+        self._cancelled.set()
 
 
 class _NonJsonBody:
@@ -103,10 +139,26 @@ class UnasTransport:
         netloc = host if port == default_port else f"{host}:{port}"
         self._base_url = f"{scheme}://{netloc}"
         self._prepared = False
+        self._retry: _DelayedRetry | None = None
 
     @property
     def base_url(self) -> str:
         return self._base_url
+
+    def allow_one_retry(self, delay: float) -> None:
+        """Let the reads that follow share one second attempt, *delay* seconds later.
+
+        See :class:`_DelayedRetry`. Applies to a ``GET`` that got no answer (a
+        timeout or a connection failure) or a 502, 503 or 504; writes and the
+        login are never sent twice by this. Each call replaces the previous
+        allowance.
+        """
+        self._retry = _DelayedRetry(delay)
+
+    def cancel_retry(self) -> None:
+        """End a wait in progress at once; its reads fail with what they got."""
+        if self._retry is not None:
+            self._retry.cancel()
 
     async def async_prepare(self) -> None:
         """Run the auth handshake once (idempotent)."""
@@ -156,7 +208,7 @@ class UnasTransport:
         allow_reauth: bool = True,
     ) -> Any:
         await self.async_prepare()
-        status, data = await self._request(
+        status, data = await self._exchange(
             method, path, json_body=json_body, expect_json=expect_json
         )
 
@@ -168,7 +220,7 @@ class UnasTransport:
             and self._auth.can_reauth
             and await self._handshake(self._auth.async_reauth)
         ):
-            status, data = await self._request(
+            status, data = await self._exchange(
                 method, path, json_body=json_body, expect_json=expect_json
             )
 
@@ -195,6 +247,35 @@ class UnasTransport:
                 status=status,
             )
         return data
+
+    async def _exchange(
+        self, method: str, path: str, *, json_body: Any, expect_json: bool
+    ) -> tuple[int, Any]:
+        """:meth:`_request`, sent once more if it is a read the allowance covers."""
+
+        async def attempt() -> tuple[int, Any]:
+            return await self._request(method, path, json_body=json_body, expect_json=expect_json)
+
+        # Taken before sending: a later allowance is not this request's.
+        retry = self._retry if method == "GET" else None
+        if retry is None:
+            return await attempt()
+        sent_at = asyncio.get_running_loop().time()
+        try:
+            answer = await attempt()
+        except UnasCertificateMismatch:
+            # Must precede UnasConnectionError, its base class. Not transient.
+            raise
+        except UnasConnectionError as err:
+            if not await retry.wait(sent_at):
+                raise
+            reason = str(err)
+        else:
+            if answer[0] not in _TRANSIENT_STATUSES or not await retry.wait(sent_at):
+                return answer
+            reason = f"status {answer[0]}"
+        _LOGGER.debug("Asking for %s again after: %s", path, reason)
+        return await attempt()
 
     @staticmethod
     def _location(data: Any) -> str:

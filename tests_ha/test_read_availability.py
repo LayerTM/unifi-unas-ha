@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
+import time
+from collections import Counter
 from collections.abc import Iterator
+from contextlib import AbstractContextManager
 from dataclasses import replace
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
@@ -14,8 +20,10 @@ from custom_components.unifi_unas_rest.aiounas import (
     UnasCapabilityError,
     UnasCertificateMismatch,
     UnasConnectionError,
+    const,
     probe,
 )
+from custom_components.unifi_unas_rest.aiounas.transport import UnasTransport
 from custom_components.unifi_unas_rest.const import (
     AUTH_PASSWORD,
     CONF_AUTH_METHOD,
@@ -28,7 +36,9 @@ from homeassistant.const import (
     CONF_HOST,
     CONF_PASSWORD,
     CONF_PORT,
+    CONF_SCAN_INTERVAL,
     CONF_USERNAME,
+    EVENT_HOMEASSISTANT_STOP,
     STATE_UNAVAILABLE,
 )
 from homeassistant.core import HomeAssistant
@@ -36,6 +46,12 @@ from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant.common import MockConfigEntry
 
 _PREFIX = "AABBCC000001_"
+_FIXTURE_DIR = Path(__file__).resolve().parents[1] / "tests" / "fixtures"
+
+
+def _load(name: str) -> object:
+    return json.loads((_FIXTURE_DIR / f"{name}.json").read_text(encoding="utf-8"))
+
 
 # Past the end of the throughput fixture's bucket and the one after it, so the
 # coordinator asks for throughput again on every cycle.
@@ -391,3 +407,177 @@ async def test_anchor_failing_during_setup_retries(
     with patch("custom_components.unifi_unas_rest.probe", probe):
         await _setup(hass, config_entry)
     assert config_entry.state is ConfigEntryState.SETUP_RETRY
+
+
+# ---------------------------------------------------------------------------
+# The delayed second attempt. These run the real client against a scripted
+# console, because the retry lives below the client the other tests replace.
+# ---------------------------------------------------------------------------
+
+_FIXTURES = {
+    const.PATH_STORAGE: "storage",
+    const.PATH_DEVICE_INFO: "device_info",
+    const.PATH_NETWORK_IO: "network_io",
+    const.PATH_FAN_CONTROL: "fan_control",
+    const.PATH_SHARES: "drives",
+    const.PATH_NOTIFICATIONS: "notifications",
+    const.PATH_LOGS: "logs",
+    const.PATH_STORAGE_IO: "storage_io_stats",
+    const.PATH_REMOTE_BACKUP_TASKS: "remote_backup_tasks",
+    const.PATH_M365_BACKUP_TASKS: "m365_backup_tasks",
+    const.PATH_SYSTEM: "system_full",
+}
+
+
+class _Console:
+    """Answers every read from the fixtures, except where a failure is scripted."""
+
+    def __init__(self) -> None:
+        self.failing: dict[str, list[int]] = {}
+        """path -> statuses still to answer with, before it works again."""
+        self.asked: Counter[str] = Counter()
+        self.refused = asyncio.Event()
+
+    def fail(self, *paths: str, times: int = 1000) -> None:
+        for path in paths or tuple(_FIXTURES):
+            self.failing[path] = [502] * times
+
+    async def request(self, method: str, path: str, **_: object) -> tuple[int, object]:
+        assert method == "GET"
+        path = path.partition("?")[0]
+        self.asked[path] += 1
+        if self.failing.get(path):
+            self.refused.set()
+            return self.failing[path].pop(), None
+        if path == const.PATH_USERS:
+            return 200, []
+        return 200, _load(_FIXTURES[path])
+
+
+@pytest.fixture
+def console() -> Iterator[_Console]:
+    fake = _Console()
+
+    async def request(_: UnasTransport, method: str, path: str, **kwargs: object) -> object:
+        return await fake.request(method, path, **kwargs)
+
+    with patch.object(UnasTransport, "_request", request):
+        yield fake
+
+
+def _retry_delay(seconds: float) -> AbstractContextManager[object]:
+    return patch(
+        "custom_components.unifi_unas_rest.coordinator.MAX_RETRY_DELAY", seconds, create=True
+    )
+
+
+def _online(hass: HomeAssistant, entry: MockConfigEntry) -> str:
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "binary_sensor", DOMAIN, f"{_PREFIX}device_online"
+    )
+    assert entity_id
+    state = hass.states.get(entity_id)
+    assert state
+    return state.state
+
+
+async def test_anchor_502_once_recovers_within_the_poll(
+    hass: HomeAssistant, console: _Console, config_entry: MockConfigEntry
+) -> None:
+    with _retry_delay(0):
+        await _setup(hass, config_entry)
+        console.asked.clear()
+        console.fail(const.PATH_STORAGE, times=1)
+        await _refresh(hass, config_entry)
+
+    assert config_entry.runtime_data.coordinator.last_update_success
+    assert _online(hass, config_entry) == "on"
+    assert console.asked[const.PATH_STORAGE] == 2
+
+
+async def test_persistent_502_fails_the_first_poll_after_one_retry(
+    hass: HomeAssistant, console: _Console, config_entry: MockConfigEntry
+) -> None:
+    with _retry_delay(0):
+        await _setup(hass, config_entry)
+        console.asked.clear()
+        console.fail(const.PATH_STORAGE)
+        await _refresh(hass, config_entry)
+
+    assert not config_entry.runtime_data.coordinator.last_update_success
+    assert _online(hass, config_entry) == "off"
+    assert console.asked[const.PATH_STORAGE] == 2
+
+
+async def test_one_retry_per_poll_when_every_optional_read_fails(
+    hass: HomeAssistant, console: _Console, config_entry: MockConfigEntry
+) -> None:
+    anchors = {const.PATH_STORAGE, const.PATH_DEVICE_INFO}
+    with _retry_delay(0.3):
+        await _setup(hass, config_entry)
+        console.asked.clear()
+        console.fail(*(set(_FIXTURES) - anchors), const.PATH_USERS)
+        started = time.monotonic()
+        await _refresh(hass, config_entry)
+
+    assert 0.3 <= time.monotonic() - started < 0.6
+    assert config_entry.runtime_data.coordinator.last_update_success
+    repeats = {path: n for path, n in console.asked.items() if n > 1}
+    assert repeats == {const.PATH_NETWORK_IO: 2}
+
+
+async def test_setup_does_not_wait_to_retry(
+    hass: HomeAssistant, console: _Console, config_entry: MockConfigEntry
+) -> None:
+    """Home Assistant retries a setup itself, and an unload cannot end one."""
+    console.fail(const.PATH_STORAGE)
+    await _setup(hass, config_entry)
+
+    assert config_entry.state is ConfigEntryState.SETUP_RETRY
+    assert console.asked[const.PATH_STORAGE] == 1
+
+
+@pytest.mark.parametrize(("scan_interval", "delay"), [(10, 5), (20, 10), (30, 15), (600, 15)])
+async def test_the_wait_never_exceeds_half_the_scan_interval(
+    hass: HomeAssistant,
+    console: _Console,
+    config_entry: MockConfigEntry,
+    scan_interval: int,
+    delay: float,
+) -> None:
+    config_entry.add_to_hass(hass)
+    hass.config_entries.async_update_entry(
+        config_entry, options={CONF_SCAN_INTERVAL: scan_interval}
+    )
+    await _setup(hass, config_entry)
+    with patch.object(UnasTransport, "allow_one_retry", autospec=True) as allow:
+        await _refresh(hass, config_entry)
+    assert [call.args[1] for call in allow.call_args_list] == [delay]
+
+
+@pytest.mark.parametrize("end", ["unload", "reload", "stop"])
+async def test_ending_the_entry_ends_the_wait_at_once(
+    hass: HomeAssistant, console: _Console, config_entry: MockConfigEntry, end: str
+) -> None:
+    with _retry_delay(60):
+        config_entry.add_to_hass(hass)
+        hass.config_entries.async_update_entry(config_entry, options={CONF_SCAN_INTERVAL: 600})
+        await _setup(hass, config_entry)
+        coordinator = config_entry.runtime_data.coordinator
+        console.asked.clear()
+        console.fail(const.PATH_STORAGE, times=1)
+        poll = hass.async_create_task(coordinator.async_refresh())
+        await console.refused.wait()
+        await asyncio.sleep(0.05)
+        assert not poll.done()
+
+        async with asyncio.timeout(2):
+            if end == "unload":
+                assert await hass.config_entries.async_unload(config_entry.entry_id)
+            elif end == "reload":
+                assert await hass.config_entries.async_reload(config_entry.entry_id)
+            else:
+                hass.bus.async_fire(EVENT_HOMEASSISTANT_STOP)
+            await poll
+
+    assert not coordinator.last_update_success

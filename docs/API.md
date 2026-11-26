@@ -42,6 +42,18 @@ integration measured it directly (`302 → /manage`); the handling here is the s
 because the failure it guards against is a property of the UniFi OS proxy, not of
 one device.
 
+### Brief interruptions
+
+A `502` (or `503`, `504`) from the UniFi OS proxy means the application behind it
+did not answer; on a healthy console such windows have lasted from seconds to
+minutes. `UnasClient.allow_one_retry(delay)`, called once per round of reads,
+lets a `GET` that got such a status, or no answer, be sent once more after
+*delay* seconds. Reads failing during that wait share it; a read sent after it is
+not repeated. `cancel_retry()` ends a wait at once. Without the call nothing is
+retried, and this never repeats a write or the login (`aiohttp` itself resends a
+`PUT` or `DELETE` whose connection drops, as HTTP allows for idempotent
+requests).
+
 ### Session (local account)
 
 ```

@@ -11,7 +11,8 @@ from datetime import timedelta
 from enum import StrEnum
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.const import EVENT_HOMEASSISTANT_STOP
+from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -38,6 +39,10 @@ from .const import DOMAIN
 from .issues import clear_cert_mismatch, raise_cert_mismatch, sync_storage_issues
 
 _LOGGER = logging.getLogger(__name__)
+
+MAX_RETRY_DELAY = 15.0
+"""Longest wait, in seconds, before a failed read of a poll is sent once more;
+a short scan interval caps it at half the interval."""
 
 
 class Read(StrEnum):
@@ -98,6 +103,10 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
             update_interval=timedelta(seconds=scan_interval),
         )
         self.client = client
+        self._retry_delay = min(MAX_RETRY_DELAY, scan_interval / 2)
+        # An unload or a reload ends a wait through `async_shutdown`; stopping
+        # Home Assistant does not call that for a config entry's coordinator.
+        entry.async_on_unload(hass.bus.async_listen(EVENT_HOMEASSISTANT_STOP, self._async_stopping))
         self.capabilities = capabilities
         self.hub_device_id: str | None = None
         """Device-registry id of the hub, set by `async_setup_entry` before the
@@ -109,6 +118,14 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
         """Reads this console is known to serve, so losing one is worth a warning.
         The setup probe checks each of them except fan control, which joins once
         it has answered."""
+
+    @callback
+    def _async_stopping(self, _: Event) -> None:
+        self.client.cancel_retry()
+
+    async def async_shutdown(self) -> None:
+        self.client.cancel_retry()
+        await super().async_shutdown()
 
     async def _read[T](
         self, read: Read, call: Callable[[], Awaitable[T]], failed: set[Read]
@@ -175,6 +192,10 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
     async def _async_update_data(self) -> UnasData:
         failed: set[Read] = set()
         caps = self.capabilities
+        # Not for the first poll: it is part of setup, which Home Assistant
+        # retries by itself and which an unload waits for instead of ending.
+        if self.data is not None:
+            self.client.allow_one_retry(self._retry_delay)
         try:
             # The anchors run first and on their own: a 401 here IS a credential
             # failure, and it is what licenses _read to absorb a 401 below.

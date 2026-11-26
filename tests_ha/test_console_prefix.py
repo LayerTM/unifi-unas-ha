@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from custom_components.unifi_unas_rest.aiounas import Capabilities
 from custom_components.unifi_unas_rest.const import DOMAIN
@@ -69,6 +69,7 @@ async def test_two_consoles_give_their_disks_different_names(
     """Before, both consoles' first disk read "Disk 1 Temperature"."""
     first_info = await unas_client.get_device_info()
     second_client = AsyncMock()
+    second_client.cancel_retry = MagicMock()
     for name in dir(unas_client):
         if name.startswith("get_") or name == "async_prepare":
             setattr(second_client, name, getattr(unas_client, name))
