@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterator
 from dataclasses import replace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 from custom_components.unifi_unas_rest.aiounas import (
@@ -84,6 +84,20 @@ def clock() -> Iterator[MagicMock]:
 
 
 @pytest.fixture
+def every_entity_enabled() -> Iterator[None]:
+    """Enable the entities shipped disabled, so each has a state to look at.
+
+    The harness's own fixture for this is absent from the oldest supported one.
+    """
+    with patch(
+        "homeassistant.helpers.entity.Entity.entity_registry_enabled_default",
+        new_callable=PropertyMock,
+        return_value=True,
+    ):
+        yield
+
+
+@pytest.fixture
 def controls_entry() -> MockConfigEntry:
     """A local account with controls on, so every platform has its entities."""
     return MockConfigEntry(
@@ -138,7 +152,7 @@ def _dependants(method: str, states: dict[str, str]) -> set[str]:
 @pytest.mark.parametrize("method", _READS)
 async def test_failed_read_hides_only_its_own_entities(
     hass: HomeAssistant,
-    entity_registry_enabled_by_default: None,
+    every_entity_enabled: None,
     mock_aiounas: AsyncMock,
     controls_entry: MockConfigEntry,
     method: str,
@@ -172,7 +186,7 @@ async def test_failed_read_hides_only_its_own_entities(
 @pytest.mark.parametrize("method", _ANCHORS)
 async def test_failed_anchor_read_hides_everything(
     hass: HomeAssistant,
-    entity_registry_enabled_by_default: None,
+    every_entity_enabled: None,
     mock_aiounas: AsyncMock,
     controls_entry: MockConfigEntry,
     method: str,
@@ -204,7 +218,7 @@ async def test_certificate_change_on_any_read_fails_the_update(
 
 async def test_read_that_never_answered_leaves_its_entities_unavailable(
     hass: HomeAssistant,
-    entity_registry_enabled_by_default: None,
+    every_entity_enabled: None,
     mock_aiounas: AsyncMock,
     config_entry: MockConfigEntry,
 ) -> None:
@@ -253,7 +267,7 @@ async def test_failure_is_logged_once_and_so_is_the_recovery(
 
 async def test_network_throughput_out_of_scope_is_neither_read_nor_shown(
     hass: HomeAssistant,
-    entity_registry_enabled_by_default: None,
+    every_entity_enabled: None,
     mock_aiounas: AsyncMock,
     config_entry: MockConfigEntry,
 ) -> None:
@@ -278,7 +292,7 @@ async def test_network_throughput_out_of_scope_is_neither_read_nor_shown(
 
 async def test_fan_select_appears_once_a_failed_first_read_succeeds(
     hass: HomeAssistant,
-    entity_registry_enabled_by_default: None,
+    every_entity_enabled: None,
     mock_aiounas: AsyncMock,
     controls_entry: MockConfigEntry,
 ) -> None:
