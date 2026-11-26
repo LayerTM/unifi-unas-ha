@@ -70,6 +70,7 @@ _FAILURES = {
     "timeout": UnasConnectionError(f"GET {_PATH}: TimeoutError"),
     "refusal": UnasCapabilityError(f"forbidden for {_PATH}"),
     "unauthorized": UnasAuthError(f"unauthorized for {_PATH}"),
+    "server error": UnasApiError(f"unexpected status 500 for {_PATH}", status=500),
 }
 
 _COORDINATOR_LOGGER = "custom_components.unifi_unas_rest.coordinator"
@@ -148,7 +149,7 @@ def _dependants(method: str, states: dict[str, str]) -> set[str]:
     return found
 
 
-@pytest.mark.parametrize("failure", _FAILURES)
+@pytest.mark.parametrize("failure", ["bad gateway", "timeout", "refusal", "unauthorized"])
 @pytest.mark.parametrize("method", _READS)
 async def test_failed_read_hides_only_its_own_entities(
     hass: HomeAssistant,
@@ -338,19 +339,55 @@ async def test_fan_control_never_served_is_not_warned_about(
     assert _logged() == [logging.WARNING, logging.DEBUG]
 
 
-@pytest.mark.parametrize("method", ["get_update_info", "get_console_backup"])
-async def test_transient_error_during_setup_retries_and_keeps_the_registry(
+# read -> the client methods that fail with it, in the setup probe and in a poll
+_SETUP_METHODS = {method: (method,) for method in _READS} | {
+    "get_system_readings": ("get_system_readings", "get_update_info", "get_console_backup")
+}
+
+
+@pytest.mark.parametrize("failure", ["server error", "timeout"])
+@pytest.mark.parametrize("method", _READS)
+async def test_read_failing_through_setup_keeps_its_entities(
+    hass: HomeAssistant,
+    every_entity_enabled: None,
+    mock_aiounas: AsyncMock,
+    controls_entry: MockConfigEntry,
+    method: str,
+    failure: str,
+) -> None:
+    """A restart while one read fails: the entry loads and nothing is removed."""
+    readings = await mock_aiounas.get_system_readings()
+    mock_aiounas.get_update_info.return_value = readings.update_info
+    mock_aiounas.get_console_backup.return_value = readings.console_backup
+    with patch("custom_components.unifi_unas_rest.probe", probe):  # the real probe
+        await _setup(hass, controls_entry)
+        before = _states(hass, controls_entry)
+        dependants = _dependants(method, before)
+        broken = {name: getattr(mock_aiounas, name).side_effect for name in _SETUP_METHODS[method]}
+        for name in broken:
+            getattr(mock_aiounas, name).side_effect = _FAILURES[failure]
+
+        assert await hass.config_entries.async_reload(controls_entry.entry_id)
+        await hass.async_block_till_done()
+        await _refresh(hass, controls_entry)  # still failing: a permanent failure
+
+        assert controls_entry.state is ConfigEntryState.LOADED
+        assert _states(hass, controls_entry) == {
+            **before,
+            **dict.fromkeys(dependants, STATE_UNAVAILABLE),
+        }
+
+        for name, original in broken.items():
+            getattr(mock_aiounas, name).side_effect = original
+        await _refresh(hass, controls_entry)
+        assert _states(hass, controls_entry) == before
+
+
+@pytest.mark.parametrize("method", _ANCHORS)
+async def test_anchor_failing_during_setup_retries(
     hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry, method: str
 ) -> None:
-    registry = er.async_get(hass)
-    config_entry.add_to_hass(hass)
-    rows = [
-        registry.async_get_or_create(platform, DOMAIN, f"{_PREFIX}{key}", config_entry=config_entry)
-        for platform, key in (("update", "drive_update"), ("binary_sensor", "console_auto_backup"))
-    ]
-    setattr(mock_aiounas, method, AsyncMock(side_effect=_FAILURES["timeout"]))
-    with patch("custom_components.unifi_unas_rest.probe", probe):  # the real probe
+    getattr(mock_aiounas, method).side_effect = _FAILURES["timeout"]
+    with patch("custom_components.unifi_unas_rest.probe", probe):
         await _setup(hass, config_entry)
-
     assert config_entry.state is ConfigEntryState.SETUP_RETRY
-    assert all(registry.async_get(row.entity_id) for row in rows)

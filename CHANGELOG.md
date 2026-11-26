@@ -16,15 +16,15 @@ adheres to [Semantic Versioning](https://semver.org/).
   with a server error, or a request times out), only the entities that depend on
   it become unavailable, and they come back with the next successful poll. The
   log gets one warning naming the request and one message when it recovers.
-- **A passing error during startup no longer removes entities.** A timeout or
-  server error while the update and console-backup readings were being checked
-  was taken to mean that the account cannot read them, and their entities were
-  removed. Setup now retries instead; only a refusal removes them.
-- With a local account, a server error (`500`) on a supplementary request during
-  startup no longer removes that request's entities; setup retries. A `500`
-  counts as a refusal only for an API key, which some firmware refuses that way.
-  The `aiounas` library raises `UnasApiError` for it instead of
-  `UnasCapabilityError`.
+- **A failing request during startup no longer removes entities or delays
+  setup.** Only a refusal (or a reading the console does not have) leaves a
+  reading out. A server error, a timeout or a dropped connection on any request
+  other than storage and device info now keeps its entities: the integration
+  starts, and they stay unavailable until the request answers. Before, such a
+  failure could remove entities or hold back the whole setup. With a local
+  account, a `500` is a server error, not a refusal; only an API key is refused
+  that way, and the `aiounas` library raises `UnasApiError` for a `500` to a
+  local account instead of `UnasCapabilityError`.
 - The fan profile selector appears as soon as fan control answers, even when it
   failed during startup.
 
