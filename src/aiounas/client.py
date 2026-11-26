@@ -75,6 +75,8 @@ class UnasClient:
         ssl: bool | aiohttp.Fingerprint = True,
         timeout: int = DEFAULT_TIMEOUT,
     ) -> None:
+        # Only a session can log in again, so this is "is not a local account".
+        self._refused_with_500 = not auth.can_reauth
         self._transport = UnasTransport(
             session,
             host,
@@ -195,15 +197,17 @@ class UnasClient:
     async def _get_session_only(self, path: str, hint: str = _SESSION_HINT) -> Any:
         """GET a read that UniFi OS serves to a local account only.
 
-        An API key is refused with 403, or 500 on some firmware; both surface as
-        :class:`UnasCapabilityError` carrying *hint*.
+        A refusal surfaces as :class:`UnasCapabilityError` carrying *hint*: a 403,
+        or for an API key also the 500 some firmware refuses it with. A 500 to a
+        local account is the console failing and stays :class:`UnasApiError`, so
+        it is never taken to mean the reading is out of scope.
         """
         try:
             return await self._transport.get_json(path)
         except UnasCapabilityError as err:
             raise UnasCapabilityError(hint) from err
         except UnasApiError as err:
-            if err.status == 500:
+            if err.status == 500 and self._refused_with_500:
                 raise UnasCapabilityError(hint) from err
             raise
 

@@ -105,6 +105,10 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
         self._storage_io: StorageIO | None = None
         self._failing: set[Read] = set()
         """Reads that failed the last time they were asked, to log each outage once."""
+        self._served = set(Read) - {Read.FAN_CONTROL}
+        """Reads this console is known to serve, so losing one is worth a warning.
+        The setup probe checks each of them except fan control, which joins once
+        it has answered."""
 
     async def _read[T](
         self, read: Read, call: Callable[[], Awaitable[T]], failed: set[Read]
@@ -123,8 +127,9 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
         the user into a re-auth loop over a credential that is not the problem.
 
         A changed certificate is the exception: it propagates, so the user is
-        told. The first failure after a success is logged as a warning, the
-        ones that follow at debug level, and the recovery once.
+        told. The first failure of a read the console serves is logged as a
+        warning, the ones that follow at debug level, and the recovery once. A
+        read it has never served is logged at debug level only.
 
         Only safe after the anchor reads have succeeded in this cycle; see
         :meth:`_async_update_data`, which awaits them first.
@@ -135,11 +140,14 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
             # Must precede UnasConnectionError, its base class.
             raise
         except (UnasCapabilityError, UnasApiError, UnasAuthError, UnasConnectionError) as err:
-            level = logging.DEBUG if read in self._failing else logging.WARNING
+            first = read in self._served and read not in self._failing
+            level = logging.WARNING if first else logging.DEBUG
             _LOGGER.log(level, "Could not read %s: %s", read, err)
-            self._failing.add(read)
+            if read in self._served:
+                self._failing.add(read)
             failed.add(read)
             return None
+        self._served.add(read)
         if read in self._failing:
             self._failing.discard(read)
             _LOGGER.info("Reading %s works again", read)

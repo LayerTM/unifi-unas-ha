@@ -5,16 +5,28 @@ from __future__ import annotations
 from unittest.mock import AsyncMock
 
 import pytest
+from aiohttp import web
+from aiohttp.test_utils import TestServer
 
 from aiounas.auth import ApiKeyAuth, SessionAuth
 from aiounas.capabilities import probe
 from aiounas.client import UnasClient
+from aiounas.const import (
+    PATH_LOGS,
+    PATH_M365_BACKUP_TASKS,
+    PATH_NOTIFICATIONS,
+    PATH_REMOTE_BACKUP_TASKS,
+    PATH_SHARES,
+    PATH_STORAGE_IO,
+    PATH_USERS,
+)
 from aiounas.exceptions import (
     UnasApiError,
     UnasAuthError,
     UnasCapabilityError,
     UnasConnectionError,
 )
+from conftest import make_app
 
 
 def _client(session, srv, auth) -> UnasClient:
@@ -158,3 +170,43 @@ async def test_probe_transient_failure_of_a_system_read_is_not_a_scope_answer(
     getattr(client, method).side_effect = failure
     with pytest.raises(type(failure)):
         await probe(client)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        PATH_SHARES,
+        PATH_USERS,
+        PATH_NOTIFICATIONS,
+        PATH_LOGS,
+        PATH_STORAGE_IO,
+        PATH_REMOTE_BACKUP_TASKS,
+        PATH_M365_BACKUP_TASKS,
+    ],
+)
+async def test_probe_500_to_a_local_account_is_not_a_scope_answer(session, path: str) -> None:
+    """Only an API key is refused with a 500. For a session it is a failing console."""
+
+    @web.middleware
+    async def broken(request: web.Request, handler):
+        if request.path == path:
+            return web.json_response({"error": {"code": 500}}, status=500)
+        return await handler(request)
+
+    app = make_app()
+    app.middlewares.append(broken)
+    server = TestServer(app)
+    await server.start_server()
+    try:
+        client = UnasClient(
+            session,
+            str(server.host),
+            SessionAuth("user", "pass"),
+            port=int(server.port),
+            use_ssl=False,
+        )
+        with pytest.raises(UnasApiError) as err:
+            await probe(client)
+    finally:
+        await server.close()
+    assert err.value.status == 500

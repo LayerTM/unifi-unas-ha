@@ -306,6 +306,38 @@ async def test_fan_select_appears_once_a_failed_first_read_succeeds(
     assert _states(hass, controls_entry)["fan_profile"] != STATE_UNAVAILABLE
 
 
+async def test_fan_control_never_served_is_not_warned_about(
+    hass: HomeAssistant,
+    mock_aiounas: AsyncMock,
+    config_entry: MockConfigEntry,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Fan control is the one read the setup probe does not check for."""
+    caplog.set_level(logging.DEBUG, logger=_COORDINATOR_LOGGER)
+
+    def _logged() -> list[int]:
+        return [
+            record.levelno
+            for record in caplog.records
+            if record.name == _COORDINATOR_LOGGER and "fan control" in record.getMessage()
+        ]
+
+    mock_aiounas.get_fan_control.side_effect = UnasApiError("not found", status=404)
+    await _setup(hass, config_entry)
+    await _refresh(hass, config_entry)
+    assert set(_logged()) == {logging.DEBUG}
+
+    # Once it has answered, losing it is worth a warning like any other read.
+    caplog.clear()
+    mock_aiounas.get_fan_control.side_effect = None
+    await _refresh(hass, config_entry)
+    assert _logged() == []
+    mock_aiounas.get_fan_control.side_effect = _FAILURES["bad gateway"]
+    await _refresh(hass, config_entry)
+    await _refresh(hass, config_entry)
+    assert _logged() == [logging.WARNING, logging.DEBUG]
+
+
 @pytest.mark.parametrize("method", ["get_update_info", "get_console_backup"])
 async def test_transient_error_during_setup_retries_and_keeps_the_registry(
     hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry, method: str

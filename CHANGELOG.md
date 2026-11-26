@@ -20,6 +20,11 @@ adheres to [Semantic Versioning](https://semver.org/).
   server error while the update and console-backup readings were being checked
   was taken to mean that the account cannot read them, and their entities were
   removed. Setup now retries instead; only a refusal removes them.
+- With a local account, a server error (`500`) on a supplementary request during
+  startup no longer removes that request's entities; setup retries. A `500`
+  counts as a refusal only for an API key, which some firmware refuses that way.
+  The `aiounas` library raises `UnasApiError` for it instead of
+  `UnasCapabilityError`.
 - The fan profile selector appears as soon as fan control answers, even when it
   failed during startup.
 
