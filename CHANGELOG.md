@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-11-26
+
 ### Added
 
 - **Backup readings.** Diagnostic sensors for the number of Drive backup tasks
