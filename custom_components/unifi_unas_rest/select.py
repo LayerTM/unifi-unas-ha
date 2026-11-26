@@ -15,8 +15,8 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from . import UnasConfigEntry
 from .aiounas import UnasActionClient
 from .aiounas.exceptions import UnasError
-from .coordinator import UnasDataUpdateCoordinator
-from .entity import UnasEntity
+from .coordinator import Read, UnasDataUpdateCoordinator
+from .entity import UnasEntity, add_new_entities
 from .errors import action_error
 
 PARALLEL_UPDATES = 1  # serialize write actions
@@ -27,11 +27,23 @@ async def async_setup_entry(
     entry: UnasConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Create the fan-mode selector when controls are opted in and fan-control exists."""
-    runtime = entry.runtime_data
-    if runtime.action_client is None or runtime.coordinator.data.fan_control is None:
+    """Create the fan-mode selector when controls are opted in and fan-control exists.
+
+    Added once the read first answers, so a failure during setup does not leave
+    the selector missing until a reload.
+    """
+    coordinator = entry.runtime_data.coordinator
+    action_client = entry.runtime_data.action_client
+    if action_client is None:
         return
-    async_add_entities([UnasFanSelect(runtime.coordinator, runtime.action_client)])
+    sync = add_new_entities(
+        async_add_entities,
+        set(),
+        lambda: ["fan_profile"] if coordinator.data.fan_control is not None else [],
+        lambda _key: [UnasFanSelect(coordinator, action_client)],
+    )
+    sync()
+    entry.async_on_unload(coordinator.async_add_listener(sync))
 
 
 class UnasFanSelect(UnasEntity, SelectEntity):
@@ -41,7 +53,7 @@ class UnasFanSelect(UnasEntity, SelectEntity):
     def __init__(
         self, coordinator: UnasDataUpdateCoordinator, action_client: UnasActionClient
     ) -> None:
-        super().__init__(coordinator, "fan_profile")
+        super().__init__(coordinator, "fan_profile", Read.FAN_CONTROL)
         self._action_client = action_client
 
     @property

@@ -31,7 +31,7 @@ from . import UnasConfigEntry
 from .aiounas import UnasActionClient, UpdateInfo
 from .aiounas.exceptions import UnasError
 from .const import DOMAIN
-from .coordinator import UnasDataUpdateCoordinator
+from .coordinator import Read, UnasDataUpdateCoordinator
 from .entity import UnasEntity
 from .errors import action_error
 
@@ -93,7 +93,7 @@ class UnasUpdate(UnasEntity, UpdateEntity):
         description: UnasUpdateDescription,
         action_client: UnasActionClient | None,
     ) -> None:
-        super().__init__(coordinator, description.key)
+        super().__init__(coordinator, description.key, Read.SYSTEM)
         self.entity_description = description
         self._action_client = action_client
         if action_client is not None:

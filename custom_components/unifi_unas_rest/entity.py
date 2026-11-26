@@ -16,7 +16,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .aiounas import Disk, Pool, Share
 from .const import DEFAULT_PORT, DOMAIN, MANUFACTURER
-from .coordinator import UnasDataUpdateCoordinator
+from .coordinator import Read, UnasDataUpdateCoordinator
 
 
 def add_new_entities(
@@ -115,12 +115,20 @@ class UnasEntity(CoordinatorEntity[UnasDataUpdateCoordinator]):
 
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator: UnasDataUpdateCoordinator, key: str) -> None:
+    def __init__(
+        self, coordinator: UnasDataUpdateCoordinator, key: str, read: Read | None = None
+    ) -> None:
+        """*read* is the one the entity depends on beyond the anchor reads."""
         super().__init__(coordinator)
+        self._read = read
         entry = coordinator.config_entry
         assert entry is not None
         self._attr_unique_id = f"{entry.unique_id}_{key}"
         self._attr_device_info = hub_device_info(coordinator)
+
+    @property
+    def available(self) -> bool:
+        return super().available and self._read not in self.coordinator.data.failed_reads
 
 
 class UnasDiskEntity(CoordinatorEntity[UnasDataUpdateCoordinator]):

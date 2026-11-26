@@ -16,7 +16,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import UnasConfigEntry
 from .aiounas import Disk, Pool, Share
-from .coordinator import UnasData, UnasDataUpdateCoordinator
+from .coordinator import Read, UnasData, UnasDataUpdateCoordinator
 from .entity import (
     UnasDiskEntity,
     UnasEntity,
@@ -29,6 +29,7 @@ from .entity import (
 @dataclass(frozen=True, kw_only=True)
 class UnasBinaryDescription(BinarySensorEntityDescription):
     value_fn: Callable[[UnasData], bool | None]
+    read: Read | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -110,6 +111,7 @@ SHARE_BINARY_SENSORS: tuple[UnasShareBinaryDescription, ...] = (
 CONSOLE_AUTO_BACKUP = UnasBinaryDescription(
     key="console_auto_backup",
     translation_key="console_auto_backup",
+    read=Read.SYSTEM,
     entity_category=EntityCategory.DIAGNOSTIC,
     value_fn=lambda d: d.console_backup.enabled if d.console_backup else None,
 )
@@ -191,7 +193,7 @@ class UnasBinarySensor(UnasEntity, BinarySensorEntity):
     def __init__(
         self, coordinator: UnasDataUpdateCoordinator, description: UnasBinaryDescription
     ) -> None:
-        super().__init__(coordinator, description.key)
+        super().__init__(coordinator, description.key, description.read)
         self.entity_description = description
 
     @property

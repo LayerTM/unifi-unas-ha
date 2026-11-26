@@ -311,10 +311,12 @@ async def test_get_shares_tolerates_non_dict_payload() -> None:
         await server.close()
 
 
-async def test_notification_summary_maps_500_to_capability() -> None:
+async def test_notification_summary_500_to_a_session_is_a_server_error() -> None:
+    """A local account is never refused with a 500; only an API key is."""
     async with _session_client_at(PATH_NOTIFICATIONS, _error(500)) as client:
-        with pytest.raises(UnasCapabilityError, match="session"):
+        with pytest.raises(UnasApiError) as err:
             await client.get_notification_summary()
+    assert err.value.status == 500
 
 
 async def test_notification_summary_propagates_non_capability_error() -> None:
@@ -335,10 +337,12 @@ async def test_log_summary_propagates_non_capability_error() -> None:
             await client.get_log_summary()
 
 
-async def test_storage_io_maps_500_to_capability() -> None:
+async def test_storage_io_500_to_a_session_is_a_server_error() -> None:
+    """A local account is never refused with a 500; only an API key is."""
     async with _session_client_at(PATH_STORAGE_IO, _error(500)) as client:
-        with pytest.raises(UnasCapabilityError, match="session"):
+        with pytest.raises(UnasApiError) as err:
             await client.get_storage_io()
+    assert err.value.status == 500
 
 
 async def test_storage_io_propagates_non_capability_error() -> None:

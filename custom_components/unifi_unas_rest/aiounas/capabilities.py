@@ -4,9 +4,16 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from typing import Protocol
 
 from .client import UnasClient
-from .exceptions import UnasApiError, UnasAuthError, UnasCapabilityError, UnasError
+from .exceptions import (
+    UnasApiError,
+    UnasAuthError,
+    UnasCapabilityError,
+    UnasConnectionError,
+)
+from .tls import UnasCertificateMismatch
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,22 +34,6 @@ class Capabilities:
     console_backup: bool = False
 
 
-async def _has_update_data(client: UnasClient) -> bool:
-    """True if the full /api/system (session) exposes firmware update info."""
-    try:
-        return (await client.get_update_info()).has_data
-    except UnasError:
-        return False
-
-
-async def _has_console_backup(client: UnasClient) -> bool:
-    """True if the full /api/system (session) carries the console backup settings."""
-    try:
-        return (await client.get_console_backup()).has_data
-    except UnasError:
-        return False
-
-
 async def _reachable(call: Callable[[], Awaitable[object]]) -> bool:
     """True if *call* succeeds; False only on a capability (scope) denial.
 
@@ -56,7 +47,7 @@ async def _reachable(call: Callable[[], Awaitable[object]]) -> bool:
 
 
 async def _in_scope(call: Callable[[], Awaitable[object]]) -> bool:
-    """True if *call* succeeds; False on any refusal aimed at the auth method.
+    """False only if *call* is refused or this console does not serve it.
 
     Used only once the credential has already answered a core read, which makes
     a 401 here a statement about the endpoint rather than about the credential.
@@ -68,21 +59,54 @@ async def _in_scope(call: Callable[[], Awaitable[object]]) -> bool:
     Assistant asks for the credential again, the flow validates it against a
     read the key *can* reach and reports success, and setup fails again on the
     same endpoint. The user cannot leave that loop, because nothing about their
-    credential is wrong.
+    credential is wrong. (The 500 reaches here as a refusal only for an API
+    key; see ``UnasClient._get_session_only``.)
 
     A 404 means the same for a supplementary read: this firmware does not serve
-    it, so the reading is out of reach — not a reason to fail the setup of an
-    entry whose core reads answer.
+    it, so the reading is out of reach.
+
+    Any other failure (a server error, a timeout, a dropped connection, a
+    redirect or a page where JSON belongs) says nothing about scope, so the read
+    stays in it: its entities are kept, and one failing supplementary read does
+    not hold back the rest. A changed certificate propagates.
     """
     try:
         await call()
     except (UnasCapabilityError, UnasAuthError):
         return False
-    except UnasApiError as err:
-        if err.status == 404:
-            return False
+    except UnasCertificateMismatch:
+        # Must precede UnasConnectionError, its base class.
         raise
+    except UnasApiError as err:
+        return err.status != 404
+    except UnasConnectionError:
+        return True
     return True
+
+
+class _SessionReading(Protocol):
+    @property
+    def has_data(self) -> bool: ...
+
+
+async def _carries_data(
+    in_scope: Callable[[Callable[[], Awaitable[object]]], Awaitable[bool]],
+    call: Callable[[], Awaitable[_SessionReading]],
+) -> bool:
+    """True if *call* is in scope and, when it answered, carries the reading.
+
+    The full ``/api/system`` goes to a session; an API key gets a short payload
+    with the same status, so being answered is not enough. Whether a failure
+    means "out of scope" is decided by *in_scope* as for every other read.
+    """
+    answers: list[_SessionReading] = []
+
+    async def read() -> None:
+        answers.append(await call())
+
+    if not await in_scope(read):
+        return False
+    return not answers or answers[0].has_data
 
 
 async def probe(client: UnasClient) -> Capabilities:
@@ -102,10 +126,10 @@ async def probe(client: UnasClient) -> Capabilities:
         network_io=await optional(client.get_network_io),
         shares=await optional(client.get_shares),
         users=await optional(client.get_user_count),
-        updates=await _has_update_data(client),
+        updates=await _carries_data(optional, client.get_update_info),
         notifications=await optional(client.get_notification_summary),
         logs=await optional(client.get_log_summary),
         storage_io=await optional(client.get_storage_io),
         backup_tasks=await optional(client.get_backup_task_count),
-        console_backup=await _has_console_backup(client),
+        console_backup=await _carries_data(optional, client.get_console_backup),
     )

@@ -142,7 +142,21 @@ Not supported: cloud-only access (UniFi Site Manager), and consoles without the 
 
 ## Data updates
 
-The integration **polls** the console's local REST API (`local_polling`) on a fixed interval — **30 seconds** by default, adjustable per entry under **Configure**. Every entity is served from a single shared coordinator fetch, so the poll cost does not grow with the number of entities. Supplementary reads (shares, users, updates, activity) degrade to *unknown* on a transient permission/API error without taking the core sensors unavailable.
+The integration **polls** the console's local REST API (`local_polling`) on a fixed interval — **30 seconds** by default, adjustable per entry under **Configure**. Every entity is served from a single shared coordinator fetch, so the poll cost does not grow with the number of entities. Only two requests decide the whole poll: storage and device info. If either fails, every entity becomes *unavailable* (the **Online** sensor turns off instead). Any other request that fails (a server error, a timeout, a dropped connection or a refusal) makes only the entities that depend on it *unavailable* until a later poll succeeds:
+
+| Request | Entities that depend on it |
+| --- | --- |
+| Network throughput | network receive and transmit |
+| Shared drives | the share devices' entities |
+| User count | users |
+| Console system info | applications, the UniFi OS and Drive updates, console auto-backup and its frequency |
+| Fan control | the fan profile selector |
+| Notifications | recent events, last event |
+| Logs | log entries |
+| Storage throughput | storage read and write rate |
+| Backup tasks | backup tasks |
+
+The log gets one warning naming the request when it starts failing, and one message when it works again. A changed certificate on any request still fails the whole poll and raises a repair.
 
 **Only a rejected credential asks you to re-authenticate.** A console that is booting, updating or restarting answers differently — a page of HTML where JSON belongs, or a redirect to its web UI — and that is treated as *unavailable*, so the poll simply retries and recovers on its own. A local-account session still gets one silent re-login first, since such a response can also be a genuine login page. Re-authentication is requested only for a 401 that survives that re-login.
 

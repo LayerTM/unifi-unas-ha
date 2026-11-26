@@ -2,14 +2,33 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from unittest.mock import AsyncMock
 
 import pytest
+from aiohttp import web
+from aiohttp.test_utils import TestServer
 
 from aiounas.auth import ApiKeyAuth, SessionAuth
 from aiounas.capabilities import probe
 from aiounas.client import UnasClient
-from aiounas.exceptions import UnasApiError, UnasAuthError
+from aiounas.const import (
+    PATH_LOGS,
+    PATH_M365_BACKUP_TASKS,
+    PATH_NOTIFICATIONS,
+    PATH_REMOTE_BACKUP_TASKS,
+    PATH_SHARES,
+    PATH_STORAGE_IO,
+    PATH_USERS,
+)
+from aiounas.exceptions import (
+    UnasApiError,
+    UnasAuthError,
+    UnasCapabilityError,
+    UnasConnectionError,
+)
+from aiounas.tls import UnasCertificateMismatch
+from conftest import make_app
 
 
 def _client(session, srv, auth) -> UnasClient:
@@ -102,11 +121,122 @@ async def test_probe_absent_backup_task_lists_are_out_of_scope(
     assert caps.logs is True
 
 
-async def test_probe_propagates_other_api_errors_on_supplementary_reads() -> None:
-    """Only a 404 means "not served"; a 502 is a real failure and still surfaces."""
+def _answering_client() -> AsyncMock:
     client = AsyncMock()
-    client.get_storage = AsyncMock(return_value=None)
-    client.get_device_info = AsyncMock(return_value=None)
-    client.get_network_io = AsyncMock(side_effect=UnasApiError("bad gateway", status=502))
-    with pytest.raises(UnasApiError):
+    for method in ("get_storage", "get_device_info", "get_network_io"):
+        getattr(client, method).return_value = None
+    return client
+
+
+@pytest.mark.parametrize(
+    ("method", "capability"),
+    [("get_update_info", "updates"), ("get_console_backup", "console_backup")],
+)
+@pytest.mark.parametrize(
+    "refusal",
+    [
+        UnasCapabilityError("forbidden"),
+        UnasAuthError("unauthorized"),
+        UnasApiError("not found", status=404),
+    ],
+)
+async def test_probe_refused_system_read_is_out_of_scope(
+    method: str, capability: str, refusal: Exception
+) -> None:
+    client = _answering_client()
+    getattr(client, method).side_effect = refusal
+    caps = await probe(client)
+    assert getattr(caps, capability) is False
+
+
+@pytest.mark.parametrize(
+    ("method", "capability"),
+    [
+        ("get_network_io", "network_io"),
+        ("get_shares", "shares"),
+        ("get_user_count", "users"),
+        ("get_update_info", "updates"),
+        ("get_notification_summary", "notifications"),
+        ("get_log_summary", "logs"),
+        ("get_storage_io", "storage_io"),
+        ("get_backup_task_count", "backup_tasks"),
+        ("get_console_backup", "console_backup"),
+    ],
+)
+@pytest.mark.parametrize(
+    "failure",
+    [
+        UnasConnectionError("timed out"),
+        UnasApiError("server error", status=500),
+        UnasApiError("bad gateway", status=502),
+        UnasApiError("redirected to the web UI", status=302),
+        UnasApiError("non-JSON response", status=200),
+    ],
+)
+async def test_probe_failing_supplementary_read_stays_in_scope(
+    method: str, capability: str, failure: Exception
+) -> None:
+    """Out of scope removes entities, and one failing read must not block setup."""
+    client = _answering_client()
+    getattr(client, method).side_effect = failure
+    caps = await probe(client)
+    assert getattr(caps, capability) is True
+
+
+@pytest.mark.parametrize("method", ["get_network_io", "get_shares", "get_update_info"])
+async def test_probe_certificate_change_still_propagates(method: str) -> None:
+    client = _answering_client()
+    getattr(client, method).side_effect = UnasCertificateMismatch("AA" * 32, "BB" * 32)
+    with pytest.raises(UnasCertificateMismatch):
         await probe(client)
+
+
+@pytest.mark.parametrize("method", ["get_storage", "get_device_info"])
+@pytest.mark.parametrize(
+    "failure",
+    [UnasConnectionError("timed out"), UnasApiError("server error", status=500)],
+)
+async def test_probe_failing_anchor_read_still_propagates(method: str, failure: Exception) -> None:
+    client = _answering_client()
+    getattr(client, method).side_effect = failure
+    with pytest.raises(type(failure)):
+        await probe(client)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        PATH_SHARES,
+        PATH_USERS,
+        PATH_NOTIFICATIONS,
+        PATH_LOGS,
+        PATH_STORAGE_IO,
+        PATH_REMOTE_BACKUP_TASKS,
+        PATH_M365_BACKUP_TASKS,
+    ],
+)
+async def test_probe_500_to_a_local_account_keeps_the_reading_in_scope(session, path: str) -> None:
+    """Only an API key is refused with a 500. For a session it is a failing console."""
+
+    @web.middleware
+    async def broken(request: web.Request, handler):
+        if request.path == path:
+            return web.json_response({"error": {"code": 500}}, status=500)
+        return await handler(request)
+
+    app = make_app()
+    app.middlewares.append(broken)
+    server = TestServer(app)
+    await server.start_server()
+    try:
+        client = UnasClient(
+            session,
+            str(server.host),
+            SessionAuth("user", "pass"),
+            port=int(server.port),
+            use_ssl=False,
+        )
+        caps = await probe(client)
+    finally:
+        await server.close()
+    assert all(asdict(caps).values())
