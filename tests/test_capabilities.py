@@ -9,7 +9,12 @@ import pytest
 from aiounas.auth import ApiKeyAuth, SessionAuth
 from aiounas.capabilities import probe
 from aiounas.client import UnasClient
-from aiounas.exceptions import UnasApiError, UnasAuthError
+from aiounas.exceptions import (
+    UnasApiError,
+    UnasAuthError,
+    UnasCapabilityError,
+    UnasConnectionError,
+)
 
 
 def _client(session, srv, auth) -> UnasClient:
@@ -109,4 +114,47 @@ async def test_probe_propagates_other_api_errors_on_supplementary_reads() -> Non
     client.get_device_info = AsyncMock(return_value=None)
     client.get_network_io = AsyncMock(side_effect=UnasApiError("bad gateway", status=502))
     with pytest.raises(UnasApiError):
+        await probe(client)
+
+
+def _answering_client() -> AsyncMock:
+    client = AsyncMock()
+    for method in ("get_storage", "get_device_info", "get_network_io"):
+        getattr(client, method).return_value = None
+    return client
+
+
+@pytest.mark.parametrize(
+    ("method", "capability"),
+    [("get_update_info", "updates"), ("get_console_backup", "console_backup")],
+)
+@pytest.mark.parametrize(
+    "refusal",
+    [
+        UnasCapabilityError("forbidden"),
+        UnasAuthError("unauthorized"),
+        UnasApiError("not found", status=404),
+    ],
+)
+async def test_probe_refused_system_read_is_out_of_scope(
+    method: str, capability: str, refusal: Exception
+) -> None:
+    client = _answering_client()
+    getattr(client, method).side_effect = refusal
+    caps = await probe(client)
+    assert getattr(caps, capability) is False
+
+
+@pytest.mark.parametrize("method", ["get_update_info", "get_console_backup"])
+@pytest.mark.parametrize(
+    "failure",
+    [UnasConnectionError("timed out"), UnasApiError("bad gateway", status=502)],
+)
+async def test_probe_transient_failure_of_a_system_read_is_not_a_scope_answer(
+    method: str, failure: Exception
+) -> None:
+    """Read as "out of scope", it would delete the entities from the registry."""
+    client = _answering_client()
+    getattr(client, method).side_effect = failure
+    with pytest.raises(type(failure)):
         await probe(client)

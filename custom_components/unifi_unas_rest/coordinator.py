@@ -8,6 +8,7 @@ import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import timedelta
+from enum import StrEnum
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -39,13 +40,32 @@ from .issues import clear_cert_mismatch, raise_cert_mismatch, sync_storage_issue
 _LOGGER = logging.getLogger(__name__)
 
 
+class Read(StrEnum):
+    """A read whose failure affects only the entities that depend on it.
+
+    Storage and device info are not listed: they prove the console answers this
+    credential and describe the hub and its drives, so their failure fails the
+    whole update. The value names the read in the log.
+    """
+
+    NETWORK_IO = "network throughput"
+    SHARES = "shared drives"
+    USERS = "user count"
+    SYSTEM = "firmware and console backup settings"
+    FAN_CONTROL = "fan control"
+    NOTIFICATIONS = "notifications"
+    LOGS = "logs"
+    STORAGE_IO = "storage throughput"
+    BACKUP_TASKS = "backup tasks"
+
+
 @dataclass(slots=True)
 class UnasData:
     """Snapshot of everything the coordinator fetches each cycle."""
 
     storage: Storage
     device_info: DeviceInfo
-    network_io: NetworkIO
+    network_io: NetworkIO | None
     shares: list[Share] | None
     user_count: int | None
     update_info: UpdateInfo | None
@@ -55,6 +75,8 @@ class UnasData:
     storage_io: StorageIO | None
     backup_task_count: int | None = None
     console_backup: ConsoleBackup | None = None
+    failed_reads: frozenset[Read] = frozenset()
+    """Reads that did not answer this cycle; their entities are unavailable."""
 
 
 class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
@@ -81,32 +103,49 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
         """Device-registry id of the hub, set by `async_setup_entry` before the
         platforms load. Sub-devices point at it (see `entity.link_to_hub`)."""
         self._storage_io: StorageIO | None = None
+        self._failing: set[Read] = set()
+        """Reads that failed the last time they were asked, to log each outage once."""
 
-    async def _optional[T](self, call: Callable[[], Awaitable[T]]) -> T | None:
-        """Run a supplementary (capability-scoped) fetch.
+    async def _read[T](
+        self, read: Read, call: Callable[[], Awaitable[T]], failed: set[Read]
+    ) -> T | None:
+        """Run a read that only its own entities depend on.
 
-        A refusal degrades that field to None instead of failing the whole
-        update — so a 403 on shares/users/updates/fan does not take the core
-        sensors unavailable. A 401 counts as a refusal here too: the three core
-        reads of this same cycle have already answered, so the credential is
-        good and the 401 is the console refusing this auth method on a
-        session-only read. Which status it picks is firmware-dependent (403 and
-        500 on UniFi OS 5.1.19 / Drive 4.3.6, 401 on 5.1.33 / Drive 4.4.9), so
-        the kind of refusal cannot be read off the status. Raising
+        Any failure to answer (a server error, a timeout, a dropped connection,
+        a refusal) adds *read* to *failed* instead of failing the whole update,
+        and the next cycle asks again. A 401 counts as a refusal here too: the
+        two anchor reads of this same cycle have already answered, so the
+        credential is good and the 401 is the console refusing this auth method
+        on a session-only read. Which status it picks is firmware-dependent
+        (403 and 500 on UniFi OS 5.1.19 / Drive 4.3.6, 401 on 5.1.33 / Drive
+        4.4.9), so the kind of refusal cannot be read off the status. Raising
         ConfigEntryAuthFailed for it would tear down a working entry and send
         the user into a re-auth loop over a credential that is not the problem.
 
-        Connection errors still propagate, so a retry fires.
+        A changed certificate is the exception: it propagates, so the user is
+        told. The first failure after a success is logged as a warning, the
+        ones that follow at debug level, and the recovery once.
 
-        Only safe after the core reads have succeeded in this cycle; see
+        Only safe after the anchor reads have succeeded in this cycle; see
         :meth:`_async_update_data`, which awaits them first.
         """
         try:
-            return await call()
-        except (UnasCapabilityError, UnasApiError, UnasAuthError):
+            value = await call()
+        except UnasCertificateMismatch:
+            # Must precede UnasConnectionError, its base class.
+            raise
+        except (UnasCapabilityError, UnasApiError, UnasAuthError, UnasConnectionError) as err:
+            level = logging.DEBUG if read in self._failing else logging.WARNING
+            _LOGGER.log(level, "Could not read %s: %s", read, err)
+            self._failing.add(read)
+            failed.add(read)
             return None
+        if read in self._failing:
+            self._failing.discard(read)
+            _LOGGER.info("Reading %s works again", read)
+        return value
 
-    async def _storage_io_reading(self) -> StorageIO | None:
+    async def _storage_io_reading(self, failed: set[Read]) -> StorageIO | None:
         """The latest storage throughput, fetched only once a newer bucket exists.
 
         The console averages throughput over fixed buckets and reports completed
@@ -122,53 +161,59 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
             and time.time() < last.window_end + last.interval
         ):
             return last
-        self._storage_io = await self._optional(self.client.get_storage_io)
+        self._storage_io = await self._read(Read.STORAGE_IO, self.client.get_storage_io, failed)
         return self._storage_io
 
     async def _async_update_data(self) -> UnasData:
+        failed: set[Read] = set()
+        caps = self.capabilities
         try:
-            # These three run first and on their own: a 401 here IS a credential
-            # failure, and it is what licenses _optional to absorb a 401 below.
-            storage, device_info, network_io = await asyncio.gather(
+            # The anchors run first and on their own: a 401 here IS a credential
+            # failure, and it is what licenses _read to absorb a 401 below.
+            storage, device_info = await asyncio.gather(
                 self.client.get_storage(),
                 self.client.get_device_info(),
-                self.client.get_network_io(),
+            )
+            network_io = (
+                await self._read(Read.NETWORK_IO, self.client.get_network_io, failed)
+                if caps.network_io
+                else None
             )
             shares = (
-                await self._optional(self.client.get_shares) if self.capabilities.shares else None
+                await self._read(Read.SHARES, self.client.get_shares, failed)
+                if caps.shares
+                else None
             )
             user_count = (
-                await self._optional(self.client.get_user_count)
-                if self.capabilities.users
+                await self._read(Read.USERS, self.client.get_user_count, failed)
+                if caps.users
                 else None
             )
             # One /api/system read serves every reading derived from it.
             system = (
-                await self._optional(self.client.get_system_readings)
-                if self.capabilities.updates or self.capabilities.console_backup
+                await self._read(Read.SYSTEM, self.client.get_system_readings, failed)
+                if caps.updates or caps.console_backup
                 else None
             )
-            update_info = system.update_info if system and self.capabilities.updates else None
-            fan_control = await self._optional(self.client.get_fan_control)
+            update_info = system.update_info if system and caps.updates else None
+            fan_control = await self._read(Read.FAN_CONTROL, self.client.get_fan_control, failed)
             notifications = (
-                await self._optional(self.client.get_notification_summary)
-                if self.capabilities.notifications
+                await self._read(Read.NOTIFICATIONS, self.client.get_notification_summary, failed)
+                if caps.notifications
                 else None
             )
             logs = (
-                await self._optional(self.client.get_log_summary)
-                if self.capabilities.logs
+                await self._read(Read.LOGS, self.client.get_log_summary, failed)
+                if caps.logs
                 else None
             )
-            storage_io = await self._storage_io_reading() if self.capabilities.storage_io else None
+            storage_io = await self._storage_io_reading(failed) if caps.storage_io else None
             backup_task_count = (
-                await self._optional(self.client.get_backup_task_count)
-                if self.capabilities.backup_tasks
+                await self._read(Read.BACKUP_TASKS, self.client.get_backup_task_count, failed)
+                if caps.backup_tasks
                 else None
             )
-            console_backup = (
-                system.console_backup if system and self.capabilities.console_backup else None
-            )
+            console_backup = system.console_backup if system and caps.console_backup else None
         except UnasAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except UnasCertificateMismatch as err:
@@ -208,4 +253,5 @@ class UnasDataUpdateCoordinator(DataUpdateCoordinator[UnasData]):
             storage_io=storage_io,
             backup_task_count=backup_task_count,
             console_backup=console_backup,
+            failed_reads=frozenset(failed),
         )

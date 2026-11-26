@@ -13,7 +13,7 @@ from custom_components.unifi_unas_rest.aiounas import (
     probe,
 )
 from custom_components.unifi_unas_rest.const import DOMAIN
-from homeassistant.const import STATE_UNKNOWN
+from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant.common import MockConfigEntry
@@ -99,14 +99,14 @@ async def test_fetched_once_per_completed_bucket(
     assert mock_aiounas.get_storage_io.await_count == 2
 
 
-async def test_refused_read_is_unknown_and_retried(
+async def test_refused_read_is_unavailable_and_retried(
     hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry, clock: MagicMock
 ) -> None:
     mock_aiounas.get_storage_io.side_effect = UnasCapabilityError("refused")
     await _setup(hass, config_entry)
     entity_id = _entity_id(hass, "storage_write_rate")
     assert entity_id
-    assert hass.states.get(entity_id).state == STATE_UNKNOWN
+    assert hass.states.get(entity_id).state == STATE_UNAVAILABLE
     # Core sensors are unaffected by the failed supplementary read.
     assert hass.states.get(_entity_id(hass, "storage_usage")).state != STATE_UNKNOWN
 

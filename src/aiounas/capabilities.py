@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from typing import Protocol
 
 from .client import UnasClient
-from .exceptions import UnasApiError, UnasAuthError, UnasCapabilityError, UnasError
+from .exceptions import UnasApiError, UnasAuthError, UnasCapabilityError
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,22 +26,6 @@ class Capabilities:
     # Defaulted so a Capabilities built before these readings existed still works.
     backup_tasks: bool = False
     console_backup: bool = False
-
-
-async def _has_update_data(client: UnasClient) -> bool:
-    """True if the full /api/system (session) exposes firmware update info."""
-    try:
-        return (await client.get_update_info()).has_data
-    except UnasError:
-        return False
-
-
-async def _has_console_backup(client: UnasClient) -> bool:
-    """True if the full /api/system (session) carries the console backup settings."""
-    try:
-        return (await client.get_console_backup()).has_data
-    except UnasError:
-        return False
 
 
 async def _reachable(call: Callable[[], Awaitable[object]]) -> bool:
@@ -85,6 +70,31 @@ async def _in_scope(call: Callable[[], Awaitable[object]]) -> bool:
     return True
 
 
+class _SessionReading(Protocol):
+    @property
+    def has_data(self) -> bool: ...
+
+
+async def _carries_data(
+    in_scope: Callable[[Callable[[], Awaitable[object]]], Awaitable[bool]],
+    call: Callable[[], Awaitable[_SessionReading]],
+) -> bool:
+    """True if *call* is in scope and its answer carries the reading.
+
+    The full ``/api/system`` goes to a session; an API key gets a short payload
+    with the same status, so being answered is not enough. Whether a failure
+    means "out of scope" is decided by *in_scope* as for every other read: a
+    timeout or a server error propagates, because an out-of-scope reading has
+    its entities removed.
+    """
+    answers: list[_SessionReading] = []
+
+    async def read() -> None:
+        answers.append(await call())
+
+    return await in_scope(read) and answers[0].has_data
+
+
 async def probe(client: UnasClient) -> Capabilities:
     """Determine endpoint reachability for the client's auth method.
 
@@ -102,10 +112,10 @@ async def probe(client: UnasClient) -> Capabilities:
         network_io=await optional(client.get_network_io),
         shares=await optional(client.get_shares),
         users=await optional(client.get_user_count),
-        updates=await _has_update_data(client),
+        updates=await _carries_data(optional, client.get_update_info),
         notifications=await optional(client.get_notification_summary),
         logs=await optional(client.get_log_summary),
         storage_io=await optional(client.get_storage_io),
         backup_tasks=await optional(client.get_backup_task_count),
-        console_backup=await _has_console_backup(client),
+        console_backup=await _carries_data(optional, client.get_console_backup),
     )

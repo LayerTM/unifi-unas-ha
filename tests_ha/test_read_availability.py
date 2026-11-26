@@ -1,0 +1,310 @@
+"""A failed read hides only the entities that depend on it."""
+
+from __future__ import annotations
+
+import logging
+from collections.abc import Iterator
+from dataclasses import replace
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from custom_components.unifi_unas_rest.aiounas import (
+    UnasApiError,
+    UnasAuthError,
+    UnasCapabilityError,
+    UnasCertificateMismatch,
+    UnasConnectionError,
+    probe,
+)
+from custom_components.unifi_unas_rest.const import (
+    AUTH_PASSWORD,
+    CONF_AUTH_METHOD,
+    CONF_ENABLE_CONTROLS,
+    CONF_TLS_MODE,
+    DOMAIN,
+)
+from homeassistant.config_entries import ConfigEntryState
+from homeassistant.const import (
+    CONF_HOST,
+    CONF_PASSWORD,
+    CONF_PORT,
+    CONF_USERNAME,
+    STATE_UNAVAILABLE,
+)
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
+from pytest_homeassistant.common import MockConfigEntry
+
+_PREFIX = "AABBCC000001_"
+
+# Past the end of the throughput fixture's bucket and the one after it, so the
+# coordinator asks for throughput again on every cycle.
+_AFTER_NEXT_BUCKET = 1791193500 + 600
+
+_SHARES = "every share entity"
+
+# client method -> the entity keys that exist only because of that read
+_READS: dict[str, tuple[str, ...] | str] = {
+    "get_network_io": ("network_rx", "network_tx"),
+    "get_shares": _SHARES,
+    "get_user_count": ("user_count",),
+    "get_system_readings": (
+        "applications",
+        "unifi_os_update",
+        "drive_update",
+        "console_auto_backup",
+        "console_backup_frequency",
+    ),
+    "get_fan_control": ("fan_profile",),
+    "get_notification_summary": ("recent_events", "last_event"),
+    "get_log_summary": ("log_entries",),
+    "get_storage_io": ("storage_read_rate", "storage_write_rate"),
+    "get_backup_task_count": ("backup_tasks",),
+}
+
+_ANCHORS = ["get_storage", "get_device_info"]
+
+_PATH = "/proxy/drive/example"
+_FAILURES = {
+    "bad gateway": UnasApiError(f"unexpected status 502 for {_PATH}", status=502),
+    "timeout": UnasConnectionError(f"GET {_PATH}: TimeoutError"),
+    "refusal": UnasCapabilityError(f"forbidden for {_PATH}"),
+    "unauthorized": UnasAuthError(f"unauthorized for {_PATH}"),
+}
+
+_COORDINATOR_LOGGER = "custom_components.unifi_unas_rest.coordinator"
+
+
+@pytest.fixture(autouse=True)
+def clock() -> Iterator[MagicMock]:
+    fake = MagicMock()
+    fake.time.return_value = _AFTER_NEXT_BUCKET
+    with patch("custom_components.unifi_unas_rest.coordinator.time", fake):
+        yield fake
+
+
+@pytest.fixture
+def controls_entry() -> MockConfigEntry:
+    """A local account with controls on, so every platform has its entities."""
+    return MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="AABBCC000001",
+        data={
+            CONF_HOST: "192.0.2.10",
+            CONF_PORT: 443,
+            CONF_TLS_MODE: "insecure",
+            CONF_USERNAME: "user",
+            CONF_PASSWORD: "pass",
+            CONF_AUTH_METHOD: AUTH_PASSWORD,
+        },
+        options={CONF_ENABLE_CONTROLS: True},
+    )
+
+
+async def _setup(hass: HomeAssistant, entry: MockConfigEntry) -> None:
+    if hass.config_entries.async_get_entry(entry.entry_id) is None:
+        entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+
+async def _refresh(hass: HomeAssistant, entry: MockConfigEntry) -> None:
+    await entry.runtime_data.coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+
+def _states(hass: HomeAssistant, entry: MockConfigEntry) -> dict[str, str]:
+    """State of every entity of the entry, by the entity's own part of its unique id."""
+    states = {}
+    for row in er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id):
+        state = hass.states.get(row.entity_id)
+        assert state, row.entity_id
+        states[row.unique_id.removeprefix(_PREFIX)] = state.state
+    return states
+
+
+def _dependants(method: str, states: dict[str, str]) -> set[str]:
+    keys = _READS[method]
+    if keys == _SHARES:
+        found = {key for key in states if key.startswith("share")}
+    else:
+        found = set(keys)
+        assert found <= states.keys()
+    assert found
+    return found
+
+
+@pytest.mark.parametrize("failure", _FAILURES)
+@pytest.mark.parametrize("method", _READS)
+async def test_failed_read_hides_only_its_own_entities(
+    hass: HomeAssistant,
+    entity_registry_enabled_by_default: None,
+    mock_aiounas: AsyncMock,
+    controls_entry: MockConfigEntry,
+    method: str,
+    failure: str,
+) -> None:
+    await _setup(hass, controls_entry)
+    before = _states(hass, controls_entry)
+    dependants = _dependants(method, before)
+    assert STATE_UNAVAILABLE not in {before[key] for key in dependants}
+    read = getattr(mock_aiounas, method)
+
+    read.side_effect = _FAILURES[failure]
+    await _refresh(hass, controls_entry)
+
+    assert controls_entry.runtime_data.coordinator.last_update_success
+    assert _states(hass, controls_entry) == {
+        **before,
+        **dict.fromkeys(dependants, STATE_UNAVAILABLE),
+    }
+    assert not hass.config_entries.flow.async_progress()  # never a re-authentication
+
+    # The following poll asks again, and a success brings the entities back.
+    asked = read.await_count
+    read.side_effect = None
+    await _refresh(hass, controls_entry)
+    assert read.await_count == asked + 1
+    assert _states(hass, controls_entry) == before
+
+
+@pytest.mark.parametrize("failure", ["bad gateway", "timeout"])
+@pytest.mark.parametrize("method", _ANCHORS)
+async def test_failed_anchor_read_hides_everything(
+    hass: HomeAssistant,
+    entity_registry_enabled_by_default: None,
+    mock_aiounas: AsyncMock,
+    controls_entry: MockConfigEntry,
+    method: str,
+    failure: str,
+) -> None:
+    await _setup(hass, controls_entry)
+
+    getattr(mock_aiounas, method).side_effect = _FAILURES[failure]
+    await _refresh(hass, controls_entry)
+
+    states = _states(hass, controls_entry)
+    assert states.pop("device_online") == "off"
+    assert set(states.values()) == {STATE_UNAVAILABLE}
+
+
+async def test_certificate_change_on_any_read_fails_the_update(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
+) -> None:
+    """A changed certificate is a connection error that must not be absorbed."""
+    await _setup(hass, config_entry)
+
+    mock_aiounas.get_user_count.side_effect = UnasCertificateMismatch("AA" * 32, "BB" * 32)
+    with patch("custom_components.unifi_unas_rest.coordinator.raise_cert_mismatch") as repair:
+        await _refresh(hass, config_entry)
+
+    assert not config_entry.runtime_data.coordinator.last_update_success
+    repair.assert_called_once()
+
+
+async def test_read_that_never_answered_leaves_its_entities_unavailable(
+    hass: HomeAssistant,
+    entity_registry_enabled_by_default: None,
+    mock_aiounas: AsyncMock,
+    config_entry: MockConfigEntry,
+) -> None:
+    mock_aiounas.get_network_io.side_effect = _FAILURES["bad gateway"]
+    await _setup(hass, config_entry)
+
+    states = _states(hass, config_entry)
+    assert states["network_rx"] == states["network_tx"] == STATE_UNAVAILABLE
+    assert states["storage_usage"] != STATE_UNAVAILABLE
+
+
+async def test_failure_is_logged_once_and_so_is_the_recovery(
+    hass: HomeAssistant,
+    mock_aiounas: AsyncMock,
+    config_entry: MockConfigEntry,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.DEBUG, logger=_COORDINATOR_LOGGER)
+    await _setup(hass, config_entry)
+
+    def _logged() -> list[int]:
+        return [
+            record.levelno
+            for record in caplog.records
+            if record.name == _COORDINATOR_LOGGER and "user count" in record.getMessage()
+        ]
+
+    caplog.clear()
+    mock_aiounas.get_user_count.side_effect = _FAILURES["bad gateway"]
+    for _ in range(3):
+        await _refresh(hass, config_entry)
+    assert _logged() == [logging.WARNING, logging.DEBUG, logging.DEBUG]
+    assert f"unexpected status 502 for {_PATH}" in caplog.text
+
+    caplog.clear()
+    mock_aiounas.get_user_count.side_effect = None
+    await _refresh(hass, config_entry)
+    await _refresh(hass, config_entry)
+    assert _logged() == [logging.INFO]
+
+    caplog.clear()
+    mock_aiounas.get_user_count.side_effect = _FAILURES["timeout"]
+    await _refresh(hass, config_entry)
+    assert _logged() == [logging.WARNING]
+
+
+async def test_network_throughput_out_of_scope_is_neither_read_nor_shown(
+    hass: HomeAssistant,
+    entity_registry_enabled_by_default: None,
+    mock_aiounas: AsyncMock,
+    config_entry: MockConfigEntry,
+) -> None:
+    caps = await probe(mock_aiounas)
+    registry = er.async_get(hass)
+    config_entry.add_to_hass(hass)
+    stale = registry.async_get_or_create(
+        "sensor", DOMAIN, f"{_PREFIX}network_rx", config_entry=config_entry
+    )
+    mock_aiounas.get_network_io.reset_mock()
+    with patch(
+        "custom_components.unifi_unas_rest.probe",
+        AsyncMock(return_value=replace(caps, network_io=False)),
+    ):
+        await _setup(hass, config_entry)
+
+    mock_aiounas.get_network_io.assert_not_called()
+    states = _states(hass, config_entry)
+    assert not {"network_rx", "network_tx"} & states.keys()
+    assert registry.async_get(stale.entity_id) is None
+
+
+async def test_fan_select_appears_once_a_failed_first_read_succeeds(
+    hass: HomeAssistant,
+    entity_registry_enabled_by_default: None,
+    mock_aiounas: AsyncMock,
+    controls_entry: MockConfigEntry,
+) -> None:
+    mock_aiounas.get_fan_control.side_effect = _FAILURES["timeout"]
+    await _setup(hass, controls_entry)
+    assert "fan_profile" not in _states(hass, controls_entry)
+
+    mock_aiounas.get_fan_control.side_effect = None
+    await _refresh(hass, controls_entry)
+
+    assert _states(hass, controls_entry)["fan_profile"] != STATE_UNAVAILABLE
+
+
+@pytest.mark.parametrize("method", ["get_update_info", "get_console_backup"])
+async def test_transient_error_during_setup_retries_and_keeps_the_registry(
+    hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry, method: str
+) -> None:
+    registry = er.async_get(hass)
+    config_entry.add_to_hass(hass)
+    rows = [
+        registry.async_get_or_create(platform, DOMAIN, f"{_PREFIX}{key}", config_entry=config_entry)
+        for platform, key in (("update", "drive_update"), ("binary_sensor", "console_auto_backup"))
+    ]
+    setattr(mock_aiounas, method, AsyncMock(side_effect=_FAILURES["timeout"]))
+    with patch("custom_components.unifi_unas_rest.probe", probe):  # the real probe
+        await _setup(hass, config_entry)
+
+    assert config_entry.state is ConfigEntryState.SETUP_RETRY
+    assert all(registry.async_get(row.entity_id) for row in rows)

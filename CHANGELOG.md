@@ -6,6 +6,28 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.11.1] - 2026-11-26
+
+### Fixed
+
+- **One failing request no longer makes every entity unavailable.** Only the
+  storage and device-info requests decide the whole update. When any other
+  request fails (for example the console answers the network throughput request
+  with a server error, or a request times out), only the entities that depend on
+  it become unavailable, and they come back with the next successful poll. The
+  log gets one warning naming the request and one message when it recovers.
+- **A passing error during startup no longer removes entities.** A timeout or
+  server error while the update and console-backup readings were being checked
+  was taken to mean that the account cannot read them, and their entities were
+  removed. Setup now retries instead; only a refusal removes them.
+- The fan profile selector appears as soon as fan control answers, even when it
+  failed during startup.
+
+### Changed
+
+- A supplementary reading that the console fails or refuses to answer now shows
+  its entities as *unavailable* rather than *unknown*.
+
 ## [1.11.0] - 2026-11-26
 
 ### Added

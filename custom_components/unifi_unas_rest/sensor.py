@@ -28,7 +28,7 @@ from homeassistant.helpers.typing import StateType
 from . import UnasConfigEntry
 from .aiounas import Disk, Pool, Share
 from .const import BACKUP_FREQUENCIES
-from .coordinator import UnasData, UnasDataUpdateCoordinator
+from .coordinator import Read, UnasData, UnasDataUpdateCoordinator
 from .entity import (
     UnasDiskEntity,
     UnasEntity,
@@ -44,6 +44,7 @@ class UnasSensorDescription(SensorEntityDescription):
 
     value_fn: Callable[[UnasData], StateType | datetime]
     attrs_fn: Callable[[UnasData], Mapping[str, Any] | None] | None = None
+    read: Read | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -170,26 +171,6 @@ SENSORS: tuple[UnasSensorDescription, ...] = (
         value_fn=lambda d: d.device_info.memory_percent,
     ),
     UnasSensorDescription(
-        key="network_rx",
-        translation_key="network_rx",
-        native_unit_of_measurement=UnitOfDataRate.KIBIBYTES_PER_SECOND,
-        device_class=SensorDeviceClass.DATA_RATE,
-        state_class=SensorStateClass.MEASUREMENT,
-        suggested_display_precision=1,
-        entity_registry_enabled_default=False,  # high-churn; opt-in
-        value_fn=lambda d: d.network_io.rx_kbps,
-    ),
-    UnasSensorDescription(
-        key="network_tx",
-        translation_key="network_tx",
-        native_unit_of_measurement=UnitOfDataRate.KIBIBYTES_PER_SECOND,
-        device_class=SensorDeviceClass.DATA_RATE,
-        state_class=SensorStateClass.MEASUREMENT,
-        suggested_display_precision=1,
-        entity_registry_enabled_default=False,  # high-churn; opt-in
-        value_fn=lambda d: d.network_io.tx_kbps,
-    ),
-    UnasSensorDescription(
         key="unifi_os_version",
         translation_key="unifi_os_version",
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -216,10 +197,36 @@ SENSORS: tuple[UnasSensorDescription, ...] = (
     ),
 )
 
+NETWORK_IO_SENSORS: tuple[UnasSensorDescription, ...] = (
+    UnasSensorDescription(
+        key="network_rx",
+        translation_key="network_rx",
+        native_unit_of_measurement=UnitOfDataRate.KIBIBYTES_PER_SECOND,
+        device_class=SensorDeviceClass.DATA_RATE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        entity_registry_enabled_default=False,  # high-churn; opt-in
+        value_fn=lambda d: d.network_io.rx_kbps if d.network_io else None,
+        read=Read.NETWORK_IO,
+    ),
+    UnasSensorDescription(
+        key="network_tx",
+        translation_key="network_tx",
+        native_unit_of_measurement=UnitOfDataRate.KIBIBYTES_PER_SECOND,
+        device_class=SensorDeviceClass.DATA_RATE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        entity_registry_enabled_default=False,  # high-churn; opt-in
+        value_fn=lambda d: d.network_io.tx_kbps if d.network_io else None,
+        read=Read.NETWORK_IO,
+    ),
+)
+
 # Session-only: the number of local accounts (count only — no account PII is read).
 USER_COUNT = UnasSensorDescription(
     key="user_count",
     translation_key="user_count",
+    read=Read.USERS,
     state_class=SensorStateClass.MEASUREMENT,
     entity_category=EntityCategory.DIAGNOSTIC,
     value_fn=lambda d: d.user_count,
@@ -229,6 +236,7 @@ USER_COUNT = UnasSensorDescription(
 APPLICATIONS = UnasSensorDescription(
     key="applications",
     translation_key="applications",
+    read=Read.SYSTEM,
     state_class=SensorStateClass.MEASUREMENT,
     entity_category=EntityCategory.DIAGNOSTIC,
     value_fn=lambda d: len(d.update_info.applications) if d.update_info else None,
@@ -241,6 +249,7 @@ APPLICATIONS = UnasSensorDescription(
 RECENT_EVENTS = UnasSensorDescription(
     key="recent_events",
     translation_key="recent_events",
+    read=Read.NOTIFICATIONS,
     state_class=SensorStateClass.MEASUREMENT,
     entity_category=EntityCategory.DIAGNOSTIC,
     value_fn=lambda d: d.notification_summary.total if d.notification_summary else None,
@@ -250,6 +259,7 @@ RECENT_EVENTS = UnasSensorDescription(
 LAST_EVENT = UnasSensorDescription(
     key="last_event",
     translation_key="last_event",
+    read=Read.NOTIFICATIONS,
     device_class=SensorDeviceClass.TIMESTAMP,
     entity_category=EntityCategory.DIAGNOSTIC,
     value_fn=lambda d: d.notification_summary.latest if d.notification_summary else None,
@@ -259,6 +269,7 @@ LAST_EVENT = UnasSensorDescription(
 LOG_ENTRIES = UnasSensorDescription(
     key="log_entries",
     translation_key="log_entries",
+    read=Read.LOGS,
     state_class=SensorStateClass.MEASUREMENT,
     entity_category=EntityCategory.DIAGNOSTIC,
     value_fn=lambda d: d.log_summary.total if d.log_summary else None,
@@ -270,6 +281,7 @@ STORAGE_IO_SENSORS: tuple[UnasSensorDescription, ...] = (
     UnasSensorDescription(
         key="storage_read_rate",
         translation_key="storage_read_rate",
+        read=Read.STORAGE_IO,
         native_unit_of_measurement=UnitOfDataRate.KIBIBYTES_PER_SECOND,
         device_class=SensorDeviceClass.DATA_RATE,
         state_class=SensorStateClass.MEASUREMENT,
@@ -280,6 +292,7 @@ STORAGE_IO_SENSORS: tuple[UnasSensorDescription, ...] = (
     UnasSensorDescription(
         key="storage_write_rate",
         translation_key="storage_write_rate",
+        read=Read.STORAGE_IO,
         native_unit_of_measurement=UnitOfDataRate.KIBIBYTES_PER_SECOND,
         device_class=SensorDeviceClass.DATA_RATE,
         state_class=SensorStateClass.MEASUREMENT,
@@ -293,6 +306,7 @@ STORAGE_IO_SENSORS: tuple[UnasSensorDescription, ...] = (
 BACKUP_TASKS = UnasSensorDescription(
     key="backup_tasks",
     translation_key="backup_tasks",
+    read=Read.BACKUP_TASKS,
     state_class=SensorStateClass.MEASUREMENT,
     entity_category=EntityCategory.DIAGNOSTIC,
     value_fn=lambda d: d.backup_task_count,
@@ -302,6 +316,7 @@ BACKUP_TASKS = UnasSensorDescription(
 CONSOLE_BACKUP_FREQUENCY = UnasSensorDescription(
     key="console_backup_frequency",
     translation_key="console_backup_frequency",
+    read=Read.SYSTEM,
     device_class=SensorDeviceClass.ENUM,
     options=list(BACKUP_FREQUENCIES),
     entity_category=EntityCategory.DIAGNOSTIC,
@@ -498,6 +513,8 @@ async def async_setup_entry(
     coordinator = entry.runtime_data.coordinator
     caps = coordinator.capabilities
     aggregate: list[SensorEntity] = [UnasSensor(coordinator, d) for d in SENSORS]
+    if caps.network_io:
+        aggregate.extend(UnasSensor(coordinator, d) for d in NETWORK_IO_SENSORS)
     if caps.users:
         aggregate.append(UnasSensor(coordinator, USER_COUNT))
     if caps.updates:
@@ -554,7 +571,7 @@ class UnasSensor(UnasEntity, SensorEntity):
     def __init__(
         self, coordinator: UnasDataUpdateCoordinator, description: UnasSensorDescription
     ) -> None:
-        super().__init__(coordinator, description.key)
+        super().__init__(coordinator, description.key, description.read)
         self.entity_description = description
 
     @property

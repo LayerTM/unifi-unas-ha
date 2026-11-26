@@ -13,7 +13,7 @@ from custom_components.unifi_unas_rest.aiounas import (
 )
 from custom_components.unifi_unas_rest.const import DOMAIN
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.const import STATE_OFF, STATE_ON, STATE_UNKNOWN
+from homeassistant.const import STATE_OFF, STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant.common import MockConfigEntry
@@ -111,14 +111,14 @@ async def test_readings_absent_without_capability(
     mock_aiounas.get_system_readings.assert_not_called()
 
 
-async def test_a_refusal_after_setup_is_unknown_and_never_a_reauth(
+async def test_a_refusal_after_setup_is_unavailable_and_never_a_reauth(
     hass: HomeAssistant, mock_aiounas: AsyncMock, config_entry: MockConfigEntry
 ) -> None:
-    """A refusal on the task lists degrades the sensor; it does not tear down the entry."""
+    """A refusal on the task lists hides that sensor only; the entry is not torn down."""
     mock_aiounas.get_backup_task_count.side_effect = UnasCapabilityError("refused")
     await _setup(hass, config_entry)
     assert config_entry.state is ConfigEntryState.LOADED
-    assert hass.states.get(_entity_id(hass, "sensor", "backup_tasks")).state == STATE_UNKNOWN
+    assert hass.states.get(_entity_id(hass, "sensor", "backup_tasks")).state == STATE_UNAVAILABLE
     assert hass.states.get(_entity_id(hass, "sensor", "storage_usage")).state != STATE_UNKNOWN
 
     mock_aiounas.get_backup_task_count.side_effect = UnasApiError("gone", status=404)

@@ -45,6 +45,7 @@ class Reading:
 
 
 OPTIONAL_READINGS: Final = (
+    Reading("network throughput", "network_io", ("network_rx", "network_tx")),
     Reading("shares", "shares", share_entities=True),
     Reading("accounts", "users", ("user_count",)),
     Reading("firmware updates", "updates", ("applications", "unifi_os_update", "drive_update")),
@@ -58,10 +59,10 @@ OPTIONAL_READINGS: Final = (
     ),
     Reading("storage throughput", "storage_io", ("storage_read_rate", "storage_write_rate")),
 )
-"""Readings a local account can reach and an API key cannot.
+"""Readings an entry's authentication, or the console, may not serve.
 
-The core readings — storage, device info, network I/O — are not here: an entry
-that cannot reach those has nothing to degrade to and fails setup instead.
+Storage and device info are not here: an entry that cannot reach those has
+nothing to degrade to and fails setup instead.
 """
 
 
