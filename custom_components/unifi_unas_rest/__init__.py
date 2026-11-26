@@ -47,7 +47,7 @@ from .const import (
     PLATFORMS,
 )
 from .coordinator import UnasDataUpdateCoordinator
-from .entity import hub_device_info
+from .entity import hub_device_fields
 from .issues import clear_cert_mismatch, clear_storage_issues, raise_cert_mismatch
 from .scope import prune_registry, readings_out_of_scope
 from .tls import ssl_for_entry, tls_mode_of
@@ -160,7 +160,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: UnasConfigEntry) -> bool
     # Register the hub before the platforms load: a sub-device can only be linked
     # to it by device-registry id, which does not exist until the hub does.
     hub = dr.async_get(hass).async_get_or_create(
-        config_entry_id=entry.entry_id, **hub_device_info(coordinator)
+        config_entry_id=entry.entry_id, **hub_device_fields(coordinator)
     )
     coordinator.hub_device_id = hub.id
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

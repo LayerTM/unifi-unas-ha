@@ -25,8 +25,10 @@ from custom_components.unifi_unas_rest.const import DOMAIN
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryError
+from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import label_registry as lr
 from multidict import CIMultiDict
 from pytest_homeassistant.common import MockConfigEntry
 
@@ -856,6 +858,9 @@ async def test_narrowing_keeps_a_row_the_user_customised(
     accounts = registry.async_get_entity_id("sensor", DOMAIN, f"{prefix}_user_count")
     logs = registry.async_get_entity_id("sensor", DOMAIN, f"{prefix}_log_entries")
     assert accounts and logs
+    # The label and the area a row can name have to exist.
+    lr.async_get(hass).async_create("nas")
+    ar.async_get(hass).async_create("office")
     registry.async_update_entity(accounts, **changes)
 
     await hass.config_entries.async_unload(config_entry.entry_id)

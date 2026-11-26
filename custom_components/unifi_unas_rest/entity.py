@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
+from typing import Any
 
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.helpers.device_registry import (
@@ -60,12 +61,14 @@ def console_name(coordinator: UnasDataUpdateCoordinator) -> str:
     return coordinator.data.device_info.name or "UNAS"
 
 
-def hub_device_info(coordinator: UnasDataUpdateCoordinator) -> DeviceInfo:
+def hub_device_fields(coordinator: UnasDataUpdateCoordinator) -> dict[str, Any]:
     """Describe the UNAS hub device.
 
     One definition, used both by the hub entities and by ``async_setup_entry``,
     which registers this device before any platform loads so that every
-    sub-device has a hub id to point at.
+    sub-device has a hub id to point at. These are keyword arguments rather than
+    a ``DeviceInfo`` because the registry takes them as keywords, and a
+    ``DeviceInfo`` must not be unpacked.
     """
     entry = coordinator.config_entry
     assert entry is not None
@@ -76,15 +79,15 @@ def hub_device_info(coordinator: UnasDataUpdateCoordinator) -> DeviceInfo:
     connections: set[tuple[str, str]] = set()
     if entry.unique_id:
         connections = {(CONNECTION_NETWORK_MAC, format_mac(entry.unique_id))}
-    return DeviceInfo(
-        identifiers={(DOMAIN, entry.entry_id)},
-        connections=connections,
-        manufacturer=MANUFACTURER,
-        name=console_name(coordinator),
-        model=info.model or None,
-        sw_version=info.firmware_version or None,
-        configuration_url=config_url,
-    )
+    return {
+        "identifiers": {(DOMAIN, entry.entry_id)},
+        "connections": connections,
+        "manufacturer": MANUFACTURER,
+        "name": console_name(coordinator),
+        "model": info.model or None,
+        "sw_version": info.firmware_version or None,
+        "configuration_url": config_url,
+    }
 
 
 # Home Assistant 2026.8 replaced `via_device` (the hub's identifiers) with
@@ -99,15 +102,13 @@ def hub_device_info(coordinator: UnasDataUpdateCoordinator) -> DeviceInfo:
 _ACCEPTS_VIA_DEVICE_ID = "via_device_id" in DeviceInfo.__annotations__
 
 
-def link_to_hub(info: DeviceInfo, coordinator: UnasDataUpdateCoordinator) -> DeviceInfo:
-    """Attach a sub-device to the hub device of its config entry."""
+def hub_link(coordinator: UnasDataUpdateCoordinator) -> dict[str, Any]:
+    """Return the field that attaches a sub-device to its config entry's hub."""
     entry = coordinator.config_entry
     assert entry is not None
     if _ACCEPTS_VIA_DEVICE_ID and (hub_id := coordinator.hub_device_id) is not None:
-        info["via_device_id"] = hub_id
-    else:
-        info["via_device"] = (DOMAIN, entry.entry_id)
-    return info
+        return {"via_device_id": hub_id}
+    return {"via_device": (DOMAIN, entry.entry_id)}
 
 
 class UnasEntity(CoordinatorEntity[UnasDataUpdateCoordinator]):
@@ -124,7 +125,7 @@ class UnasEntity(CoordinatorEntity[UnasDataUpdateCoordinator]):
         entry = coordinator.config_entry
         assert entry is not None
         self._attr_unique_id = f"{entry.unique_id}_{key}"
-        self._attr_device_info = hub_device_info(coordinator)
+        self._attr_device_info = DeviceInfo(**hub_device_fields(coordinator))
 
     @property
     def available(self) -> bool:
@@ -144,15 +145,13 @@ class UnasDiskEntity(CoordinatorEntity[UnasDataUpdateCoordinator]):
         self._attr_unique_id = f"{entry.unique_id}_disk{slot}_{key}"
         disk = self.disk
         vendor = (disk.vendor if disk else None) or MANUFACTURER
-        self._attr_device_info = link_to_hub(
-            DeviceInfo(
-                identifiers={(DOMAIN, f"{entry.entry_id}_disk{slot}")},
-                manufacturer=vendor,
-                model=disk.model if disk else None,
-                serial_number=disk.serial if disk else None,
-                name=f"{console_name(coordinator)} Disk {slot}",
-            ),
-            coordinator,
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry.entry_id}_disk{slot}")},
+            manufacturer=vendor,
+            model=disk.model if disk else None,
+            serial_number=disk.serial if disk else None,
+            name=f"{console_name(coordinator)} Disk {slot}",
+            **hub_link(coordinator),
         )
 
     @property
@@ -179,14 +178,12 @@ class UnasPoolEntity(CoordinatorEntity[UnasDataUpdateCoordinator]):
         entry = coordinator.config_entry
         assert entry is not None
         self._attr_unique_id = f"{entry.unique_id}_pool{self._pool_key}_{key}"
-        self._attr_device_info = link_to_hub(
-            DeviceInfo(
-                identifiers={(DOMAIN, f"{entry.entry_id}_pool{self._pool_key}")},
-                manufacturer=MANUFACTURER,
-                model="Storage pool",
-                name=f"{console_name(coordinator)} Pool {pool.number}",
-            ),
-            coordinator,
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry.entry_id}_pool{self._pool_key}")},
+            manufacturer=MANUFACTURER,
+            model="Storage pool",
+            name=f"{console_name(coordinator)} Pool {pool.number}",
+            **hub_link(coordinator),
         )
 
     @property
@@ -213,14 +210,12 @@ class UnasShareEntity(CoordinatorEntity[UnasDataUpdateCoordinator]):
         entry = coordinator.config_entry
         assert entry is not None
         self._attr_unique_id = f"{entry.unique_id}_share{share.id}_{key}"
-        self._attr_device_info = link_to_hub(
-            DeviceInfo(
-                identifiers={(DOMAIN, f"{entry.entry_id}_share{share.id}")},
-                manufacturer=MANUFACTURER,
-                model="Shared drive",
-                name=f"{console_name(coordinator)} {share.name or f'Share {share.id}'}",
-            ),
-            coordinator,
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry.entry_id}_share{share.id}")},
+            manufacturer=MANUFACTURER,
+            model="Shared drive",
+            name=f"{console_name(coordinator)} {share.name or f'Share {share.id}'}",
+            **hub_link(coordinator),
         )
 
     @property
