@@ -581,3 +581,21 @@ async def test_ending_the_entry_ends_the_wait_at_once(
             await poll
 
     assert not coordinator.last_update_success
+
+
+async def test_a_wait_left_by_an_earlier_poll_does_not_outlive_it(
+    hass: HomeAssistant, console: _Console, config_entry: MockConfigEntry
+) -> None:
+    """One anchor fails for good while the other still waits to be sent again."""
+    with _retry_delay(0.5):
+        await _setup(hass, config_entry)
+        coordinator = config_entry.runtime_data.coordinator
+        console.asked.clear()
+        console.failing[const.PATH_STORAGE] = [500]
+        console.failing[const.PATH_DEVICE_INFO] = [502]
+        await coordinator.async_refresh()  # ends on storage; device info still waits
+        await coordinator.async_refresh()  # within that wait
+        assert await hass.config_entries.async_unload(config_entry.entry_id)
+        await asyncio.sleep(0.8)
+
+    assert console.asked[const.PATH_DEVICE_INFO] == 2  # one per poll, no third

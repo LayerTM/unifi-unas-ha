@@ -33,12 +33,15 @@ from .exceptions import (
     UnasOperationBlocked,
     describe,
 )
-from .tls import UnasCertificateMismatch, mismatch_from
+from .tls import mismatch_from
 
 _LOGGER = logging.getLogger(__name__)
 
 # What a console answers while the application behind its proxy is briefly away.
 _TRANSIENT_STATUSES = frozenset({502, 503, 504})
+
+# A certificate that was refused (pinned or CA-verified) is refused again.
+_CERTIFICATE_REFUSALS = (aiohttp.ServerFingerprintMismatch, aiohttp.ClientConnectorCertificateError)
 
 
 class _DelayedRetry:
@@ -150,9 +153,11 @@ class UnasTransport:
 
         See :class:`_DelayedRetry`. Applies to a ``GET`` that got no answer (a
         timeout or a connection failure) or a 502, 503 or 504; writes and the
-        login are never sent twice by this. Each call replaces the previous
-        allowance.
+        login are never sent twice by this, nor is a read whose certificate was
+        refused. Each call replaces the previous allowance and ends a wait it
+        still has pending.
         """
+        self.cancel_retry()
         self._retry = _DelayedRetry(delay)
 
     def cancel_retry(self) -> None:
@@ -263,11 +268,9 @@ class UnasTransport:
         sent_at = asyncio.get_running_loop().time()
         try:
             answer = await attempt()
-        except UnasCertificateMismatch:
-            # Must precede UnasConnectionError, its base class. Not transient.
-            raise
         except UnasConnectionError as err:
-            if not await retry.wait(sent_at):
+            refused = isinstance(err.__cause__, _CERTIFICATE_REFUSALS)
+            if refused or not await retry.wait(sent_at):
                 raise
             reason = str(err)
         else:

@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 import itertools
 import logging
+import ssl
 import time
 from collections.abc import AsyncIterator
 from unittest.mock import MagicMock
@@ -426,15 +427,46 @@ async def test_a_write_is_never_retried(method: str, failure: int | str) -> None
         assert seen == [method]
 
 
-async def test_a_changed_certificate_is_not_retried() -> None:
-    mismatch = aiohttp.ServerFingerprintMismatch(b"a" * 32, b"b" * 32, "192.0.2.10", 443)
+@pytest.mark.parametrize(
+    ("refused", "raised"),
+    [
+        pytest.param(
+            aiohttp.ServerFingerprintMismatch(b"a" * 32, b"b" * 32, "192.0.2.10", 443),
+            UnasCertificateMismatch,
+            id="pinned",
+        ),
+        pytest.param(
+            aiohttp.ClientConnectorCertificateError(
+                MagicMock(), ssl.SSLCertVerificationError("self-signed certificate")
+            ),
+            UnasConnectionError,
+            id="ca",
+        ),
+    ],
+)
+async def test_a_refused_certificate_is_not_retried(
+    refused: aiohttp.ClientError, raised: type[UnasConnectionError]
+) -> None:
     session = MagicMock()
-    session.request.side_effect = mismatch
+    session.request.side_effect = refused
     t = UnasTransport(session, "192.0.2.10", ApiKeyAuth("k"))
     t.allow_one_retry(0)
-    with pytest.raises(UnasCertificateMismatch):
+    with pytest.raises(raised):
         await t.get_json(_READ_PATH)
     assert session.request.call_count == 1
+
+
+async def test_a_new_allowance_ends_the_wait_of_the_previous_one() -> None:
+    async with _scripted_console(502, 200) as (server, seen), aiohttp.ClientSession() as http:
+        t = _transport(http, server, ApiKeyAuth("k"))
+        t.allow_one_retry(60)
+        read = asyncio.create_task(t.get_json(_READ_PATH))
+        await asyncio.sleep(0.2)  # long enough for the first answer
+        assert not read.done()
+        t.allow_one_retry(60)
+        with pytest.raises(UnasApiError):
+            await asyncio.wait_for(read, 1)
+        assert seen == ["GET"]
 
 
 async def test_reads_in_flight_share_one_wait_and_later_ones_fail_at_once() -> None:

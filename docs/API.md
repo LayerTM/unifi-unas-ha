@@ -50,7 +50,8 @@ minutes. `UnasClient.allow_one_retry(delay)`, called once per round of reads,
 lets a `GET` that got such a status, or no answer, be sent once more after
 *delay* seconds. Reads failing during that wait share it; a read sent after it is
 not repeated. `cancel_retry()` ends a wait at once. Without the call nothing is
-retried, and this never repeats a write or the login (`aiohttp` itself resends a
+retried; a new allowance ends a wait the previous one still has pending, a
+refused certificate is never retried, and this never repeats a write or the login (`aiohttp` itself resends a
 `PUT` or `DELETE` whose connection drops, as HTTP allows for idempotent
 requests).
 
