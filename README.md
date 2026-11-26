@@ -156,6 +156,8 @@ The integration **polls** the console's local REST API (`local_polling`) on a fi
 | Storage throughput | storage read and write rate |
 | Backup tasks | backup tasks |
 
+Before a poll gives up on a request that got no answer (a timeout or a dropped connection) or a `502`, `503` or `504`, it sends it once more after 15 seconds (half the scan interval if that is shorter). The requests failing at that moment share that one wait, and any that fails later in the same poll is not repeated. A short interruption of the console therefore does not show up at all. A longer one makes the entities *unavailable* at the first poll that meets it, later than it would otherwise by the wait and, when the console does not answer at all, by one more request timeout (15 seconds). Setup is not repeated this way: Home Assistant retries it by itself. Control actions are never repeated by the integration.
+
 The log gets one warning naming the request when it starts failing, and one message when it works again. A changed certificate on any request still fails the whole poll and raises a repair.
 
 **Only a rejected credential asks you to re-authenticate.** A console that is booting, updating or restarting answers differently — a page of HTML where JSON belongs, or a redirect to its web UI — and that is treated as *unavailable*, so the poll simply retries and recovers on its own. A local-account session still gets one silent re-login first, since such a response can also be a genuine login page. Re-authentication is requested only for a 401 that survives that re-login.

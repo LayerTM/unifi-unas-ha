@@ -6,6 +6,19 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **A short console interruption is now less likely to make every entity
+  unavailable.** When a request during a poll gets no answer (a timeout or a
+  dropped connection) or a `502`, `503` or `504`, it is sent once more after 15
+  seconds, or half the scan interval if that is shorter. Requests failing at the
+  same moment share that one wait, so a console that is really away is reported
+  at the first poll as before, later by the wait (plus one request timeout when
+  it does not answer at all). Longer interruptions still make the entities
+  unavailable. Setup and control actions are not repeated.
+- The `aiounas` library has `UnasClient.allow_one_retry()` and `cancel_retry()`;
+  without a call to the first it retries nothing, as before.
+
 ## [1.11.1] - 2026-11-26
 
 ### Fixed

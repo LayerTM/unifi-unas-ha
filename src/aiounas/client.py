@@ -211,6 +211,21 @@ class UnasClient:
                 raise UnasCapabilityError(hint) from err
             raise
 
+    def allow_one_retry(self, delay: float) -> None:
+        """Let the reads that follow share one delayed second attempt.
+
+        Meant to be called once per round of reads, such as a poll. A read that
+        gets no answer, or a 502, 503 or 504, waits *delay* seconds and is sent
+        once more. Reads failing in the same wait join it; a read sent after it
+        fails at once, so a console that is away costs one wait. Without this
+        call nothing is retried.
+        """
+        self._transport.allow_one_retry(delay)
+
+    def cancel_retry(self) -> None:
+        """End a wait in progress at once, for example on shutdown."""
+        self._transport.cancel_retry()
+
     async def close(self) -> None:
         """Release client resources.
 

@@ -3,7 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import itertools
+import logging
+import ssl
 import time
+from collections.abc import AsyncIterator
+from unittest.mock import MagicMock
 
 import aiohttp
 import pytest
@@ -17,6 +23,7 @@ from aiounas.exceptions import (
     UnasCapabilityError,
     UnasConnectionError,
 )
+from aiounas.tls import UnasCertificateMismatch
 from aiounas.transport import UnasTransport
 
 
@@ -325,3 +332,189 @@ async def test_relogin_that_never_answers_times_out_as_a_connection_error() -> N
         assert elapsed < 3
     finally:
         await server.close()
+
+
+_READ_PATH = "/proxy/drive/api/v2/storage"
+
+
+@contextlib.asynccontextmanager
+async def _scripted_console(
+    *answers: int | str,
+) -> AsyncIterator[tuple[TestServer, list[str]]]:
+    """A console that answers each request with the next entry, the last one for good.
+
+    An entry is a status, or ``"drop"`` / ``"hang"`` for no answer at all. Yields
+    the server and the methods of the requests it received.
+    """
+    seen: list[str] = []
+
+    async def handle(request: web.Request) -> web.StreamResponse:
+        seen.append(request.method)
+        answer = answers[min(len(seen), len(answers)) - 1]
+        if answer == "hang":
+            await asyncio.sleep(1.5)
+        if answer in ("drop", "hang"):
+            assert request.transport is not None
+            request.transport.close()
+            return web.Response()
+        return web.json_response({}, status=int(answer))
+
+    app = web.Application()
+    app.router.add_route("*", "/{tail:.*}", handle)
+    server = TestServer(app)
+    await server.start_server()
+    try:
+        yield server, seen
+    finally:
+        await server.close()
+
+
+@pytest.mark.parametrize("failure", [502, 503, 504, "drop", "hang"])
+async def test_failed_read_is_asked_once_more(failure: int | str) -> None:
+    async with _scripted_console(failure, 200) as (server, seen), aiohttp.ClientSession() as http:
+        t = UnasTransport(
+            http, server.host, ApiKeyAuth("k"), port=server.port, use_ssl=False, timeout=1
+        )
+        t.allow_one_retry(0)
+        assert await t.get_json(_READ_PATH) == {}
+        assert seen == ["GET", "GET"]
+
+
+async def test_second_failure_is_final() -> None:
+    async with _scripted_console(502) as (server, seen), aiohttp.ClientSession() as http:
+        t = _transport(http, server, ApiKeyAuth("k"))
+        t.allow_one_retry(0)
+        with pytest.raises(UnasApiError) as caught:
+            await t.get_json(_READ_PATH)
+        assert caught.value.status == 502
+        assert len(seen) == 2
+
+
+@pytest.mark.parametrize("status", [401, 403, 404, 500])
+async def test_other_statuses_are_not_retried(status: int) -> None:
+    async with _scripted_console(status) as (server, seen), aiohttp.ClientSession() as http:
+        t = _transport(http, server, ApiKeyAuth("k"))
+        t.allow_one_retry(0)
+        with pytest.raises((UnasApiError, UnasAuthError, UnasCapabilityError)):
+            await t.get_json(_READ_PATH)
+        assert len(seen) == 1
+
+
+async def test_no_retry_unless_asked_for() -> None:
+    async with _scripted_console(502) as (server, seen), aiohttp.ClientSession() as http:
+        with pytest.raises(UnasApiError):
+            await _transport(http, server, ApiKeyAuth("k")).get_json(_READ_PATH)
+        assert len(seen) == 1
+
+
+@pytest.mark.parametrize(
+    ("method", "failure"),
+    [
+        *itertools.product(["POST", "PUT", "PATCH", "DELETE"], [502, 503, 504]),
+        # aiohttp itself resends a PUT or DELETE whose connection drops (they are
+        # idempotent, RFC 9112 section 9.3.1), so a drop says nothing about this
+        # library for those two.
+        ("POST", "drop"),
+        ("PATCH", "drop"),
+    ],
+)
+async def test_a_write_is_never_retried(method: str, failure: int | str) -> None:
+    async with _scripted_console(failure, 200) as (server, seen), aiohttp.ClientSession() as http:
+        t = _transport(http, server, ApiKeyAuth("k"))
+        t.allow_one_retry(0)
+        with pytest.raises((UnasApiError, UnasConnectionError)):
+            await t.send(method, _READ_PATH)
+        assert seen == [method]
+
+
+@pytest.mark.parametrize(
+    ("refused", "raised"),
+    [
+        pytest.param(
+            aiohttp.ServerFingerprintMismatch(b"a" * 32, b"b" * 32, "192.0.2.10", 443),
+            UnasCertificateMismatch,
+            id="pinned",
+        ),
+        pytest.param(
+            aiohttp.ClientConnectorCertificateError(
+                MagicMock(), ssl.SSLCertVerificationError("self-signed certificate")
+            ),
+            UnasConnectionError,
+            id="ca",
+        ),
+    ],
+)
+async def test_a_refused_certificate_is_not_retried(
+    refused: aiohttp.ClientError, raised: type[UnasConnectionError]
+) -> None:
+    session = MagicMock()
+    session.request.side_effect = refused
+    t = UnasTransport(session, "192.0.2.10", ApiKeyAuth("k"))
+    t.allow_one_retry(0)
+    with pytest.raises(raised):
+        await t.get_json(_READ_PATH)
+    assert session.request.call_count == 1
+
+
+async def test_a_new_allowance_ends_the_wait_of_the_previous_one() -> None:
+    async with _scripted_console(502, 200) as (server, seen), aiohttp.ClientSession() as http:
+        t = _transport(http, server, ApiKeyAuth("k"))
+        t.allow_one_retry(60)
+        read = asyncio.create_task(t.get_json(_READ_PATH))
+        await asyncio.sleep(0.2)  # long enough for the first answer
+        assert not read.done()
+        t.allow_one_retry(60)
+        with pytest.raises(UnasApiError):
+            await asyncio.wait_for(read, 1)
+        assert seen == ["GET"]
+
+
+async def test_reads_in_flight_share_one_wait_and_later_ones_fail_at_once() -> None:
+    async with _scripted_console(502) as (server, seen), aiohttp.ClientSession() as http:
+        t = _transport(http, server, ApiKeyAuth("k"))
+        t.allow_one_retry(0.3)
+        started = time.monotonic()
+        results = await asyncio.gather(
+            *(t.get_json(_READ_PATH) for _ in range(3)), return_exceptions=True
+        )
+        for _ in range(4):
+            with pytest.raises(UnasApiError):
+                await t.get_json(_READ_PATH)
+        assert 0.3 <= time.monotonic() - started < 0.6  # one wait, not seven
+        assert all(isinstance(result, UnasApiError) for result in results)
+        assert len(seen) == 3 * 2 + 4
+
+
+async def test_a_new_poll_gets_a_new_retry() -> None:
+    async with _scripted_console(502) as (server, seen), aiohttp.ClientSession() as http:
+        t = _transport(http, server, ApiKeyAuth("k"))
+        for polls in (1, 2):
+            t.allow_one_retry(0)
+            with pytest.raises(UnasApiError):
+                await t.get_json(_READ_PATH)
+            assert len(seen) == 2 * polls
+
+
+async def test_cancelling_the_retry_ends_the_wait_at_once() -> None:
+    async with _scripted_console(502, 200) as (server, seen), aiohttp.ClientSession() as http:
+        t = _transport(http, server, ApiKeyAuth("k"))
+        t.allow_one_retry(60)
+        read = asyncio.create_task(t.get_json(_READ_PATH))
+        await asyncio.sleep(0.2)  # long enough for the first answer
+        assert seen == ["GET"]
+        assert not read.done()
+        t.cancel_retry()
+        with pytest.raises(UnasApiError):
+            await asyncio.wait_for(read, 1)
+        assert len(seen) == 1
+
+
+async def test_a_retry_is_logged_at_debug_only(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.DEBUG, logger="aiounas")
+    async with _scripted_console(502, 200) as (server, _), aiohttp.ClientSession() as http:
+        t = _transport(http, server, ApiKeyAuth("k"))
+        t.allow_one_retry(0)
+        await t.get_json(_READ_PATH)
+    ours = [r for r in caplog.records if r.name.startswith("aiounas")]
+    assert [r.levelno for r in ours] == [logging.DEBUG]
+    assert "status 502" in ours[0].getMessage()

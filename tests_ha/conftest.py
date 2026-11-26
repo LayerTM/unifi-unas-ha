@@ -12,7 +12,7 @@ import json
 import logging
 from collections.abc import Iterator
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from custom_components.unifi_unas_rest.aiounas import (
@@ -132,6 +132,8 @@ def _enable_custom(enable_custom_integrations: object) -> None:
 def unas_client() -> AsyncMock:
     client = AsyncMock()
     client.async_prepare = AsyncMock(return_value=None)
+    client.allow_one_retry = MagicMock()
+    client.cancel_retry = MagicMock()
     client.get_identity = AsyncMock(return_value=SystemIdentity.from_api(_load("system_short")))
     client.get_storage = AsyncMock(return_value=Storage.from_api(_load("storage")))
     client.get_device_info = AsyncMock(return_value=DeviceInfo.from_api(_load("device_info")))
